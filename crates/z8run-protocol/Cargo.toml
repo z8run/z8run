@@ -1,0 +1,16 @@
+[package]
+name = "z8run-protocol"
+description = "Binary protocol for z8run frontend-backend communication"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+z8run-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

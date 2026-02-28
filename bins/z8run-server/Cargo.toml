@@ -1,0 +1,13 @@
+[package]
+name = "z8run-server"
+description = "Binario del servidor z8run con frontend embebido"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "z8run-server"
+path = "src/main.rs"
+
+[dependencies]
+rust-embed = { workspace = true }

@@ -1,0 +1,31 @@
+# Rust
+/target/
+**/*.rs.bk
+# Cargo.lock is committed for binaries (ensures reproducible builds)
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# z8run data
+/data/
+*.db
+*.db-journal
+*.db-wal
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Frontend build (when added)
+/frontend/node_modules/
+/frontend/dist/
+/frontend/build/

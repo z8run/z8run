@@ -1,0 +1,21 @@
+[package]
+name = "z8run-storage"
+description = "Persistence layer for z8run (SQLite + PostgreSQL)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+z8run-core = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+aes-gcm = { workspace = true }
+rand = { workspace = true }
+async-trait = { workspace = true }

@@ -1,0 +1,45 @@
+# ════════════════════════════════════════
+# z8run — Server Configuration
+# ════════════════════════════════════════
+# Copy this file as z8run.toml and adjust for your environment.
+# Environment variables with Z8_ prefix take priority.
+
+[server]
+# HTTP/WebSocket port
+port = 7700
+# Bind address
+bind = "0.0.0.0"
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+[database]
+# SQLite for standalone (default)
+url = "sqlite://./data/z8run.db"
+# PostgreSQL for multi-tenant:
+# url = "postgres://z8run:password@localhost:5432/z8run"
+
+[storage]
+# Data directory
+data_dir = "./data"
+# Plugins directory
+plugins_dir = "./data/plugins"
+
+[engine]
+# Backpressure buffer size between nodes
+buffer_size = 256
+# Global flow execution timeout (ms, 0 = no limit)
+default_timeout_ms = 0
+
+[wasm]
+# Memory limit per WASM node (bytes)
+memory_limit = 268435456  # 256 MB
+# Enable debug mode for plugins
+debug_mode = false
+
+[auth]
+# Enable authentication (false for development)
+enabled = false
+# Secret for signing JWT tokens (change in production!)
+jwt_secret = "change-this-secret-in-production"
+# Token duration in hours
+token_ttl_hours = 24
