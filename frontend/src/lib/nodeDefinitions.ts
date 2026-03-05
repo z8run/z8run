@@ -15,13 +15,13 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
   // Input nodes
   {
     type: "http-in",
-    label: "HTTP Request",
+    label: "HTTP In",
     category: "input",
     icon: "Globe",
     description: "Receive HTTP requests",
     inputs: [],
     outputs: [{ id: "response", name: "Response", type: "object" }],
-    defaultConfig: { method: "GET", path: "/webhook" },
+    defaultConfig: { method: "POST", path: "/" },
   },
   {
     type: "timer",
@@ -64,6 +64,19 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     inputs: [{ id: "input", name: "Input", type: "any" }],
     outputs: [{ id: "output", name: "Output", type: "object" }],
     defaultConfig: { action: "parse" },
+  },
+  {
+    type: "http-request",
+    label: "HTTP Request",
+    category: "process",
+    icon: "Send",
+    description: "Make HTTP requests to external APIs",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "response", name: "Response", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: { url: "https://httpbin.org/post", method: "POST", headers: {}, bodyPath: "req.body", timeout: 5000 },
   },
   {
     type: "filter",

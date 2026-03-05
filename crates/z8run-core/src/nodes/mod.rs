@@ -9,6 +9,7 @@ pub mod filter;
 pub mod function;
 pub mod http_in;
 pub mod http_out;
+pub mod http_request;
 pub mod switch;
 
 use std::sync::Arc;
@@ -36,5 +37,8 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .await;
     engine
         .register_node_type(Arc::new(filter::FilterNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(http_request::HttpRequestNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
 }

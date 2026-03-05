@@ -53,7 +53,7 @@ pub struct SwitchNode {
 }
 
 /// Look up a value in a JSON object using dot-notation path.
-fn json_path_lookup(data: &Value, path: &str) -> Value {
+pub fn json_path_lookup(data: &Value, path: &str) -> Value {
     let mut current = data;
     for segment in path.split('.') {
         match current {

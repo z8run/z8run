@@ -73,11 +73,27 @@ export function FlowCanvas() {
     [],
   );
 
+  // Style error edges red + dashed, default edges stay normal
+  const styledEdges = useMemo(
+    () =>
+      edges.map((edge) => {
+        if (edge.sourceHandle === "error" || edge.sourceHandle === "reject") {
+          return {
+            ...edge,
+            animated: false,
+            style: { stroke: "#EF4444", strokeWidth: 2, strokeDasharray: "6 3" },
+          };
+        }
+        return edge;
+      }),
+    [edges],
+  );
+
   return (
     <div className="flex-1 h-full" tabIndex={0}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={styledEdges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

@@ -25,8 +25,14 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
   const nodeData = data as unknown as Z8NodeData;
   const openConfigPanel = useUIStore((s) => s.openConfigPanel);
   const { deleteElements } = useReactFlow();
-  const Icon = ICON_MAP[nodeData.icon];
-  const categoryColor = CATEGORY_COLORS[nodeData.category] ?? "#6366f1";
+
+  // Resilient: fallback for nodes created via curl or with incomplete data
+  const icon = nodeData.icon ?? "Code";
+  const category = nodeData.category ?? "process";
+  const label = nodeData.label ?? nodeData.type ?? "Node";
+
+  const Icon = ICON_MAP[icon];
+  const categoryColor = CATEGORY_COLORS[category] ?? "#6366f1";
   const status = nodeData.status ?? "idle";
   const statusStyle = STATUS_STYLES[status] || STATUS_STYLES.idle;
   const inputs = nodeData.inputs ?? [];
@@ -73,7 +79,7 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
           {Icon && <Icon size={14} />}
         </div>
         <span className="text-xs font-medium text-slate-200 truncate">
-          {nodeData.label}
+          {label}
         </span>
       </div>
 
@@ -93,6 +99,7 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
             type="target"
             position={Position.Left}
             id={port.id}
+            title={port.name}
             style={{
               top,
               background: PORT_COLORS[port.type],
@@ -107,15 +114,17 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
       {/* Output handles */}
       {outputs.map((port, i) => {
         const top = 36 + i * 24;
+        const isError = port.id === "error" || port.id === "reject";
         return (
           <Handle
             key={port.id}
             type="source"
             position={Position.Right}
             id={port.id}
+            title={port.name}
             style={{
               top,
-              background: PORT_COLORS[port.type],
+              background: isError ? "#EF4444" : PORT_COLORS[port.type],
               width: 10,
               height: 10,
               border: "2px solid #1e293b",

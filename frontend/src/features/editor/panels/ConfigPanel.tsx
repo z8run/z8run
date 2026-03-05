@@ -20,6 +20,144 @@ function humanizeKey(key: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** HTTP methods for dropdown */
+const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"];
+
+/** Common HTTP status codes for dropdown */
+const HTTP_STATUS_CODES = [
+  { value: 200, label: "200 — OK" },
+  { value: 201, label: "201 — Created" },
+  { value: 204, label: "204 — No Content" },
+  { value: 301, label: "301 — Moved" },
+  { value: 400, label: "400 — Bad Request" },
+  { value: 401, label: "401 — Unauthorized" },
+  { value: 403, label: "403 — Forbidden" },
+  { value: 404, label: "404 — Not Found" },
+  { value: 500, label: "500 — Server Error" },
+];
+
+const selectClass = `w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
+  text-xs text-slate-200 focus:outline-none focus:border-z8-500 transition-colors`;
+const inputClass = `w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
+  text-xs text-slate-200 font-mono focus:outline-none focus:border-z8-500 transition-colors`;
+
+/** Render a smart config field based on key name and node type */
+function SmartConfigField({
+  fieldKey,
+  value,
+  nodeType,
+  onChange,
+}: {
+  fieldKey: string;
+  value: unknown;
+  nodeType: string;
+  onChange: (val: unknown) => void;
+}) {
+  // Method dropdown for HTTP nodes
+  if (fieldKey === "method") {
+    return (
+      <select
+        value={String(value ?? "GET")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        {HTTP_METHODS.map((m) => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+    );
+  }
+
+  // Status code dropdown for http-out
+  if (fieldKey === "statusCode") {
+    const current = Number(value ?? 200);
+    return (
+      <select
+        value={current}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={selectClass}
+      >
+        {HTTP_STATUS_CODES.map((s) => (
+          <option key={s.value} value={s.value}>{s.label}</option>
+        ))}
+        {/* If current value isn't in the list, show it too */}
+        {!HTTP_STATUS_CODES.some((s) => s.value === current) && (
+          <option value={current}>{current}</option>
+        )}
+      </select>
+    );
+  }
+
+  // URL field with placeholder
+  if (fieldKey === "url") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https://api.example.com/endpoint"
+        className={inputClass}
+      />
+    );
+  }
+
+  // Timeout with ms suffix
+  if (fieldKey === "timeout") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={Number(value ?? 5000)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={`${inputClass} flex-1`}
+          min={100}
+          step={500}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">ms</span>
+      </div>
+    );
+  }
+
+  // Action dropdown for JSON Transform
+  if (fieldKey === "action" && nodeType === "json") {
+    return (
+      <select
+        value={String(value ?? "parse")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="parse">Parse (string → object)</option>
+        <option value="stringify">Stringify (object → string)</option>
+      </select>
+    );
+  }
+
+  // Unit dropdown for delay
+  if (fieldKey === "unit") {
+    return (
+      <select
+        value={String(value ?? "ms")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="ms">Milliseconds</option>
+        <option value="s">Seconds</option>
+        <option value="m">Minutes</option>
+      </select>
+    );
+  }
+
+  // No smart field
+  return null;
+}
+
+/** Check if a key has a smart field renderer */
+function hasSmartField(key: string, nodeType: string): boolean {
+  return ["method", "statusCode", "url", "timeout"].includes(key)
+    || (key === "action" && nodeType === "json")
+    || key === "unit";
+}
+
 /** Available switch operators with human-friendly labels */
 const SWITCH_OPERATORS: { value: string; label: string }[] = [
   { value: "eq", label: "== (equals)" },
@@ -258,7 +396,14 @@ export function ConfigPanel() {
                   <label className="text-[10px] font-medium text-slate-400 block mb-1">
                     {humanizeKey(key)}
                   </label>
-                  {typeof value === "string" && (key === "code" || value.length > 50) ? (
+                  {hasSmartField(key, nodeType) ? (
+                    <SmartConfigField
+                      fieldKey={key}
+                      value={value}
+                      nodeType={nodeType}
+                      onChange={(val) => handleConfigChange(key, val)}
+                    />
+                  ) : typeof value === "string" && (key === "code" || value.length > 50) ? (
                     <textarea
                       value={String(value)}
                       onChange={(e) => handleConfigChange(key, e.target.value)}
