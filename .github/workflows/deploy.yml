@@ -13,6 +13,7 @@ jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,18 +37,34 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key" \
             ./ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
-      - name: Deploy on server
+      - name: Build and deploy on server
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'EOF'
+          ssh -i ~/.ssh/deploy_key -o ServerAliveInterval=30 ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'EOF'
             cd /opt/z8run
-            docker compose down
-            docker compose up -d --build --remove-orphans
-            docker system prune -f
+
+            # Build images (keep cache for faster rebuilds)
+            docker compose build
+
+            # Restart with new images
+            docker compose up -d --remove-orphans
+
+            # Only prune dangling images (not build cache)
+            docker image prune -f
+
             echo "✓ z8run deployed successfully"
           EOF
 
       - name: Health check
         run: |
-          sleep 15
-          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "curl -sf http://localhost/api/v1/flows > /dev/null && echo '✓ Health check passed' || echo '✗ Health check failed'"
+          for i in 1 2 3 4 5; do
+            sleep 10
+            if ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "curl -sf http://localhost/api/v1/flows > /dev/null"; then
+              echo "✓ Health check passed (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying..."
+          done
+          echo "✗ Health check failed after 5 attempts"
+          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker compose -f /opt/z8run/docker-compose.yml logs --tail=30"
+          exit 1
