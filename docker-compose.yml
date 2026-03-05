@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  # ── z8run backend (API + WebSocket) ──────────────────────
+  z8run:
+    build: .
+    container_name: z8run
+    restart: unless-stopped
+    environment:
+      Z8_PORT: "7700"
+      Z8_BIND: "0.0.0.0"
+      Z8_DB_URL: "postgres://z8run:${POSTGRES_PASSWORD:-z8run_secret}@host.docker.internal:5432/z8run"
+      Z8_DATA_DIR: "/app/data"
+      Z8_LOG_LEVEL: "${Z8_LOG_LEVEL:-info}"
+      Z8_VAULT_SECRET: "${Z8_VAULT_SECRET:-change-me-in-production}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - z8run_data:/app/data
+    networks:
+      - z8net
+
+  # ── Nginx (frontend + reverse proxy) ─────────────────────
+  nginx:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.nginx
+    container_name: z8run-web
+    restart: unless-stopped
+    depends_on:
+      - z8run
+    ports:
+      - "${Z8_PUBLIC_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - z8net
+
+volumes:
+  z8run_data:
+
+networks:
+  z8net:
+    driver: bridge

@@ -1,0 +1,53 @@
+name: Deploy z8run
+
+on:
+  push:
+    branches: [main]
+
+env:
+  DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+  DEPLOY_USER: root
+  DEPLOY_PATH: /opt/z8run
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync files to server
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude 'target' \
+            --exclude 'frontend/node_modules' \
+            --exclude 'frontend/dist' \
+            --exclude 'data' \
+            --exclude '.env' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            ./ ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+
+      - name: Deploy on server
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'EOF'
+            cd /opt/z8run
+            docker compose down
+            docker compose up -d --build --remove-orphans
+            docker system prune -f
+            echo "✓ z8run deployed successfully"
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 15
+          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "curl -sf http://localhost/api/v1/flows > /dev/null && echo '✓ Health check passed' || echo '✗ Health check failed'"
