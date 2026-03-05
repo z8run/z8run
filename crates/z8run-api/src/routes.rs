@@ -19,7 +19,7 @@ use z8run_core::message::FlowMessage;
 use z8run_core::node::{Node, PortType};
 use tracing::{info, warn, error};
 
-/// Mounts the REST API routes.
+/// Mounts the REST API routes (protected by JWT).
 pub fn api_routes() -> Router<Arc<AppState>> {
     Router::new()
         // Flows
@@ -32,7 +32,11 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         // Vault
         .route("/vault", get(list_credentials).post(store_credential))
         .route("/vault/{key}", get(get_credential).delete(delete_credential))
-        // Health check
+}
+
+/// Mounts public API routes (no authentication required).
+pub fn public_routes() -> Router<Arc<AppState>> {
+    Router::new()
         .route("/health", get(health_check))
         .route("/info", get(server_info))
 }

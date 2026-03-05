@@ -59,7 +59,7 @@ jobs:
           for i in 1 2 3 4 5; do
             sleep 10
             if ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-              "curl -sf http://localhost/api/v1/flows > /dev/null"; then
+              "curl -sf http://localhost/api/v1/health > /dev/null"; then
               echo "✓ Health check passed (attempt $i)"
               exit 0
             fi

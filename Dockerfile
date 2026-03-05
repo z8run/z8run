@@ -85,7 +85,7 @@ ENV Z8_PORT=7700 \
 EXPOSE 7700
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:7700/api/v1/flows || exit 1
+    CMD curl -f http://localhost:7700/api/v1/health || exit 1
 
 ENTRYPOINT ["/app/z8run"]
 CMD ["serve"]

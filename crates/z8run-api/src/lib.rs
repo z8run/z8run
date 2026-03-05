@@ -29,8 +29,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             .layer(axum::middleware::from_fn_with_state(state.clone(), auth::jwt_middleware)),
     );
 
+    // Public API routes (health, info) — no auth required
+    let public_api = routes::public_routes();
+
     Router::new()
-        .nest("/api/v1", protected_api)
+        .nest("/api/v1", protected_api.merge(public_api))
         .nest("/auth", auth_router)
         .nest("/hook", routes::hook_routes())
         .nest("/ws", ws::ws_routes())
