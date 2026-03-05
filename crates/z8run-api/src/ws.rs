@@ -51,6 +51,11 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
             }
             v
         },
+        EngineEvent::NodeSkipped { flow_id, node_id } => serde_json::json!({
+            "type": "node_skipped",
+            "flow_id": flow_id.to_string(),
+            "node_id": node_id.to_string(),
+        }),
         EngineEvent::NodeError { flow_id, node_id, error } => serde_json::json!({
             "type": "node_error",
             "flow_id": flow_id.to_string(),

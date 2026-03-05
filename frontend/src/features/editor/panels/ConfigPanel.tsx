@@ -1,4 +1,4 @@
-import { X, Settings, Zap, AlertCircle, CheckCircle2, Loader2, Circle } from "lucide-react";
+import { X, Settings, Zap, AlertCircle, CheckCircle2, Loader2, Circle, Plus, Trash2 } from "lucide-react";
 import { useUIStore } from "@/stores/uiStore";
 import { useFlowStore } from "@/stores/flowStore";
 import type { Z8NodeData, NodeStatus } from "@/types/flow";
@@ -18,6 +18,128 @@ function humanizeKey(key: string): string {
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Available switch operators with human-friendly labels */
+const SWITCH_OPERATORS: { value: string; label: string }[] = [
+  { value: "eq", label: "== (equals)" },
+  { value: "neq", label: "!= (not equal)" },
+  { value: "gt", label: "> (greater)" },
+  { value: "lt", label: "< (less)" },
+  { value: "gte", label: ">= (greater or equal)" },
+  { value: "lte", label: "<= (less or equal)" },
+  { value: "contains", label: "contains" },
+  { value: "regex", label: "matches regex" },
+  { value: "empty", label: "is empty" },
+  { value: "notempty", label: "is not empty" },
+  { value: "true", label: "is truthy" },
+  { value: "false", label: "is falsy" },
+];
+
+interface SwitchRule {
+  type: string;
+  value?: string;
+  port: string;
+}
+
+/** Inline rules editor for Switch nodes */
+function SwitchRulesEditor({
+  rules,
+  outputs,
+  onChange,
+}: {
+  rules: SwitchRule[];
+  outputs: { id: string; name: string }[];
+  onChange: (rules: SwitchRule[]) => void;
+}) {
+  const updateRule = (index: number, field: keyof SwitchRule, val: string) => {
+    const updated = rules.map((r, i) => (i === index ? { ...r, [field]: val } : r));
+    onChange(updated);
+  };
+
+  const addRule = () => {
+    const nextPort = outputs.find(
+      (o) => o.id !== "default" && !rules.some((r) => r.port === o.id)
+    );
+    onChange([
+      ...rules,
+      { type: "eq", value: "", port: nextPort?.id ?? outputs[0]?.id ?? "out1" },
+    ]);
+  };
+
+  const removeRule = (index: number) => {
+    onChange(rules.filter((_, i) => i !== index));
+  };
+
+  // Operators that don't need a value input
+  const noValueOps = new Set(["empty", "notempty", "true", "false"]);
+
+  return (
+    <div className="space-y-2">
+      {rules.map((rule, i) => (
+        <div key={i} className="bg-slate-800/60 rounded-md p-2 space-y-1.5 border border-slate-700/50">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-500 shrink-0 w-4">{i + 1}.</span>
+            <select
+              value={rule.type}
+              onChange={(e) => updateRule(i, "type", e.target.value)}
+              className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1
+                text-[11px] text-slate-200 focus:outline-none focus:border-z8-500"
+            >
+              {SWITCH_OPERATORS.map((op) => (
+                <option key={op.value} value={op.value}>
+                  {op.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => removeRule(i)}
+              className="p-1 hover:bg-slate-700 rounded transition-colors"
+            >
+              <Trash2 size={11} className="text-slate-600 hover:text-red-400" />
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5 ml-4">
+            {!noValueOps.has(rule.type) && (
+              <input
+                type="text"
+                value={rule.value ?? ""}
+                onChange={(e) => updateRule(i, "value", e.target.value)}
+                placeholder="value"
+                className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1
+                  text-[11px] text-slate-200 font-mono focus:outline-none focus:border-z8-500"
+              />
+            )}
+            <span className="text-[10px] text-slate-600 shrink-0">→</span>
+            <select
+              value={rule.port}
+              onChange={(e) => updateRule(i, "port", e.target.value)}
+              className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-1
+                text-[11px] text-slate-200 focus:outline-none focus:border-z8-500"
+            >
+              {outputs
+                .filter((o) => o.id !== "default")
+                .map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addRule}
+        className="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-z8-400
+          px-2 py-1 hover:bg-slate-800 rounded transition-colors w-full"
+      >
+        <Plus size={12} />
+        <span>Add rule</span>
+      </button>
+    </div>
+  );
 }
 
 export function ConfigPanel() {
@@ -114,7 +236,24 @@ export function ConfigPanel() {
               </span>
             </div>
             <div className="space-y-2.5">
-              {Object.entries(config).map(([key, value]) => (
+              {Object.entries(config).map(([key, value]) => {
+                // Switch rules get a dedicated editor
+                if (key === "rules" && nodeType === "switch" && Array.isArray(value)) {
+                  return (
+                    <div key={key}>
+                      <label className="text-[10px] font-medium text-slate-400 block mb-1.5">
+                        Rules
+                      </label>
+                      <SwitchRulesEditor
+                        rules={value as SwitchRule[]}
+                        outputs={outputs}
+                        onChange={(newRules) => handleConfigChange("rules", newRules)}
+                      />
+                    </div>
+                  );
+                }
+
+                return (
                 <div key={key}>
                   <label className="text-[10px] font-medium text-slate-400 block mb-1">
                     {humanizeKey(key)}
@@ -158,6 +297,22 @@ export function ConfigPanel() {
                         {value ? "Enabled" : "Disabled"}
                       </span>
                     </div>
+                  ) : typeof value === "object" && value !== null ? (
+                    <textarea
+                      value={JSON.stringify(value, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          handleConfigChange(key, JSON.parse(e.target.value));
+                        } catch {
+                          // Don't update if invalid JSON — user is still typing
+                        }
+                      }}
+                      rows={4}
+                      className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
+                        text-xs text-slate-200 font-mono focus:outline-none focus:border-z8-500
+                        transition-colors resize-y"
+                      spellCheck={false}
+                    />
                   ) : (
                     <input
                       type="text"
@@ -169,7 +324,8 @@ export function ConfigPanel() {
                     />
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

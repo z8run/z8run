@@ -70,6 +70,8 @@ function applyNodeEvent(event: EngineEvent, nodeMap: NodeMap) {
     setNodeStatus(canvasId, "running");
   } else if (event.type === "node_completed") {
     setNodeStatus(canvasId, "success");
+  } else if (event.type === "node_skipped") {
+    setNodeStatus(canvasId, "disabled");
   } else if (event.type === "node_error") {
     setNodeStatus(canvasId, "error");
   }

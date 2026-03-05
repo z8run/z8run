@@ -135,6 +135,19 @@ export function Header() {
               if (res.node_map) {
                 useEngineStore.getState().setNodeMap(res.node_map);
               }
+              // Log registered routes for visibility
+              if (res.routes && res.routes.length > 0) {
+                const port = window.location.port === "5173" ? "7700" : window.location.port;
+                const base = `${window.location.protocol}//${window.location.hostname}:${port}`;
+                const routeList = res.routes.map((r: { method: string; path: string }) =>
+                  `  ${r.method} ${base}${r.path}`
+                ).join("\n");
+                useEngineStore.getState().addLog({
+                  type: "routes_registered",
+                  flow_id: flowId,
+                  routes: routeList,
+                } as never);
+              }
             } catch (err) {
               console.error("Deploy failed:", err);
             }

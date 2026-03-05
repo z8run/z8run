@@ -31,10 +31,18 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/info", get(server_info))
 }
 
-/// Mounts webhook routes (outside /api/v1 namespace).
-pub fn webhook_routes() -> Router<Arc<AppState>> {
+/// Mounts hook routes: /hook/{flow_id} and /hook/{flow_id}/{*path}
+///
+/// Every flow gets a unique namespace under /hook/{flow_id}.
+/// The http-in node's path becomes a sub-route within that namespace.
+/// Examples:
+///   POST /hook/{flow_id}           → triggers the flow directly
+///   POST /hook/{flow_id}/branch    → matches http-in with path="/branch"
+///   GET  /hook/{flow_id}/users/123 → matches http-in with path="/users/123"
+pub fn hook_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/{flow_id}", post(webhook_handler))
+        .route("/{flow_id}", axum::routing::any(hook_handler))
+        .route("/{flow_id}/{*path}", axum::routing::any(hook_handler))
 }
 
 /// GET /api/v1/health
@@ -245,7 +253,9 @@ async fn start_flow(
         "Starting flow execution"
     );
 
-    let trace_id = state.engine.execute(exec_flow).await.map_err(ApiError::from)?;
+    // Resolve hook URLs for http-in nodes
+    let registered_routes = register_hook_routes(&stored_flow, id);
+    let has_input_nodes = !registered_routes.is_empty();
 
     // Return canvas_id → core UUID mapping so the frontend can
     // correlate engine events back to canvas nodes for visual feedback.
@@ -254,12 +264,76 @@ async fn start_flow(
         .map(|(canvas_id, uuid)| (canvas_id, serde_json::Value::String(uuid.to_string())))
         .collect();
 
-    Ok(Json(serde_json::json!({
-        "flow_id": id.to_string(),
-        "trace_id": trace_id.to_string(),
-        "status": "running",
-        "node_map": node_map,
-    })))
+    if has_input_nodes {
+        // Flow has input nodes (http-in, webhook, etc.) — don't execute now.
+        // Just register the hook routes and wait for incoming requests.
+        info!(flow_id = %id, "Flow deployed — waiting for hook triggers");
+        Ok(Json(serde_json::json!({
+            "flow_id": id.to_string(),
+            "status": "deployed",
+            "node_map": node_map,
+            "routes": registered_routes,
+        })))
+    } else {
+        // No input nodes — execute immediately (manual/cron flow).
+        let trace_id = state.engine.execute(exec_flow).await.map_err(ApiError::from)?;
+        Ok(Json(serde_json::json!({
+            "flow_id": id.to_string(),
+            "trace_id": trace_id.to_string(),
+            "status": "running",
+            "node_map": node_map,
+        })))
+    }
+}
+
+/// Scans canvas_nodes for http-in nodes and returns their hook URLs.
+/// Each flow gets its own namespace: /hook/{flow_id}/{path}
+/// No conflict detection needed — namespaces prevent collisions.
+fn register_hook_routes(
+    stored: &Flow,
+    flow_id: Uuid,
+) -> Vec<serde_json::Value> {
+    let mut registered = Vec::new();
+
+    let canvas_nodes = match stored.metadata.positions.get("canvas_nodes")
+        .and_then(|v| v.as_array())
+    {
+        Some(nodes) => nodes,
+        None => return registered,
+    };
+
+    for node in canvas_nodes {
+        let data = &node["data"];
+        let node_type = data["type"].as_str().unwrap_or("");
+
+        if node_type == "http-in" {
+            let config = &data["config"];
+            let method = config["method"].as_str().unwrap_or("POST").to_uppercase();
+            let path = config["path"].as_str().unwrap_or("/").to_string();
+
+            // Build the full hook URL path: /hook/{flow_id}/{sub_path}
+            let hook_path = if path == "/" || path.is_empty() {
+                format!("/hook/{}", flow_id)
+            } else {
+                let clean = path.trim_start_matches('/');
+                format!("/hook/{}/{}", flow_id, clean)
+            };
+
+            info!(
+                flow_id = %flow_id,
+                method = %method,
+                hook_path = %hook_path,
+                "Hook route registered"
+            );
+
+            registered.push(serde_json::json!({
+                "method": method,
+                "path": hook_path,
+            }));
+        }
+    }
+
+    registered
 }
 
 /// Converts the frontend canvas state (stored in metadata) into
@@ -280,6 +354,11 @@ fn canvas_to_flow(stored: &Flow) -> Result<(Flow, std::collections::HashMap<Stri
     flow.id = stored.id;
     flow.description = stored.description.clone();
 
+    // Namespace UUID for deterministic ID generation.
+    // Same flow_id + canvas_id always produces the same core UUID,
+    // so Deploy and hook trigger share the same node mapping.
+    let namespace = stored.id;
+
     // Map canvas node IDs (strings like "node_123") to core UUIDs
     let mut id_map: std::collections::HashMap<String, Uuid> = std::collections::HashMap::new();
 
@@ -295,6 +374,9 @@ fn canvas_to_flow(stored: &Flow) -> Result<(Flow, std::collections::HashMap<Stri
 
         // Build core Node with appropriate ports based on type
         let mut core_node = Node::new(label, node_type_str);
+
+        // Override with deterministic UUID: same canvas_id always → same core UUID
+        core_node.id = Uuid::new_v5(&namespace, canvas_id.as_bytes());
 
         // Add input ports based on canvas data
         if let Some(inputs) = data["inputs"].as_array() {
@@ -371,18 +453,58 @@ async fn stop_flow(
     })))
 }
 
-/// POST /webhooks/:flow_id — Execute a flow synchronously via webhook.
+/// ANY /hook/{flow_id} or /hook/{flow_id}/{*path}
 ///
-/// Accepts an HTTP request, runs the flow, and returns the HTTP response
-/// generated by the http-out node (or times out after 10 seconds).
-async fn webhook_handler(
+/// Unified hook handler for all input node types (http-in, webhook, etc.).
+/// Each flow gets its own namespace under /hook/{flow_id}, preventing
+/// route collisions between flows — ready for multi-tenant SaaS.
+///
+/// Examples:
+///   POST /hook/{flow_id}              → triggers the flow (root path)
+///   POST /hook/{flow_id}/branch       → matches http-in with path="/branch"
+///   GET  /hook/{flow_id}/users?id=5   → matches http-in with path="/users"
+async fn hook_handler(
     State(state): State<Arc<AppState>>,
-    Path(flow_id): Path<Uuid>,
+    Path(params): Path<HashMap<String, String>>,
     Query(query_params): Query<HashMap<String, String>>,
+    method: axum::http::Method,
     headers: HeaderMap,
     body: String,
 ) -> impl IntoResponse {
-    info!(flow_id = %flow_id, "Webhook triggered");
+    // Extract flow_id and optional sub-path
+    let flow_id_str = match params.get("flow_id") {
+        Some(id) => id,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "Missing flow_id"})),
+            );
+        }
+    };
+
+    let flow_id: Uuid = match flow_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": format!("Invalid flow_id: {}", flow_id_str)})),
+            );
+        }
+    };
+
+    // Sub-path from the wildcard capture (e.g. "branch" or "users/123")
+    let sub_path = params.get("path")
+        .map(|p| format!("/{}", p))
+        .unwrap_or_else(|| "/".to_string());
+
+    let method_str = method.to_string().to_uppercase();
+
+    info!(
+        flow_id = %flow_id,
+        method = %method_str,
+        path = %sub_path,
+        "Hook triggered"
+    );
 
     // Load the flow
     let stored_flow = match state.storage.get_flow(flow_id).await {
@@ -409,7 +531,7 @@ async fn webhook_handler(
 
     // Parse body as JSON (or wrap raw string)
     let body_json: serde_json::Value = serde_json::from_str(&body)
-        .unwrap_or_else(|_| serde_json::json!(body));
+        .unwrap_or_else(|_| if body.is_empty() { serde_json::json!(null) } else { serde_json::json!(body) });
 
     // Convert headers to JSON map
     let headers_json: serde_json::Map<String, serde_json::Value> = headers
@@ -428,33 +550,28 @@ async fn webhook_handler(
     // Create the trigger message with real HTTP data
     let trace_id = Uuid::now_v7();
     let trigger_payload = serde_json::json!({
-        "method": "POST",
-        "path": format!("/webhooks/{}", flow_id),
+        "method": method_str,
+        "path": sub_path,
         "headers": headers_json,
         "query": query_json,
         "body": body_json,
     });
 
     let trigger_msg = FlowMessage::new(
-        Uuid::nil(),  // source_node will be overridden by engine
-        "webhook",
+        Uuid::nil(),
+        "hook",
         trigger_payload,
         trace_id,
     );
 
     // Create oneshot channel for the response
     let (tx, rx) = tokio::sync::oneshot::channel();
-
-    // Store the sender so http-out can find it
-    {
-        state.webhook_responders.write().await.insert(trace_id, tx);
-    }
+    state.webhook_responders.write().await.insert(trace_id, tx);
 
     // Execute the flow with the trigger message
     match state.engine.execute_with_trigger(exec_flow, Some(trigger_msg)).await {
         Ok(_) => {}
         Err(e) => {
-            // Clean up responder
             state.webhook_responders.write().await.remove(&trace_id);
             error!(error = %e, "Failed to execute flow");
             return (
@@ -465,30 +582,37 @@ async fn webhook_handler(
     }
 
     // Wait for the response from http-out (with timeout)
+    await_flow_response(flow_id, rx, &state).await
+}
+
+/// Shared logic: waits for the oneshot response from http-out node.
+async fn await_flow_response(
+    flow_id: Uuid,
+    rx: tokio::sync::oneshot::Receiver<z8run_core::nodes::http_out::WebhookResponse>,
+    state: &Arc<AppState>,
+) -> (StatusCode, Json<serde_json::Value>) {
     match tokio::time::timeout(std::time::Duration::from_secs(10), rx).await {
         Ok(Ok(response)) => {
             info!(
                 flow_id = %flow_id,
                 status = response.status,
-                "Webhook response sent"
+                "Flow response sent"
             );
             let status = StatusCode::from_u16(response.status)
                 .unwrap_or(StatusCode::OK);
             (status, Json(response.body))
         }
         Ok(Err(_)) => {
-            // Sender was dropped (flow completed without http-out?)
-            warn!(flow_id = %flow_id, "Webhook response channel dropped");
-            state.webhook_responders.write().await.remove(&trace_id);
+            warn!(flow_id = %flow_id, "Response channel dropped");
+            state.webhook_responders.write().await.remove(&flow_id);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": "Flow completed without sending a response"})),
             )
         }
         Err(_) => {
-            // Timeout
-            warn!(flow_id = %flow_id, "Webhook timed out after 10 seconds");
-            state.webhook_responders.write().await.remove(&trace_id);
+            warn!(flow_id = %flow_id, "Flow timed out after 10 seconds");
+            state.webhook_responders.write().await.remove(&flow_id);
             (
                 StatusCode::GATEWAY_TIMEOUT,
                 Json(serde_json::json!({"error": "Flow execution timed out (10s)"})),
@@ -496,3 +620,4 @@ async fn webhook_handler(
         }
     }
 }
+

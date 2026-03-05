@@ -4,10 +4,12 @@
 //! Each implements `NodeExecutor` and has a corresponding factory.
 
 pub mod debug;
+pub mod delay;
+pub mod filter;
 pub mod function;
 pub mod http_in;
 pub mod http_out;
-pub mod delay;
+pub mod switch;
 
 use std::sync::Arc;
 use crate::engine::{FlowEngine, NodeExecutorFactory};
@@ -28,5 +30,11 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .await;
     engine
         .register_node_type(Arc::new(delay::DelayNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(switch::SwitchNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(filter::FilterNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
 }

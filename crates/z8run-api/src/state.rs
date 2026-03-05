@@ -17,7 +17,7 @@ pub struct AppState {
     pub jwt_secret: String,
     /// Server port.
     pub port: u16,
-    /// Webhook response channels keyed by trace_id.
+    /// Hook response channels keyed by trace_id.
     pub webhook_responders: WebhookResponders,
 }
 

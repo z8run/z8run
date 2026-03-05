@@ -29,6 +29,11 @@ pub enum EngineEvent {
         /// Truncated output payload for UI display (first output message).
         output_preview: Option<serde_json::Value>,
     },
+    /// A node was skipped (received no message in a conditional branch).
+    NodeSkipped {
+        flow_id: Uuid,
+        node_id: Uuid,
+    },
     /// A node failed.
     NodeError {
         flow_id: Uuid,
@@ -321,33 +326,47 @@ impl FlowEngine {
 
                 let handle = tokio::spawn(async move {
                     let start = std::time::Instant::now();
-                    let _ = event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
-
-                    // Create the node executor
-                    let reg = registry.read().await;
-                    let factory = reg.get(&node_type_str).ok_or_else(|| {
-                        Z8Error::Internal(format!(
-                            "No executor registered for type '{}'",
-                            node_type_str
-                        ))
-                    })?;
-
-                    let executor = factory.create(node_config).await?;
 
                     // If it is a root node (no receiver), generate an initial message
                     let messages = if let Some(ref mut receiver) = rx {
                         // Receive a message from the channel
                         match receiver.recv().await {
-                            Some(msg) => executor.process(msg).await?,
+                            Some(msg) => {
+                                // Node will process — emit NodeStarted
+                                let _ = event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
+
+                                let reg = registry.read().await;
+                                let factory = reg.get(&node_type_str).ok_or_else(|| {
+                                    Z8Error::Internal(format!(
+                                        "No executor registered for type '{}'",
+                                        node_type_str
+                                    ))
+                                })?;
+                                let executor = factory.create(node_config).await?;
+                                executor.process(msg).await?
+                            }
                             None => {
-                                warn!(node_id = %node_id, "Channel closed, node received no messages");
-                                Vec::new()
+                                // Channel closed — this node is on an inactive branch.
+                                // Emit NodeSkipped instead of NodeStarted + NodeCompleted.
+                                debug!(node_id = %node_id, "Node skipped (no message received)");
+                                let _ = event_tx.send(EngineEvent::NodeSkipped { flow_id, node_id });
+                                return Ok(());
                             }
                         }
                     } else {
-                        // Root node: use provided trigger message or generate a default
+                        // Root node: always processes
+                        let _ = event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
+
+                        let reg = registry.read().await;
+                        let factory = reg.get(&node_type_str).ok_or_else(|| {
+                            Z8Error::Internal(format!(
+                                "No executor registered for type '{}'",
+                                node_type_str
+                            ))
+                        })?;
+                        let executor = factory.create(node_config).await?;
+
                         let root_msg = if let Some(ref tmsg) = trigger_clone {
-                            // Use the webhook trigger message, but update source_node
                             let mut m = tmsg.clone();
                             m.source_node = node_id;
                             m
@@ -406,6 +425,20 @@ impl FlowEngine {
                     Err(e) => {
                         return Err(Z8Error::Internal(format!("Task panicked: {}", e)));
                     }
+                }
+            }
+
+            // Drop the original senders for this step's outgoing targets.
+            // The spawned tasks already cloned what they needed; those clones
+            // are now dropped too (tasks finished). By removing the originals
+            // here, downstream nodes that received NO message will see their
+            // channel close → recv() returns None → they complete gracefully.
+            // This is critical for conditional routing (switch/filter) where
+            // only one branch receives a message.
+            for &node_id in &step.node_ids {
+                let outgoing = flow.outgoing_edges(node_id);
+                for edge in &outgoing {
+                    channels.remove(&edge.to_node);
                 }
             }
         }

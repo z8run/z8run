@@ -3,7 +3,7 @@ import { useEngineStore } from "@/hooks/useEngineSocket";
 import type { EngineEvent, NodeInfo } from "@/hooks/useEngineSocket";
 import {
   Trash2, ChevronUp, ChevronDown, ChevronRight,
-  Play, CheckCircle2, XCircle, ArrowRight, Zap, AlertTriangle,
+  Play, CheckCircle2, XCircle, ArrowRight, Zap, AlertTriangle, SkipForward, Globe,
 } from "lucide-react";
 
 type ResolveFn = (id: string) => NodeInfo | undefined;
@@ -34,6 +34,15 @@ function formatPreview(value: unknown): string {
 }
 
 const EVENT_CONFIG: Record<string, EventDisplay> = {
+  routes_registered: {
+    icon: Globe,
+    color: "text-purple-400",
+    label: "ROUTES",
+    detail: (e, _r) => {
+      const routes = (e as Record<string, unknown>).routes as string | undefined;
+      return routes ? `Registered endpoints:\n${routes}` : "No routes registered";
+    },
+  },
   flow_started: {
     icon: Play,
     color: "text-blue-400",
@@ -74,6 +83,17 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
       return info
         ? `"${info.label}" completed${dur}`
         : `Node ${e.node_id?.substring(0, 8) ?? "?"} completed${dur}`;
+    },
+  },
+  node_skipped: {
+    icon: SkipForward,
+    color: "text-slate-500",
+    label: "SKIPPED",
+    detail: (e, resolve) => {
+      const info = e.node_id ? resolve(e.node_id) : undefined;
+      return info
+        ? `"${info.label}" skipped (inactive branch)`
+        : `Node ${e.node_id?.substring(0, 8) ?? "?"} skipped`;
     },
   },
   node_error: {

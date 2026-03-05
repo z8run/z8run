@@ -76,7 +76,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { id: "pass", name: "Pass", type: "any" },
       { id: "reject", name: "Reject", type: "any" },
     ],
-    defaultConfig: { expression: "msg.payload != null" },
+    defaultConfig: { property: "req.body.age", condition: "gte", value: 18 },
   },
 
   // Output nodes
@@ -114,7 +114,10 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { id: "out2", name: "Case 2", type: "any" },
       { id: "default", name: "Default", type: "any" },
     ],
-    defaultConfig: { property: "msg.payload", rules: [] },
+    defaultConfig: { property: "req.body.action", rules: [
+      { type: "eq", value: "create", port: "out1" },
+      { type: "eq", value: "update", port: "out2" },
+    ] },
   },
   {
     type: "delay",
