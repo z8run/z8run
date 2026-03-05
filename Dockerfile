@@ -35,11 +35,9 @@ RUN cargo build --release --bin z8run 2>/dev/null || true
 COPY crates/ crates/
 COPY bins/   bins/
 
-# Touch main files to invalidate the dummy cache
-RUN touch bins/z8run-cli/src/main.rs && \
-    touch bins/z8run-server/src/main.rs
-
-RUN cargo build --release --bin z8run
+# Invalidate cargo cache for ALL crates (dummy libs must be recompiled)
+RUN find crates/ bins/ -name "*.rs" -exec touch {} + && \
+    cargo build --release --bin z8run
 
 # ── Stage 2: Frontend build ─────────────────────────────────
 FROM node:22-bookworm-slim AS frontend-builder
