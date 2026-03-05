@@ -8,6 +8,7 @@ pub mod repository;
 pub mod credential_vault;
 pub mod migration;
 pub mod sqlite;
+pub mod postgres;
 
 use thiserror::Error;
 

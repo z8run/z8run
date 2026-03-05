@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1" />
+      <stop offset="50%" style="stop-color:#3B82F6" />
+      <stop offset="100%" style="stop-color:#06B6D4" />
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818CF8" />
+      <stop offset="100%" style="stop-color:#06B6D4" />
+    </linearGradient>
+    <filter id="gl" x="-15%" y="-15%" width="130%" height="130%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feComposite in="SourceGraphic" in2="b" operator="over"/>
+    </filter>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="256" height="256" rx="56" fill="#0F172A"/>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+
+  <!-- Flow lines -->
+  <line x1="58" y1="78" x2="108" y2="112" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="148" y1="125" x2="198" y2="98" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="140" y1="140" x2="190" y2="172" stroke="url(#g1)" stroke-width="3.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="55" y1="92" x2="65" y2="148" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+  <line x1="75" y1="155" x2="110" y2="132" stroke="url(#g1)" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Nodes -->
+  <!-- Input node top-left -->
+  <circle cx="52" cy="72" r="13" fill="none" stroke="url(#g2)" stroke-width="2.5" filter="url(#gl)"/>
+  <circle cx="52" cy="72" r="5.5" fill="url(#g2)"/>
+
+  <!-- Mid-left node -->
+  <circle cx="65" cy="155" r="10" fill="none" stroke="url(#g2)" stroke-width="2" filter="url(#gl)"/>
+  <circle cx="65" cy="155" r="4.5" fill="url(#g2)" opacity="0.8"/>
+
+  <!-- Center engine node -->
+  <circle cx="128" cy="128" r="22" fill="none" stroke="url(#g1)" stroke-width="3.5" filter="url(#gl)"/>
+  <circle cx="128" cy="128" r="10" fill="url(#g1)"/>
+
+  <!-- Output right -->
+  <circle cx="204" cy="92" r="12" fill="none" stroke="url(#g2)" stroke-width="2.5" filter="url(#gl)"/>
+  <circle cx="204" cy="92" r="5" fill="url(#g2)"/>
+
+  <!-- Output bottom-right -->
+  <circle cx="196" cy="178" r="12" fill="none" stroke="url(#g2)" stroke-width="2.5" filter="url(#gl)"/>
+  <circle cx="196" cy="178" r="5" fill="url(#g2)"/>
+
+  <!-- Data particles -->
+  <circle cx="82" cy="94" r="2.5" fill="#818CF8" opacity="0.8"/>
+  <circle cx="174" cy="110" r="2.5" fill="#38BDF8" opacity="0.8"/>
+  <circle cx="165" cy="155" r="2.5" fill="#38BDF8" opacity="0.8"/>
+
+  <!-- z8 text -->
+  <text x="128" y="228" text-anchor="middle" font-family="'SF Pro Display', 'Inter', system-ui, sans-serif" font-weight="800" font-size="42" fill="white" letter-spacing="-1">
+    z8
+  </text>
+</svg>

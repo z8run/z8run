@@ -83,6 +83,9 @@ enum PluginAction {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load .env file (silently ignore if not found)
+    dotenvy::dotenv().ok();
+
     let cli = Cli::parse();
 
     // Configure tracing
@@ -120,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
 async fn cmd_serve(
     port: u16,
     bind: String,
-    _db_url: Option<String>,
+    db_url: Option<String>,
     data_dir: &str,
 ) -> anyhow::Result<()> {
     println!(
@@ -146,16 +149,24 @@ async fn cmd_serve(
     let plugin_count = registry.scan().await.unwrap_or(0);
     tracing::info!(plugins = plugin_count, "Plugins scanned");
 
-    // Initialize SQLite storage
-    let db_path = format!("{}/z8run.db", data_dir);
-    let db_url = format!("sqlite://{}?mode=rwc", db_path);
-    tracing::info!(db = %db_path, "Connecting to database");
+    // Initialize storage (PostgreSQL or SQLite based on URL)
+    let url = db_url.unwrap_or_else(|| {
+        format!("sqlite://{}/z8run.db?mode=rwc", data_dir)
+    });
 
-    let storage = z8run_storage::sqlite::SqliteStorage::new(&db_url).await?;
-    storage.migrate().await?;
-    tracing::info!("Database ready");
-
-    let storage = Arc::new(storage);
+    let storage: Arc<dyn z8run_storage::repository::FlowRepository> = if url.starts_with("postgres") {
+        tracing::info!(url = %url, "Connecting to PostgreSQL");
+        let pg = z8run_storage::postgres::PgStorage::new(&url).await?;
+        pg.migrate().await?;
+        tracing::info!("PostgreSQL ready");
+        Arc::new(pg)
+    } else {
+        tracing::info!(url = %url, "Connecting to SQLite");
+        let sqlite = z8run_storage::sqlite::SqliteStorage::new(&url).await?;
+        sqlite.migrate().await?;
+        tracing::info!("SQLite ready");
+        Arc::new(sqlite)
+    };
 
     // Create application state
     let state = Arc::new(z8run_api::state::AppState::new(
@@ -163,6 +174,10 @@ async fn cmd_serve(
         "z8run-dev-secret".to_string(), // TODO: generate or load from config
         port,
     ));
+
+    // Register built-in node executors
+    z8run_core::nodes::register_builtin_nodes(&state.engine).await;
+    tracing::info!("Built-in nodes registered");
 
     // Build router
     let app = z8run_api::build_router(state);
@@ -185,8 +200,15 @@ async fn cmd_migrate(db_url: Option<String>, data_dir: &str) -> anyhow::Result<(
         format!("sqlite://{}/z8run.db?mode=rwc", data_dir)
     });
     tracing::info!(url = %url, "Running migrations...");
-    z8run_storage::migration::run_migrations(&url).await
-        .map_err(|e| anyhow::anyhow!(e))?;
+
+    if url.starts_with("postgres") {
+        let pg = z8run_storage::postgres::PgStorage::new(&url).await?;
+        pg.migrate().await.map_err(|e| anyhow::anyhow!(e))?;
+    } else {
+        let sqlite = z8run_storage::sqlite::SqliteStorage::new(&url).await?;
+        sqlite.migrate().await.map_err(|e| anyhow::anyhow!(e))?;
+    }
+
     tracing::info!("Migrations completed");
     Ok(())
 }

@@ -1,0 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-slate-700;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50;
+  }
+
+  /* React Flow overrides */
+  .react-flow__background {
+    background-color: #0b1120 !important;
+  }
+
+  .react-flow__minimap {
+    background-color: #1e293b !important;
+    border-radius: 8px;
+    border: 1px solid #334155;
+  }
+
+  .react-flow__controls {
+    border-radius: 8px;
+    border: 1px solid #334155;
+    overflow: hidden;
+  }
+
+  .react-flow__controls-button {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+    color: #94a3b8 !important;
+  }
+
+  .react-flow__controls-button:hover {
+    background-color: #334155 !important;
+    color: #f8fafc !important;
+  }
+}

@@ -87,6 +87,7 @@ rust-embed = "8"
 
 # Config
 config = "0.15"
+dotenvy = "0.15"
 
 # Testing
 tokio-test = "0.4"

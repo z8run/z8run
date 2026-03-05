@@ -2,14 +2,14 @@
 
 use std::sync::Arc;
 use z8run_core::engine::FlowEngine;
-use z8run_storage::sqlite::SqliteStorage;
+use z8run_storage::repository::FlowRepository;
 
 /// Global application state, shared between handlers.
 pub struct AppState {
     /// Flow engine.
     pub engine: FlowEngine,
-    /// SQLite storage for persistence.
-    pub storage: Arc<SqliteStorage>,
+    /// Storage backend (SQLite or PostgreSQL).
+    pub storage: Arc<dyn FlowRepository>,
     /// Secret for signing JWT tokens.
     pub jwt_secret: String,
     /// Server port.
@@ -17,7 +17,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(storage: Arc<SqliteStorage>, jwt_secret: String, port: u16) -> Self {
+    pub fn new(storage: Arc<dyn FlowRepository>, jwt_secret: String, port: u16) -> Self {
         Self {
             engine: FlowEngine::new(),
             storage,

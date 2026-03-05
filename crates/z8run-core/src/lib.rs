@@ -10,6 +10,7 @@ pub mod node;
 pub mod message;
 pub mod engine;
 pub mod scheduler;
+pub mod nodes;
 
 pub use error::{Z8Error, Z8Result};
 pub use flow::{Flow, FlowConfig, FlowMeta, FlowStatus};

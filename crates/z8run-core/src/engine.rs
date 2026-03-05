@@ -212,9 +212,18 @@ impl FlowEngine {
         let mut channels: HashMap<Uuid, mpsc::Sender<FlowMessage>> = HashMap::new();
         let mut receivers: HashMap<Uuid, mpsc::Receiver<FlowMessage>> = HashMap::new();
 
-        // Create channels for each node
+        // Determine which nodes have incoming edges (non-root nodes)
+        let nodes_with_incoming: std::collections::HashSet<Uuid> = flow
+            .edges
+            .iter()
+            .map(|e| e.to_node)
+            .collect();
+
+        // Create channels ONLY for nodes that have incoming edges.
+        // Root nodes (no incoming edges) won't get a receiver,
+        // so they'll take the "generate trigger message" path.
         for node in &flow.nodes {
-            if node.enabled {
+            if node.enabled && nodes_with_incoming.contains(&node.id) {
                 let (tx, rx) = mpsc::channel(
                     flow.config.buffer_size.max(self.default_buffer_size),
                 );
