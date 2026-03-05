@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ── z8run backend (API + WebSocket) ──────────────────────
   z8run:

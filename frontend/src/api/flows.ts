@@ -33,6 +33,7 @@ export const flowsApi = {
       trace_id: string;
       status: string;
       node_map: Record<string, string>;
+      routes?: { method: string; path: string }[];
     }>(),
 
   stop: (id: string) =>

@@ -39,7 +39,7 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
     color: "text-purple-400",
     label: "ROUTES",
     detail: (e, _r) => {
-      const routes = (e as Record<string, unknown>).routes as string | undefined;
+      const routes = (e as unknown as Record<string, unknown>).routes as string | undefined;
       return routes ? `Registered endpoints:\n${routes}` : "No routes registered";
     },
   },
