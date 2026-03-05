@@ -129,7 +129,12 @@ export function Header() {
               await saveFlow(reactFlow.getViewport());
             }
             try {
-              await flowsApi.start(flowId);
+              // Clear old mapping so new events get queued until fresh map arrives
+              useEngineStore.getState().setNodeMap({});
+              const res = await flowsApi.start(flowId);
+              if (res.node_map) {
+                useEngineStore.getState().setNodeMap(res.node_map);
+              }
             } catch (err) {
               console.error("Deploy failed:", err);
             }

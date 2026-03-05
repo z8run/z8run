@@ -39,25 +39,37 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
             "flow_id": flow_id.to_string(),
             "node_id": node_id.to_string(),
         }),
-        EngineEvent::NodeCompleted { flow_id, node_id, duration_us } => serde_json::json!({
-            "type": "node_completed",
-            "flow_id": flow_id.to_string(),
-            "node_id": node_id.to_string(),
-            "duration_us": duration_us,
-        }),
+        EngineEvent::NodeCompleted { flow_id, node_id, duration_us, output_preview } => {
+            let mut v = serde_json::json!({
+                "type": "node_completed",
+                "flow_id": flow_id.to_string(),
+                "node_id": node_id.to_string(),
+                "duration_us": duration_us,
+            });
+            if let Some(preview) = output_preview {
+                v["output"] = preview.clone();
+            }
+            v
+        },
         EngineEvent::NodeError { flow_id, node_id, error } => serde_json::json!({
             "type": "node_error",
             "flow_id": flow_id.to_string(),
             "node_id": node_id.to_string(),
             "error": error,
         }),
-        EngineEvent::MessageSent { flow_id, from_node, to_node, message_id } => serde_json::json!({
-            "type": "message_sent",
-            "flow_id": flow_id.to_string(),
-            "from_node": from_node.to_string(),
-            "to_node": to_node.to_string(),
-            "message_id": message_id.to_string(),
-        }),
+        EngineEvent::MessageSent { flow_id, from_node, to_node, message_id, payload_preview } => {
+            let mut v = serde_json::json!({
+                "type": "message_sent",
+                "flow_id": flow_id.to_string(),
+                "from_node": from_node.to_string(),
+                "to_node": to_node.to_string(),
+                "message_id": message_id.to_string(),
+            });
+            if let Some(preview) = payload_preview {
+                v["payload"] = preview.clone();
+            }
+            v
+        },
         EngineEvent::FlowCompleted { flow_id, trace_id, duration_ms } => serde_json::json!({
             "type": "flow_completed",
             "flow_id": flow_id.to_string(),

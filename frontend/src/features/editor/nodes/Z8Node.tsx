@@ -15,9 +15,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
 
 const STATUS_STYLES: Record<string, string> = {
   idle: "border-slate-600",
-  running: "border-blue-500 shadow-blue-500/20 shadow-lg",
-  success: "border-green-500",
-  error: "border-red-500",
+  running: "border-blue-400 shadow-blue-500/30 shadow-lg animate-pulse",
+  success: "border-green-400 shadow-green-500/20 shadow-md",
+  error: "border-red-500 shadow-red-500/20 shadow-md",
   disabled: "border-slate-700 opacity-50",
 };
 
@@ -26,8 +26,11 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
   const openConfigPanel = useUIStore((s) => s.openConfigPanel);
   const { deleteElements } = useReactFlow();
   const Icon = ICON_MAP[nodeData.icon];
-  const categoryColor = CATEGORY_COLORS[nodeData.category];
-  const statusStyle = STATUS_STYLES[nodeData.status] || STATUS_STYLES.idle;
+  const categoryColor = CATEGORY_COLORS[nodeData.category] ?? "#6366f1";
+  const status = nodeData.status ?? "idle";
+  const statusStyle = STATUS_STYLES[status] || STATUS_STYLES.idle;
+  const inputs = nodeData.inputs ?? [];
+  const outputs = nodeData.outputs ?? [];
 
   const handleDelete = useCallback(
     (e: React.MouseEvent) => {
@@ -77,12 +80,12 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
       {/* Type label */}
       <div className="px-3 py-2">
         <span className="text-[10px] text-slate-500 font-mono">
-          {nodeData.type}
+          {nodeData.type ?? (nodeData as Record<string, unknown>).nodeType ?? "node"}
         </span>
       </div>
 
       {/* Input handles */}
-      {nodeData.inputs.map((port, i) => {
+      {inputs.map((port, i) => {
         const top = 36 + i * 24;
         return (
           <Handle
@@ -102,7 +105,7 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
       })}
 
       {/* Output handles */}
-      {nodeData.outputs.map((port, i) => {
+      {outputs.map((port, i) => {
         const top = 36 + i * 24;
         return (
           <Handle

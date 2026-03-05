@@ -28,7 +28,12 @@ export const flowsApi = {
   delete: (id: string) => api.delete(`flows/${id}`).json<{ deleted: string }>(),
 
   start: (id: string) =>
-    api.post(`flows/${id}/start`).json<{ flow_id: string; status: string }>(),
+    api.post(`flows/${id}/start`).json<{
+      flow_id: string;
+      trace_id: string;
+      status: string;
+      node_map: Record<string, string>;
+    }>(),
 
   stop: (id: string) =>
     api.post(`flows/${id}/stop`).json<{ flow_id: string; status: string }>(),

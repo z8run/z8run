@@ -1,7 +1,10 @@
 //! Application shared state.
 
+use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use z8run_core::engine::FlowEngine;
+use z8run_core::nodes::http_out::{self, WebhookResponders};
 use z8run_storage::repository::FlowRepository;
 
 /// Global application state, shared between handlers.
@@ -14,15 +17,22 @@ pub struct AppState {
     pub jwt_secret: String,
     /// Server port.
     pub port: u16,
+    /// Webhook response channels keyed by trace_id.
+    pub webhook_responders: WebhookResponders,
 }
 
 impl AppState {
     pub fn new(storage: Arc<dyn FlowRepository>, jwt_secret: String, port: u16) -> Self {
+        let responders: WebhookResponders = Arc::new(RwLock::new(HashMap::new()));
+        // Initialize the global responder map so http-out nodes can access it
+        http_out::init_webhook_responders(Arc::clone(&responders));
+
         Self {
             engine: FlowEngine::new(),
             storage,
             jwt_secret,
             port,
+            webhook_responders: responders,
         }
     }
 }

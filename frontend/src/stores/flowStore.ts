@@ -10,7 +10,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
-import type { Z8NodeData } from "@/types/flow";
+import type { Z8NodeData, NodeStatus } from "@/types/flow";
 import { flowsApi, type SaveFlowRequest } from "@/api/flows";
 
 interface FlowState {
@@ -31,6 +31,8 @@ interface FlowState {
   onConnect: (connection: Connection) => void;
   addNode: (type: string, data: Z8NodeData, position: XYPosition) => void;
   updateNodeData: (id: string, data: Partial<Z8NodeData>) => void;
+  setNodeStatus: (id: string, status: NodeStatus) => void;
+  resetAllNodeStatus: () => void;
   setFlowName: (name: string) => void;
   removeSelected: () => void;
   clear: () => void;
@@ -79,6 +81,21 @@ export const useFlowStore = create<FlowState>((set, get) => ({
         node.id === id ? { ...node, data: { ...node.data, ...data } } : node,
       ),
       dirty: true,
+    }),
+
+  setNodeStatus: (id, status: NodeStatus) =>
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === id ? { ...node, data: { ...node.data, status } } : node,
+      ),
+    }),
+
+  resetAllNodeStatus: () =>
+    set({
+      nodes: get().nodes.map((node) => ({
+        ...node,
+        data: { ...node.data, status: "idle" as NodeStatus },
+      })),
     }),
 
   removeSelected: () =>

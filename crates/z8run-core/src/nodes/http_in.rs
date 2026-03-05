@@ -1,7 +1,8 @@
 //! HTTP In node: trigger node that starts a flow.
 //!
-//! This is a root node (no inputs). When the flow executes,
-//! it generates an initial HTTP-like trigger message.
+//! When triggered from a webhook, the incoming message already contains
+//! the real HTTP request data. The node restructures it into a standard
+//! `{ req: { method, path, headers, query, body } }` format.
 
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
@@ -24,16 +25,25 @@ impl NodeExecutor for HttpInNode {
             "HTTP In trigger"
         );
 
-        // Enrich the trigger message with HTTP request-like data
-        let payload = serde_json::json!({
-            "req": {
-                "method": self.method,
-                "path": self.path,
-                "headers": {},
-                "query": {},
-                "body": msg.payload,
-            }
-        });
+        // Check if the incoming message already has real HTTP data (from webhook)
+        let payload = if msg.payload.get("method").is_some() {
+            // Real webhook trigger — payload has { method, path, headers, query, body }
+            serde_json::json!({ "req": msg.payload })
+        } else if msg.payload.get("req").is_some() {
+            // Already wrapped in "req" — pass through
+            msg.payload.clone()
+        } else {
+            // Default trigger (no real HTTP data) — generate stub
+            serde_json::json!({
+                "req": {
+                    "method": self.method,
+                    "path": self.path,
+                    "headers": {},
+                    "query": {},
+                    "body": msg.payload,
+                }
+            })
+        };
 
         let out = msg.derive(msg.source_node, "output", payload);
         Ok(vec![out])

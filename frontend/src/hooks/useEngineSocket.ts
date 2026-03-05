@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { create } from "zustand";
+import { useFlowStore } from "@/stores/flowStore";
 
 /** Engine event received from the WebSocket. */
 export interface EngineEvent {
@@ -13,6 +14,10 @@ export interface EngineEvent {
   duration_us?: number;
   duration_ms?: number;
   error?: string;
+  /** Payload preview for message_sent events */
+  payload?: unknown;
+  /** Output preview for node_completed events */
+  output?: unknown;
 }
 
 interface EngineLogEntry {
@@ -21,25 +26,102 @@ interface EngineLogEntry {
   event: EngineEvent;
 }
 
+/** Maps core UUID → canvas node ID for visual feedback */
+type NodeMap = Record<string, string>;
+
+/** Info about a canvas node, resolved for log display */
+export interface NodeInfo {
+  canvasId: string;
+  label: string;
+  nodeType: string;
+}
+
+/** Maps core UUID → node info for descriptive logs */
+type NodeInfoMap = Record<string, NodeInfo>;
+
 interface EngineStore {
   connected: boolean;
   running: boolean;
   logs: EngineLogEntry[];
+  /** Reverse map: core UUID → canvas node ID */
+  nodeMap: NodeMap;
+  /** Reverse map: core UUID → {canvasId, label, nodeType} for log display */
+  nodeInfoMap: NodeInfoMap;
   setConnected: (v: boolean) => void;
   setRunning: (v: boolean) => void;
   addLog: (event: EngineEvent) => void;
   clearLogs: () => void;
+  /** Store the node_map returned by start_flow (canvas_id → UUID), reversed for lookup */
+  setNodeMap: (map: Record<string, string>) => void;
 }
 
 let logCounter = 0;
+let resetTimer: ReturnType<typeof setTimeout> | null = null;
+/** Queue of node events that arrived before node_map was available */
+let pendingNodeEvents: EngineEvent[] = [];
+
+/** Apply a node event to the canvas (update node visual status) */
+function applyNodeEvent(event: EngineEvent, nodeMap: NodeMap) {
+  if (!event.node_id) return;
+  const canvasId = nodeMap[event.node_id];
+  if (!canvasId) return;
+  const { setNodeStatus } = useFlowStore.getState();
+  if (event.type === "node_started") {
+    setNodeStatus(canvasId, "running");
+  } else if (event.type === "node_completed") {
+    setNodeStatus(canvasId, "success");
+  } else if (event.type === "node_error") {
+    setNodeStatus(canvasId, "error");
+  }
+}
 
 export const useEngineStore = create<EngineStore>((set, get) => ({
   connected: false,
   running: false,
   logs: [],
+  nodeMap: {},
+  nodeInfoMap: {},
 
   setConnected: (v) => set({ connected: v }),
   setRunning: (v) => set({ running: v }),
+
+  setNodeMap: (forwardMap) => {
+    // Reverse: canvas_id → uuid  →  uuid → canvas_id
+    const reversed: NodeMap = {};
+    const infoMap: NodeInfoMap = {};
+
+    // Get canvas nodes from flowStore to resolve names
+    const canvasNodes = useFlowStore.getState().nodes;
+    const nodeDataById: Record<string, { label: string; nodeType: string }> = {};
+    for (const n of canvasNodes) {
+      const d = n.data as Record<string, unknown>;
+      nodeDataById[n.id] = {
+        label: String(d.label ?? "Node"),
+        nodeType: String(d.type ?? d.nodeType ?? "unknown"),
+      };
+    }
+
+    for (const [canvasId, uuid] of Object.entries(forwardMap)) {
+      reversed[uuid] = canvasId;
+      const meta = nodeDataById[canvasId];
+      infoMap[uuid] = {
+        canvasId,
+        label: meta?.label ?? canvasId,
+        nodeType: meta?.nodeType ?? "unknown",
+      };
+    }
+
+    set({ nodeMap: reversed, nodeInfoMap: infoMap });
+
+    // Replay any events that arrived before the map was ready
+    if (pendingNodeEvents.length > 0) {
+      const queued = [...pendingNodeEvents];
+      pendingNodeEvents = [];
+      for (const evt of queued) {
+        applyNodeEvent(evt, reversed);
+      }
+    }
+  },
 
   addLog: (event) => {
     logCounter++;
@@ -48,18 +130,37 @@ export const useEngineStore = create<EngineStore>((set, get) => ({
       timestamp: new Date(),
       event,
     };
-    // Keep last 200 entries
     const logs = [...get().logs, entry].slice(-200);
     set({ logs });
 
     // Update running state based on event type
     if (event.type === "flow_started") {
       set({ running: true });
+      pendingNodeEvents = []; // clear any stale queue
+      useFlowStore.getState().resetAllNodeStatus();
     } else if (
       event.type === "flow_completed" ||
       event.type === "flow_error"
     ) {
       set({ running: false });
+      // Keep success/error visible for 4 seconds, then reset to idle
+      if (resetTimer) clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => {
+        useFlowStore.getState().resetAllNodeStatus();
+        resetTimer = null;
+      }, 4000);
+    }
+
+    // Update individual node visual status
+    const { nodeMap } = get();
+    if (event.node_id) {
+      if (Object.keys(nodeMap).length > 0) {
+        // Map is ready — apply immediately
+        applyNodeEvent(event, nodeMap);
+      } else {
+        // Map not ready yet (HTTP response still in flight) — queue for replay
+        pendingNodeEvents.push(event);
+      }
     }
   },
 

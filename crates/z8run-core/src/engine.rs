@@ -26,6 +26,8 @@ pub enum EngineEvent {
         flow_id: Uuid,
         node_id: Uuid,
         duration_us: u64,
+        /// Truncated output payload for UI display (first output message).
+        output_preview: Option<serde_json::Value>,
     },
     /// A node failed.
     NodeError {
@@ -39,6 +41,8 @@ pub enum EngineEvent {
         from_node: Uuid,
         to_node: Uuid,
         message_id: Uuid,
+        /// Truncated payload for UI display.
+        payload_preview: Option<serde_json::Value>,
     },
     /// A flow completed execution.
     FlowCompleted {
@@ -106,6 +110,40 @@ pub trait NodeExecutorFactory: Send + Sync {
     fn node_type(&self) -> &str;
 }
 
+/// Truncate a JSON payload for UI preview (max ~500 chars).
+/// Deeply nested objects get replaced with a summary.
+fn truncate_payload(value: &serde_json::Value) -> serde_json::Value {
+    let s = value.to_string();
+    if s.len() <= 500 {
+        return value.clone();
+    }
+    // For large payloads, show top-level keys with truncated values
+    if let serde_json::Value::Object(map) = value {
+        let mut preview = serde_json::Map::new();
+        for (k, v) in map.iter().take(10) {
+            let vs = v.to_string();
+            if vs.len() > 100 {
+                preview.insert(
+                    k.clone(),
+                    serde_json::Value::String(format!("{}...", &vs[..97])),
+                );
+            } else {
+                preview.insert(k.clone(), v.clone());
+            }
+        }
+        if map.len() > 10 {
+            preview.insert(
+                "_truncated".to_string(),
+                serde_json::Value::String(format!("...and {} more keys", map.len() - 10)),
+            );
+        }
+        serde_json::Value::Object(preview)
+    } else {
+        // For non-objects, just truncate the string
+        serde_json::Value::String(format!("{}...", &s[..497]))
+    }
+}
+
 impl FlowEngine {
     /// Creates a new flow engine.
     pub fn new() -> Self {
@@ -139,7 +177,21 @@ impl FlowEngine {
     /// Compiles and executes a flow.
     #[instrument(skip(self, flow), fields(flow_id = %flow.id, flow_name = %flow.name))]
     pub async fn execute(&self, flow: Flow) -> Z8Result<Uuid> {
-        let trace_id = Uuid::now_v7();
+        self.execute_with_trigger(flow, None).await
+    }
+
+    /// Compiles and executes a flow with an optional trigger message.
+    /// When `trigger_msg` is provided, root nodes receive it instead of generating a default one.
+    #[instrument(skip(self, flow, trigger_msg), fields(flow_id = %flow.id, flow_name = %flow.name))]
+    pub async fn execute_with_trigger(
+        &self,
+        flow: Flow,
+        trigger_msg: Option<FlowMessage>,
+    ) -> Z8Result<Uuid> {
+        let trace_id = trigger_msg
+            .as_ref()
+            .map(|m| m.trace_id)
+            .unwrap_or_else(Uuid::now_v7);
         let flow_id = flow.id;
 
         info!("Compiling execution plan");
@@ -175,7 +227,7 @@ impl FlowEngine {
         tokio::spawn(async move {
             let start = std::time::Instant::now();
 
-            match engine.execute_plan(&flow_clone, &plan, trace_id).await {
+            match engine.execute_plan(&flow_clone, &plan, trace_id, trigger_msg.as_ref()).await {
                 Ok(()) => {
                     let duration_ms = start.elapsed().as_millis() as u64;
                     info!(duration_ms, "Flow completed successfully");
@@ -207,6 +259,7 @@ impl FlowEngine {
         flow: &Flow,
         plan: &ExecutionPlan,
         trace_id: Uuid,
+        trigger_msg: Option<&FlowMessage>,
     ) -> Z8Result<()> {
         // Communication channels between nodes: node_id -> sender
         let mut channels: HashMap<Uuid, mpsc::Sender<FlowMessage>> = HashMap::new();
@@ -264,6 +317,7 @@ impl FlowEngine {
                     .collect();
 
                 let registry = self.node_registry.clone();
+                let trigger_clone = trigger_msg.cloned();
 
                 let handle = tokio::spawn(async move {
                     let start = std::time::Instant::now();
@@ -291,25 +345,37 @@ impl FlowEngine {
                             }
                         }
                     } else {
-                        // Root node: generate trigger message
-                        let trigger_msg = FlowMessage::new(
-                            node_id,
-                            "trigger",
-                            serde_json::json!({"triggered": true}),
-                            trace_id,
-                        );
-                        executor.process(trigger_msg).await?
+                        // Root node: use provided trigger message or generate a default
+                        let root_msg = if let Some(ref tmsg) = trigger_clone {
+                            // Use the webhook trigger message, but update source_node
+                            let mut m = tmsg.clone();
+                            m.source_node = node_id;
+                            m
+                        } else {
+                            FlowMessage::new(
+                                node_id,
+                                "trigger",
+                                serde_json::json!({"triggered": true}),
+                                trace_id,
+                            )
+                        };
+                        executor.process(root_msg).await?
                     };
 
+                    // Capture the first output payload for UI preview
+                    let output_preview = messages.first().map(|m| truncate_payload(&m.payload));
+
                     // Send messages to target nodes
-                    for msg in messages {
+                    for msg in &messages {
                         for (port, to_node, tx) in &out_channels {
                             if msg.source_port == *port || out_channels.len() == 1 {
+                                let preview = truncate_payload(&msg.payload);
                                 let _ = event_tx.send(EngineEvent::MessageSent {
                                     flow_id,
                                     from_node: node_id,
                                     to_node: *to_node,
                                     message_id: msg.id,
+                                    payload_preview: Some(preview),
                                 });
                                 if tx.send(msg.clone()).await.is_err() {
                                     warn!("Channel closed when sending to node {}", to_node);
@@ -323,6 +389,7 @@ impl FlowEngine {
                         flow_id,
                         node_id,
                         duration_us,
+                        output_preview,
                     });
 
                     Ok::<(), Z8Error>(())

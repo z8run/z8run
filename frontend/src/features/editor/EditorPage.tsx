@@ -11,6 +11,7 @@ import { useUIStore } from "@/stores/uiStore";
 import { useEngineSocket } from "@/hooks/useEngineSocket";
 import { flowsApi } from "@/api/flows";
 import type { Z8NodeData } from "@/types/flow";
+import { NODE_DEFINITIONS } from "@/lib/nodeDefinitions";
 
 /** Inner component that has access to ReactFlow context for Ctrl+S */
 function EditorInner() {
@@ -21,10 +22,32 @@ function EditorInner() {
   const reactFlow = useReactFlow();
 
   // Load flow from backend (including saved canvas state)
+  // Enrich nodes with inputs/outputs from NODE_DEFINITIONS if missing
   useEffect(() => {
     if (!id) return;
     flowsApi.get(id).then((flow) => {
-      const nodes = (flow.canvas_nodes ?? []) as Node<Z8NodeData>[];
+      const rawNodes = (flow.canvas_nodes ?? []) as Node<Z8NodeData>[];
+      const nodes = rawNodes.map((node) => {
+        const data = node.data;
+        const nodeType = data.type ?? (data as Record<string, unknown>).nodeType as string;
+        // If inputs/outputs are missing, look them up from NODE_DEFINITIONS
+        if (nodeType && (!data.inputs?.length || !data.outputs?.length)) {
+          const def = NODE_DEFINITIONS.find((d) => d.type === nodeType);
+          if (def) {
+            return {
+              ...node,
+              data: {
+                ...data,
+                inputs: data.inputs?.length ? data.inputs : def.inputs,
+                outputs: data.outputs?.length ? data.outputs : def.outputs,
+                category: data.category ?? def.category,
+                icon: data.icon ?? def.icon,
+              },
+            };
+          }
+        }
+        return node;
+      });
       const edges = (flow.canvas_edges ?? []) as Edge[];
       setFlow(flow.id, flow.name, nodes, edges);
     });

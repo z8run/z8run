@@ -1,12 +1,43 @@
-//! HTTP Out node: terminal node that "responds" to an HTTP request.
+//! HTTP Out node: terminal node that sends an HTTP response.
 //!
-//! For MVP, this just logs the response. In production,
-//! it would send an actual HTTP response via a held connection.
+//! When used with a webhook, it looks up the oneshot sender by trace_id
+//! and sends the response back to the waiting HTTP handler.
+//! When no webhook is waiting, it logs the response.
+
+use std::collections::HashMap;
+use std::sync::{Arc, OnceLock};
+use tokio::sync::{oneshot, RwLock};
+use uuid::Uuid;
 
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
-use tracing::info;
+use tracing::{info, warn};
+
+/// Webhook response data sent through the oneshot channel.
+#[derive(Debug, Clone)]
+pub struct WebhookResponse {
+    pub status: u16,
+    pub headers: HashMap<String, String>,
+    pub body: serde_json::Value,
+}
+
+/// Thread-safe map of trace_id → oneshot sender.
+pub type WebhookResponders = Arc<RwLock<HashMap<Uuid, oneshot::Sender<WebhookResponse>>>>;
+
+/// Global responder map, set once during app initialization.
+static WEBHOOK_RESPONDERS: OnceLock<WebhookResponders> = OnceLock::new();
+
+/// Initialize the global webhook responders map.
+/// Call this once during server startup.
+pub fn init_webhook_responders(responders: WebhookResponders) {
+    let _ = WEBHOOK_RESPONDERS.set(responders);
+}
+
+/// Get the global webhook responders map.
+pub fn get_webhook_responders() -> Option<&'static WebhookResponders> {
+    WEBHOOK_RESPONDERS.get()
+}
 
 pub struct HttpOutNode {
     name: String,
@@ -19,10 +50,29 @@ impl NodeExecutor for HttpOutNode {
         info!(
             node = %self.name,
             status = self.status_code,
+            trace_id = %msg.trace_id,
             payload = %msg.payload,
             "HTTP Out response"
         );
 
+        // Try to send response through webhook oneshot channel
+        if let Some(responders) = WEBHOOK_RESPONDERS.get() {
+            let sender = responders.write().await.remove(&msg.trace_id);
+            if let Some(tx) = sender {
+                let response = WebhookResponse {
+                    status: self.status_code,
+                    headers: HashMap::new(),
+                    body: msg.payload.clone(),
+                };
+                if tx.send(response).is_err() {
+                    warn!(trace_id = %msg.trace_id, "Webhook receiver already dropped");
+                } else {
+                    info!(trace_id = %msg.trace_id, "Sent webhook response");
+                }
+            }
+        }
+
+        // Also emit the response as an output message (for logging/chaining)
         let payload = serde_json::json!({
             "res": {
                 "status": self.status_code,
