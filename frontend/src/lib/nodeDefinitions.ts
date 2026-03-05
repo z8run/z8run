@@ -151,8 +151,20 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     icon: "Database",
     description: "Query a database",
     inputs: [{ id: "query", name: "Query", type: "string" }],
-    outputs: [{ id: "results", name: "Results", type: "array" }],
-    defaultConfig: { type: "sqlite", query: "" },
+    outputs: [
+      { id: "results", name: "Results", type: "array" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      dbType: "postgres",
+      host: "localhost",
+      port: 5432,
+      database: "",
+      user: "",
+      password: "",
+      query: "",
+      params: [],
+    },
   },
 ];
 

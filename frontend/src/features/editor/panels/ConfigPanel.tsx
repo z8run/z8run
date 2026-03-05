@@ -23,6 +23,22 @@ function humanizeKey(key: string): string {
 /** HTTP methods for dropdown */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"];
 
+/** Database types */
+const DB_TYPES = [
+  { value: "postgres", label: "PostgreSQL" },
+  { value: "mysql", label: "MySQL" },
+  { value: "sqlite", label: "SQLite" },
+  { value: "mssql", label: "SQL Server" },
+];
+
+/** Default ports per database type */
+const DB_DEFAULT_PORTS: Record<string, number> = {
+  postgres: 5432,
+  mysql: 3306,
+  sqlite: 0,
+  mssql: 1433,
+};
+
 /** Common HTTP status codes for dropdown */
 const HTTP_STATUS_CODES = [
   { value: 200, label: "200 — OK" },
@@ -128,7 +144,103 @@ function SmartConfigField({
       >
         <option value="parse">Parse (string → object)</option>
         <option value="stringify">Stringify (object → string)</option>
+        <option value="extract">Extract (dot-notation path)</option>
       </select>
+    );
+  }
+
+  // Database type dropdown
+  if (fieldKey === "dbType" && nodeType === "database") {
+    return (
+      <select
+        value={String(value ?? "postgres")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        {DB_TYPES.map((db) => (
+          <option key={db.value} value={db.value}>{db.label}</option>
+        ))}
+      </select>
+    );
+  }
+
+  // Database host
+  if (fieldKey === "host" && nodeType === "database") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "localhost")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="localhost o IP del servidor"
+        className={inputClass}
+      />
+    );
+  }
+
+  // Database port
+  if (fieldKey === "port" && nodeType === "database") {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 5432)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+        min={0}
+        max={65535}
+      />
+    );
+  }
+
+  // Database name
+  if (fieldKey === "database" && nodeType === "database") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="nombre_de_la_base_de_datos"
+        className={inputClass}
+      />
+    );
+  }
+
+  // Database user
+  if (fieldKey === "user" && nodeType === "database") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="usuario"
+        className={inputClass}
+      />
+    );
+  }
+
+  // Database password
+  if (fieldKey === "password" && nodeType === "database") {
+    return (
+      <input
+        type="password"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="••••••••"
+        className={inputClass}
+      />
+    );
+  }
+
+  // Query textarea for database
+  if (fieldKey === "query" && nodeType === "database") {
+    return (
+      <textarea
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        rows={4}
+        placeholder="SELECT * FROM users WHERE id = $1"
+        className={`${inputClass} resize-y`}
+        spellCheck={false}
+      />
     );
   }
 
@@ -155,7 +267,8 @@ function SmartConfigField({
 function hasSmartField(key: string, nodeType: string): boolean {
   return ["method", "statusCode", "url", "timeout"].includes(key)
     || (key === "action" && nodeType === "json")
-    || key === "unit";
+    || key === "unit"
+    || (nodeType === "database" && ["dbType", "host", "port", "database", "user", "password", "query"].includes(key));
 }
 
 /** Available switch operators with human-friendly labels */

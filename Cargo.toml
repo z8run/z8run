@@ -49,7 +49,7 @@ bincode = "1.3"
 toml = "0.8"
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "uuid", "chrono", "json"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "mysql", "uuid", "chrono", "json"] }
 
 # WASM runtime
 wasmtime = "42"
