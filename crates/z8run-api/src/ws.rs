@@ -87,6 +87,13 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
             "trace_id": trace_id.to_string(),
             "error": error,
         }),
+        EngineEvent::StreamChunk { flow_id, node_id, chunk, done } => serde_json::json!({
+            "type": "stream_chunk",
+            "flow_id": flow_id.to_string(),
+            "node_id": node_id.to_string(),
+            "chunk": chunk,
+            "done": done,
+        }),
     }
 }
 

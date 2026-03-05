@@ -3,6 +3,7 @@ import { FlowListPage } from "@/features/flows/FlowListPage";
 import { EditorPage } from "@/features/editor/EditorPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RegisterPage } from "@/features/auth/RegisterPage";
+import { VaultPage } from "@/features/vault/VaultPage";
 import { useAuthStore } from "@/stores/authStore";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,14 @@ export function App() {
           element={
             <ProtectedRoute>
               <EditorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/vault"
+          element={
+            <ProtectedRoute>
+              <VaultPage />
             </ProtectedRoute>
           }
         />

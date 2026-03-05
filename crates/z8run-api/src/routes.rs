@@ -29,6 +29,9 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/flows/{id}/stop", post(stop_flow))
         .route("/flows/{id}/export", get(export_flow))
         .route("/flows/import", post(import_flow))
+        // Vault
+        .route("/vault", get(list_credentials).post(store_credential))
+        .route("/vault/{key}", get(get_credential).delete(delete_credential))
         // Health check
         .route("/health", get(health_check))
         .route("/info", get(server_info))
@@ -448,6 +451,60 @@ fn parse_port_type(s: &str) -> PortType {
         "binary" => PortType::Binary,
         _ => PortType::Any,
     }
+}
+
+/// GET /api/v1/vault
+/// List all credential keys (not values!)
+async fn list_credentials(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(_claims): axum::Extension<Claims>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let keys = state.vault.list_keys().await
+        .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
+    Ok(Json(serde_json::json!({ "keys": keys })))
+}
+
+/// POST /api/v1/vault
+/// Store a credential
+/// Body: { "key": "openai_api_key", "value": "sk-..." }
+async fn store_credential(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(_claims): axum::Extension<Claims>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let key = body["key"].as_str()
+        .ok_or_else(|| ApiError::bad_request("Missing 'key' field"))?;
+    let value = body["value"].as_str()
+        .ok_or_else(|| ApiError::bad_request("Missing 'value' field"))?;
+
+    state.vault.store(key, value).await
+        .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
+
+    Ok(Json(serde_json::json!({ "status": "stored", "key": key })))
+}
+
+/// GET /api/v1/vault/:key
+/// Retrieve a credential value
+async fn get_credential(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(_claims): axum::Extension<Claims>,
+    Path(key): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let value = state.vault.retrieve(&key).await
+        .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
+    Ok(Json(serde_json::json!({ "key": key, "value": value })))
+}
+
+/// DELETE /api/v1/vault/:key
+/// Delete a credential
+async fn delete_credential(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(_claims): axum::Extension<Claims>,
+    Path(key): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.vault.delete(&key).await
+        .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
+    Ok(Json(serde_json::json!({ "status": "deleted", "key": key })))
 }
 
 /// POST /api/v1/flows/:id/stop

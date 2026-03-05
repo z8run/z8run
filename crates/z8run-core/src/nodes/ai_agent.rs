@@ -8,11 +8,13 @@
 //!   - "tool_call" port: When agent wants to call a tool (tool_name, arguments, iteration)
 //!   - "error" port: API or configuration errors
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::{NodeExecutor, NodeExecutorFactory, EngineEvent};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
 use serde::{Deserialize, Serialize};
 use tracing::{info, warn};
+use tokio::sync::broadcast;
+use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ToolDefinition {
@@ -21,6 +23,7 @@ pub struct ToolDefinition {
     pub parameters: serde_json::Value,
 }
 
+#[allow(dead_code)]
 pub struct AiAgentNode {
     name: String,
     provider: String,         // "openai", "anthropic", "ollama"
@@ -32,6 +35,9 @@ pub struct AiAgentNode {
     max_iterations: u32,
     temperature: f64,
     timeout_ms: u64,
+    event_tx: Option<broadcast::Sender<EngineEvent>>,
+    flow_id: Option<Uuid>,
+    node_id: Option<Uuid>,
 }
 
 #[async_trait::async_trait]
@@ -165,6 +171,10 @@ impl NodeExecutor for AiAgentNode {
             ));
         }
         Ok(())
+    }
+
+    fn set_event_emitter(&mut self, tx: broadcast::Sender<EngineEvent>) {
+        self.event_tx = Some(tx);
     }
 
     fn node_type(&self) -> &str {
@@ -451,6 +461,9 @@ impl NodeExecutorFactory for AiAgentNodeFactory {
             max_iterations: 5,
             temperature: 0.7,
             timeout_ms: 30000,
+            event_tx: None,
+            flow_id: None,
+            node_id: None,
         };
         node.configure(config).await?;
         Ok(Box::new(node))

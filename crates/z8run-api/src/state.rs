@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 use z8run_core::engine::FlowEngine;
 use z8run_core::nodes::http_out::{self, WebhookResponders};
 use z8run_storage::repository::{FlowRepository, UserRepository};
+use z8run_storage::credential_vault::CredentialVault;
 
 /// Global application state, shared between handlers.
 pub struct AppState {
@@ -15,6 +16,8 @@ pub struct AppState {
     pub storage: Arc<dyn FlowRepository>,
     /// User storage backend for authentication.
     pub user_storage: Arc<dyn UserRepository>,
+    /// Credential vault for storing encrypted secrets.
+    pub vault: Arc<dyn CredentialVault>,
     /// Secret for signing JWT tokens.
     pub jwt_secret: String,
     /// Server port.
@@ -27,6 +30,7 @@ impl AppState {
     pub fn new(
         storage: Arc<dyn FlowRepository>,
         user_storage: Arc<dyn UserRepository>,
+        vault: Arc<dyn CredentialVault>,
         jwt_secret: String,
         port: u16,
     ) -> Self {
@@ -38,6 +42,7 @@ impl AppState {
             engine: FlowEngine::new(),
             storage,
             user_storage,
+            vault,
             jwt_secret,
             port,
             webhook_responders: responders,

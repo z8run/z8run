@@ -154,32 +154,43 @@ async fn cmd_serve(
         format!("sqlite://{}/z8run.db?mode=rwc", data_dir)
     });
 
-    let (storage, user_storage): (
+    let jwt_secret = "z8run-dev-secret".to_string(); // TODO: generate or load from config
+    let vault_secret = std::env::var("Z8_VAULT_SECRET")
+        .unwrap_or_else(|_| jwt_secret.clone());
+
+    let (storage, user_storage, vault): (
         Arc<dyn z8run_storage::repository::FlowRepository>,
         Arc<dyn z8run_storage::repository::UserRepository>,
+        Arc<dyn z8run_storage::credential_vault::CredentialVault>,
     ) = if url.starts_with("postgres") {
         tracing::info!(url = %url, "Connecting to PostgreSQL");
         let pg = z8run_storage::postgres::PgStorage::new(&url).await?;
         pg.migrate().await?;
         tracing::info!("PostgreSQL ready");
         let pg_arc = Arc::new(pg);
+        let vault_pg = Arc::new(z8run_storage::credential_vault::PgCredentialVault::new(pg_arc.pool().clone(), &vault_secret));
         (pg_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
-         pg_arc as Arc<dyn z8run_storage::repository::UserRepository>)
+         pg_arc as Arc<dyn z8run_storage::repository::UserRepository>,
+         vault_pg as Arc<dyn z8run_storage::credential_vault::CredentialVault>)
     } else {
         tracing::info!(url = %url, "Connecting to SQLite");
         let sqlite = z8run_storage::sqlite::SqliteStorage::new(&url).await?;
         sqlite.migrate().await?;
         tracing::info!("SQLite ready");
         let sqlite_arc = Arc::new(sqlite);
+        let vault_sqlite = Arc::new(z8run_storage::credential_vault::SqliteCredentialVault::new(sqlite_arc.pool().clone(), &vault_secret));
         (sqlite_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
-         sqlite_arc as Arc<dyn z8run_storage::repository::UserRepository>)
+         sqlite_arc as Arc<dyn z8run_storage::repository::UserRepository>,
+         vault_sqlite as Arc<dyn z8run_storage::credential_vault::CredentialVault>)
     };
+    tracing::info!("Credential vault initialized");
 
     // Create application state
     let state = Arc::new(z8run_api::state::AppState::new(
         storage,
         user_storage,
-        "z8run-dev-secret".to_string(), // TODO: generate or load from config
+        vault,
+        jwt_secret,
         port,
     ));
 

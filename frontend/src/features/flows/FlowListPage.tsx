@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, Trash2, Play, Clock, AlertTriangle, LogOut, Download, Upload } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Plus, Trash2, Play, Clock, AlertTriangle, LogOut, Download, Upload, Shield } from "lucide-react";
 import { useFlowListStore } from "@/stores/flowListStore";
 import { useAuthStore } from "@/stores/authStore";
 import { flowsApi } from "@/api/flows";
@@ -91,6 +91,13 @@ export function FlowListPage() {
             {user && (
               <span className="text-xs text-slate-500">{user.email}</span>
             )}
+            <Link
+              to="/vault"
+              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+              title="Credential Vault"
+            >
+              <Shield size={16} />
+            </Link>
             <button
               type="button"
               onClick={logout}

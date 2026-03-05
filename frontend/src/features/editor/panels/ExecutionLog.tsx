@@ -3,7 +3,7 @@ import { useEngineStore } from "@/hooks/useEngineSocket";
 import type { EngineEvent, NodeInfo } from "@/hooks/useEngineSocket";
 import {
   Trash2, ChevronUp, ChevronDown, ChevronRight,
-  Play, CheckCircle2, XCircle, ArrowRight, Zap, AlertTriangle, SkipForward, Globe,
+  Play, CheckCircle2, XCircle, ArrowRight, Zap, AlertTriangle, SkipForward, Globe, MessageSquare,
 } from "lucide-react";
 
 type ResolveFn = (id: string) => NodeInfo | undefined;
@@ -116,6 +116,18 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
       const fromName = from?.label ?? e.from_node?.substring(0, 8) ?? "?";
       const toName = to?.label ?? e.to_node?.substring(0, 8) ?? "?";
       return `${fromName} → ${toName}`;
+    },
+  },
+  stream_chunk: {
+    icon: MessageSquare,
+    color: "text-purple-400",
+    label: "STREAM",
+    detail: (e, resolve) => {
+      const info = e.node_id ? resolve(e.node_id) : undefined;
+      if (e.done) {
+        return info ? `"${info.label}" finished streaming` : "Streaming finished";
+      }
+      return info ? `"${info.label}" streaming...` : "Streaming...";
     },
   },
 };

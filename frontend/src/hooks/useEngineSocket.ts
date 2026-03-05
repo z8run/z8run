@@ -18,6 +18,10 @@ export interface EngineEvent {
   payload?: unknown;
   /** Output preview for node_completed events */
   output?: unknown;
+  /** Streaming chunk for stream_chunk events */
+  chunk?: string;
+  /** Whether streaming is complete for stream_chunk events */
+  done?: boolean;
 }
 
 interface EngineLogEntry {
@@ -47,6 +51,8 @@ interface EngineStore {
   nodeMap: NodeMap;
   /** Reverse map: core UUID → {canvasId, label, nodeType} for log display */
   nodeInfoMap: NodeInfoMap;
+  /** Accumulated streaming text by node_id */
+  streamingNodes: Record<string, string>;
   setConnected: (v: boolean) => void;
   setRunning: (v: boolean) => void;
   addLog: (event: EngineEvent) => void;
@@ -83,6 +89,7 @@ export const useEngineStore = create<EngineStore>((set, get) => ({
   logs: [],
   nodeMap: {},
   nodeInfoMap: {},
+  streamingNodes: {},
 
   setConnected: (v) => set({ connected: v }),
   setRunning: (v) => set({ running: v }),
@@ -126,6 +133,33 @@ export const useEngineStore = create<EngineStore>((set, get) => ({
   },
 
   addLog: (event) => {
+    // Handle stream chunks separately — don't create a log entry for each chunk
+    if (event.type === "stream_chunk") {
+      const { streamingNodes } = get();
+      const nodeId = event.node_id;
+
+      if (nodeId) {
+        if (event.done) {
+          // Final chunk — clear the streaming state for this node
+          const updated = { ...streamingNodes };
+          delete updated[nodeId];
+          set({ streamingNodes: updated });
+        } else if (event.chunk) {
+          // Accumulate chunk
+          const accumulated = (streamingNodes[nodeId] || "") + event.chunk;
+          set({ streamingNodes: { ...streamingNodes, [nodeId]: accumulated } });
+
+          // Update node visual feedback (show it's streaming)
+          const { nodeMap } = get();
+          if (nodeId && nodeMap[nodeId]) {
+            useFlowStore.getState().setNodeStatus(nodeMap[nodeId], "running");
+          }
+        }
+      }
+      // Don't create a log entry for intermediate chunks
+      return;
+    }
+
     logCounter++;
     const entry: EngineLogEntry = {
       id: logCounter,

@@ -19,6 +19,7 @@ regex = { workspace = true }
 reqwest = { workspace = true }
 sqlx = { workspace = true }
 rumqttc = { workspace = true }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

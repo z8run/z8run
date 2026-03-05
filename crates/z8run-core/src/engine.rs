@@ -49,6 +49,14 @@ pub enum EngineEvent {
         /// Truncated payload for UI display.
         payload_preview: Option<serde_json::Value>,
     },
+    /// A streaming chunk from a node (e.g., LLM token).
+    StreamChunk {
+        flow_id: Uuid,
+        node_id: Uuid,
+        chunk: String,
+        /// Whether this is the final chunk.
+        done: bool,
+    },
     /// A flow completed execution.
     FlowCompleted {
         flow_id: Uuid,
@@ -81,6 +89,10 @@ pub trait NodeExecutor: Send + Sync {
     async fn shutdown(&self) -> Z8Result<()> {
         Ok(())
     }
+
+    /// Optionally provides an event emitter for streaming.
+    /// Default implementation does nothing.
+    fn set_event_emitter(&mut self, _tx: broadcast::Sender<EngineEvent>) {}
 
     /// Returns the name of the node type.
     fn node_type(&self) -> &str;
@@ -342,7 +354,8 @@ impl FlowEngine {
                                         node_type_str
                                     ))
                                 })?;
-                                let executor = factory.create(node_config).await?;
+                                let mut executor = factory.create(node_config).await?;
+                                executor.set_event_emitter(event_tx.clone());
                                 executor.process(msg).await?
                             }
                             None => {
@@ -364,7 +377,8 @@ impl FlowEngine {
                                 node_type_str
                             ))
                         })?;
-                        let executor = factory.create(node_config).await?;
+                        let mut executor = factory.create(node_config).await?;
+                        executor.set_event_emitter(event_tx.clone());
 
                         let root_msg = if let Some(ref tmsg) = trigger_clone {
                             let mut m = tmsg.clone();
