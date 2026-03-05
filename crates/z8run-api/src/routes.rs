@@ -691,7 +691,7 @@ async fn import_flow(
     // Validate node types — reject unknown nodes before creating the flow
     const VALID_NODE_TYPES: &[&str] = &[
         "http-in", "http-out", "http-request", "function", "debug",
-        "switch", "filter", "delay", "timer", "webhook", "json", "database",
+        "switch", "filter", "delay", "timer", "webhook", "json", "database", "mqtt",
         "llm", "embeddings", "classifier", "prompt-template", "text-splitter",
         "vector-store", "structured-output", "summarizer", "ai-agent", "image-gen",
     ];

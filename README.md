@@ -68,7 +68,7 @@ z8run is organized as a Rust workspace with focused crates:
 ```
 z8run/
 ├── crates/
-│   ├── z8run-core       # Flow engine, DAG validation, scheduler, 22 built-in nodes
+│   ├── z8run-core       # Flow engine, DAG validation, scheduler, 23 built-in nodes
 │   ├── z8run-protocol   # Binary WebSocket protocol (11-byte header)
 │   ├── z8run-storage    # SQLite / PostgreSQL persistence layer
 │   ├── z8run-runtime    # WASM plugin sandbox (wasmtime)
@@ -134,7 +134,7 @@ Connect to `ws://localhost:7700/ws/engine` for real-time communication using the
 
 ## Built-in Nodes
 
-z8run ships with 22 native nodes across 6 categories:
+z8run ships with 23 native nodes across 6 categories:
 
 | Category | Nodes |
 |---|---|
@@ -142,7 +142,7 @@ z8run ships with 22 native nodes across 6 categories:
 | **Process** | Function, JSON Transform (parse/stringify/extract), HTTP Request (outbound), Filter |
 | **Output** | Debug, HTTP Response |
 | **Logic** | Switch (multi-rule routing), Delay |
-| **Data** | Database (PostgreSQL, MySQL, SQLite support) |
+| **Data** | Database (PostgreSQL, MySQL, SQLite), MQTT (publish/subscribe) |
 | **AI** | LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen |
 
 ## Roadmap
@@ -152,7 +152,7 @@ z8run ships with 22 native nodes across 6 categories:
 - [x] REST API (Axum 0.8)
 - [x] SQLite / PostgreSQL persistence
 - [x] Visual node editor (React Flow + Zustand + Tailwind)
-- [x] 22 built-in nodes (HTTP In/Out/Request, Debug, Function, Switch, Filter, Delay, Timer, Webhook, JSON Transform, Database + 10 AI nodes)
+- [x] 23 built-in nodes (HTTP In/Out/Request, Debug, Function, Switch, Filter, Delay, Timer, Webhook, JSON Transform, Database, MQTT + 10 AI nodes)
 - [x] Real-time WebSocket execution events
 - [x] Namespaced hook routes (`/hook/{flow_id}/{path}`)
 - [x] Smart config UI (dropdowns, password fields, code editors)
@@ -162,8 +162,8 @@ z8run ships with 22 native nodes across 6 categories:
 - [x] Authentication & multi-user (JWT + argon2)
 - [x] Credential vault (AES-256-GCM encrypted connections)
 - [x] Flow import/export (JSON)
-- [ ] WASM plugin execution
-- [ ] MQTT node
+- [x] WASM plugin execution (wasmtime sandbox with capabilities)
+- [x] MQTT node (publish/subscribe with TLS)
 - [x] AI suite: LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen
 - [ ] Cloud deployment mode (Docker, Helm)
 - [ ] Plugin marketplace

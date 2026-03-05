@@ -98,6 +98,9 @@ dotenvy = "0.15"
 # Testing
 tokio-test = "0.4"
 
+# MQTT
+rumqttc = { version = "0.24", features = ["use-rustls"] }
+
 [profile.release]
 opt-level = 3
 lto = "thin"

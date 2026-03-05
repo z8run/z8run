@@ -5,14 +5,14 @@ import { CATEGORY_COLORS, PORT_COLORS } from "@/types/flow";
 import { useUIStore } from "@/stores/uiStore";
 import {
   Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database, X,
+  Bug, Send, GitBranch, Timer, Database, Radio, X,
   Brain, Fingerprint, Tags, FileText, Scissors,
   AlignLeft, Bot, Image,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
   Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database,
+  Bug, Send, GitBranch, Timer, Database, Radio,
   Brain, Fingerprint, Tags, FileText, Scissors,
   AlignLeft, Bot, Image,
 };

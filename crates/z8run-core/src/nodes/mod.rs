@@ -17,6 +17,7 @@ pub mod http_request;
 pub mod image_gen;
 pub mod json_transform;
 pub mod llm;
+pub mod mqtt;
 pub mod prompt_template;
 pub mod structured_output;
 pub mod summarizer;
@@ -69,6 +70,9 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .await;
     engine
         .register_node_type(Arc::new(llm::LlmNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(mqtt::MqttNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
     engine
         .register_node_type(Arc::new(embeddings::EmbeddingsNodeFactory) as Arc<dyn NodeExecutorFactory>)

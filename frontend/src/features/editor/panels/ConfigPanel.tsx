@@ -649,6 +649,123 @@ function SmartConfigField({
     );
   }
 
+  // --- MQTT NODES ---
+  if (fieldKey === "action" && nodeType === "mqtt") {
+    return (
+      <select
+        value={String(value ?? "publish")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="publish">Publish</option>
+        <option value="subscribe">Subscribe</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "broker" && nodeType === "mqtt") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "localhost")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="localhost"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "port" && nodeType === "mqtt") {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 1883)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+        min={1}
+        max={65535}
+      />
+    );
+  }
+
+  if (fieldKey === "topic" && nodeType === "mqtt") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "z8run/default")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="z8run/default"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "qos" && nodeType === "mqtt") {
+    return (
+      <select
+        value={Number(value ?? 0)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={selectClass}
+      >
+        <option value={0}>0 — At most once</option>
+        <option value={1}>1 — At least once</option>
+        <option value={2}>2 — Exactly once</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "clientId" && nodeType === "mqtt") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="auto-generated"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "username" && nodeType === "mqtt") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="optional"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "password" && nodeType === "mqtt") {
+    return (
+      <input
+        type="password"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="optional"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "keepAlive" && nodeType === "mqtt") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={Number(value ?? 30)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={`${inputClass} flex-1`}
+          min={1}
+          step={1}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">s</span>
+      </div>
+    );
+  }
+
   // No smart field
   return null;
 }
@@ -657,7 +774,7 @@ function SmartConfigField({
 function hasSmartField(key: string, nodeType: string): boolean {
   const AI_NODES = ["llm", "embeddings", "classifier", "structured-output", "summarizer", "ai-agent", "image-gen"];
   return ["method", "statusCode", "url", "timeout"].includes(key)
-    || (key === "action" && nodeType === "json")
+    || (key === "action" && (nodeType === "json" || nodeType === "mqtt"))
     || key === "unit"
     || (nodeType === "database" && ["dbType", "host", "port", "database", "user", "password", "query"].includes(key))
     || (AI_NODES.includes(nodeType) &&
@@ -668,7 +785,8 @@ function hasSmartField(key: string, nodeType: string): boolean {
     || (nodeType === "structured-output" && ["schema", "retries"].includes(key))
     || (nodeType === "summarizer" && ["strategy", "maxLength", "language"].includes(key))
     || (nodeType === "ai-agent" && ["tools", "maxIterations"].includes(key))
-    || (nodeType === "image-gen" && ["size", "quality", "style"].includes(key));
+    || (nodeType === "image-gen" && ["size", "quality", "style"].includes(key))
+    || (nodeType === "mqtt" && ["action", "broker", "port", "topic", "qos", "clientId", "username", "password", "keepAlive"].includes(key));
 }
 
 /** Available switch operators with human-friendly labels */

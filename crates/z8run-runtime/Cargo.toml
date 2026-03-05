@@ -16,3 +16,4 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 toml = { workspace = true }
+async-trait = { workspace = true }

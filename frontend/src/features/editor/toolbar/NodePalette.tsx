@@ -8,14 +8,14 @@ import {
 import { CATEGORY_COLORS, type NodeCategory } from "@/types/flow";
 import {
   Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database,
+  Bug, Send, GitBranch, Timer, Database, Radio,
   Brain, Fingerprint, Tags, FileText, Scissors,
   AlignLeft, Bot, Image,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database,
+  Bug, Send, GitBranch, Timer, Database, Radio,
   Brain, Fingerprint, Tags, FileText, Scissors,
   AlignLeft, Bot, Image,
 };

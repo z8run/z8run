@@ -166,6 +166,32 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       params: [],
     },
   },
+  {
+    type: "mqtt",
+    label: "MQTT",
+    category: "data",
+    icon: "Radio",
+    description: "Publish/subscribe to MQTT broker",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "message", name: "Message", type: "object" },
+      { id: "published", name: "Published", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      action: "publish",
+      broker: "localhost",
+      port: 1883,
+      topic: "z8run/default",
+      qos: 0,
+      clientId: "",
+      username: "",
+      password: "",
+      useTls: false,
+      keepAlive: 30,
+      timeout: 30000,
+    },
+  },
 
   // AI nodes
   {
