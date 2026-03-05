@@ -154,23 +154,31 @@ async fn cmd_serve(
         format!("sqlite://{}/z8run.db?mode=rwc", data_dir)
     });
 
-    let storage: Arc<dyn z8run_storage::repository::FlowRepository> = if url.starts_with("postgres") {
+    let (storage, user_storage): (
+        Arc<dyn z8run_storage::repository::FlowRepository>,
+        Arc<dyn z8run_storage::repository::UserRepository>,
+    ) = if url.starts_with("postgres") {
         tracing::info!(url = %url, "Connecting to PostgreSQL");
         let pg = z8run_storage::postgres::PgStorage::new(&url).await?;
         pg.migrate().await?;
         tracing::info!("PostgreSQL ready");
-        Arc::new(pg)
+        let pg_arc = Arc::new(pg);
+        (pg_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
+         pg_arc as Arc<dyn z8run_storage::repository::UserRepository>)
     } else {
         tracing::info!(url = %url, "Connecting to SQLite");
         let sqlite = z8run_storage::sqlite::SqliteStorage::new(&url).await?;
         sqlite.migrate().await?;
         tracing::info!("SQLite ready");
-        Arc::new(sqlite)
+        let sqlite_arc = Arc::new(sqlite);
+        (sqlite_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
+         sqlite_arc as Arc<dyn z8run_storage::repository::UserRepository>)
     };
 
     // Create application state
     let state = Arc::new(z8run_api::state::AppState::new(
         storage,
+        user_storage,
         "z8run-dev-secret".to_string(), // TODO: generate or load from config
         port,
     ));

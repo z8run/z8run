@@ -11,6 +11,7 @@ use axum::{
 };
 use uuid::Uuid;
 
+use crate::auth::Claims;
 use crate::error::ApiError;
 use crate::state::AppState;
 use z8run_core::flow::{Flow, Edge};
@@ -26,6 +27,8 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/flows/{id}", get(get_flow).put(update_flow).delete(delete_flow))
         .route("/flows/{id}/start", post(start_flow))
         .route("/flows/{id}/stop", post(stop_flow))
+        .route("/flows/{id}/export", get(export_flow))
+        .route("/flows/import", post(import_flow))
         // Health check
         .route("/health", get(health_check))
         .route("/info", get(server_info))
@@ -70,8 +73,9 @@ async fn server_info(
 /// GET /api/v1/flows
 async fn list_flows(
     State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let flows = state.storage.list_flows().await.map_err(ApiError::from)?;
+    let flows = state.storage.list_flows_by_user(claims.sub).await.map_err(ApiError::from)?;
 
     let flow_summaries: Vec<serde_json::Value> = flows
         .iter()
@@ -110,6 +114,7 @@ async fn list_flows(
 /// POST /api/v1/flows
 async fn create_flow(
     State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let name = payload["name"]
@@ -121,8 +126,8 @@ async fn create_flow(
     let mut flow = Flow::new(name);
     flow.description = description.to_string();
 
-    // Persist to database
-    state.storage.save_flow(&flow).await.map_err(ApiError::from)?;
+    // Persist to database with user ownership
+    state.storage.save_flow_with_user(&flow, claims.sub).await.map_err(ApiError::from)?;
 
     Ok(Json(serde_json::json!({
         "id": flow.id.to_string(),
@@ -136,11 +141,12 @@ async fn create_flow(
 /// PUT /api/v1/flows/:id — Update flow with canvas state (nodes, edges, metadata)
 async fn update_flow(
     State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Load existing flow
-    let mut flow = state.storage.get_flow(id).await.map_err(ApiError::from)?;
+    // Load existing flow (only if owned by user)
+    let mut flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
 
     // Update name if provided
     if let Some(name) = payload["name"].as_str() {
@@ -192,9 +198,10 @@ async fn update_flow(
 /// GET /api/v1/flows/:id
 async fn get_flow(
     State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let flow = state.storage.get_flow(id).await.map_err(ApiError::from)?;
+    let flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
 
     // Extract canvas state from metadata for the frontend
     let canvas_nodes = flow.metadata.positions.get("canvas_nodes")
@@ -227,9 +234,10 @@ async fn get_flow(
 /// DELETE /api/v1/flows/:id
 async fn delete_flow(
     State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state.storage.delete_flow(id).await.map_err(ApiError::from)?;
+    state.storage.delete_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
 
     Ok(Json(serde_json::json!({
         "deleted": id.to_string(),
@@ -239,9 +247,10 @@ async fn delete_flow(
 /// POST /api/v1/flows/:id/start
 async fn start_flow(
     State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let stored_flow = state.storage.get_flow(id).await.map_err(ApiError::from)?;
+    let stored_flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
 
     // Build an executable Flow from canvas state (returns id_map for frontend feedback)
     let (exec_flow, id_map) = canvas_to_flow(&stored_flow)?;
@@ -444,6 +453,7 @@ fn parse_port_type(s: &str) -> PortType {
 /// POST /api/v1/flows/:id/stop
 async fn stop_flow(
     State(state): State<Arc<AppState>>,
+    axum::Extension(_claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.engine.stop(id).await.map_err(ApiError::from)?;
@@ -619,5 +629,128 @@ async fn await_flow_response(
             )
         }
     }
+}
+
+/// GET /api/v1/flows/:id/export — Export a flow as a portable JSON document.
+///
+/// The exported JSON includes flow metadata and the full canvas state
+/// (nodes, edges, viewport) but strips internal fields like user_id
+/// so it can be imported by any user.
+async fn export_flow(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
+
+    let canvas_nodes = flow.metadata.positions.get("canvas_nodes")
+        .cloned()
+        .unwrap_or(serde_json::json!([]));
+    let canvas_edges = flow.metadata.positions.get("canvas_edges")
+        .cloned()
+        .unwrap_or(serde_json::json!([]));
+    let viewport = flow.metadata.positions.get("viewport")
+        .cloned()
+        .unwrap_or(serde_json::json!({"x": 0, "y": 0, "zoom": 1}));
+
+    let export = serde_json::json!({
+        "z8run_version": env!("CARGO_PKG_VERSION"),
+        "export_format": 1,
+        "flow": {
+            "name": flow.name,
+            "description": flow.description,
+            "version": flow.version,
+            "canvas_nodes": canvas_nodes,
+            "canvas_edges": canvas_edges,
+            "viewport": viewport,
+        }
+    });
+
+    info!(flow_id = %id, "Flow exported");
+    Ok(Json(export))
+}
+
+/// POST /api/v1/flows/import — Import a flow from an exported JSON document.
+///
+/// Creates a brand-new flow (new UUID) owned by the authenticated user,
+/// populated with the canvas state from the export.
+async fn import_flow(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
+    Json(payload): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    // Validate export format
+    let flow_data = payload.get("flow")
+        .ok_or_else(|| ApiError::bad_request("Invalid export: missing 'flow' key"))?;
+
+    let name = flow_data["name"].as_str()
+        .ok_or_else(|| ApiError::bad_request("Invalid export: missing flow name"))?;
+    let description = flow_data["description"].as_str().unwrap_or("");
+    let version = flow_data["version"].as_str().unwrap_or("0.1.0");
+
+    // Validate node types — reject unknown nodes before creating the flow
+    const VALID_NODE_TYPES: &[&str] = &[
+        "http-in", "http-out", "http-request", "function", "debug",
+        "switch", "filter", "delay", "timer", "webhook", "json", "database",
+        "llm", "embeddings", "classifier", "prompt-template", "text-splitter",
+        "vector-store", "structured-output", "summarizer", "ai-agent", "image-gen",
+    ];
+
+    if let Some(canvas_nodes) = flow_data["canvas_nodes"].as_array() {
+        let mut unknown_types: Vec<String> = Vec::new();
+
+        for node in canvas_nodes {
+            let node_type = node["data"]["type"].as_str().unwrap_or("unknown");
+            if !VALID_NODE_TYPES.contains(&node_type) {
+                unknown_types.push(node_type.to_string());
+            }
+        }
+
+        if !unknown_types.is_empty() {
+            // Deduplicate
+            unknown_types.sort();
+            unknown_types.dedup();
+            return Err(ApiError::bad_request(format!(
+                "Flow contains unsupported node types: {}. Supported types: {}",
+                unknown_types.join(", "),
+                VALID_NODE_TYPES.join(", "),
+            )));
+        }
+    }
+
+    // Create a new flow with a fresh ID
+    let mut flow = Flow::new(name);
+    flow.description = description.to_string();
+    flow.version = version.to_string();
+
+    // Restore canvas state into metadata
+    if let Some(nodes) = flow_data.get("canvas_nodes") {
+        flow.metadata.positions.insert("canvas_nodes".to_string(), nodes.clone());
+    }
+    if let Some(edges) = flow_data.get("canvas_edges") {
+        flow.metadata.positions.insert("canvas_edges".to_string(), edges.clone());
+    }
+    if let Some(vp) = flow_data.get("viewport") {
+        flow.metadata.positions.insert("viewport".to_string(), vp.clone());
+    }
+
+    // Count imported nodes/edges for the response
+    let node_count = flow_data["canvas_nodes"].as_array().map(|a| a.len()).unwrap_or(0);
+    let edge_count = flow_data["canvas_edges"].as_array().map(|a| a.len()).unwrap_or(0);
+
+    // Save with user ownership
+    state.storage.save_flow_with_user(&flow, claims.sub).await.map_err(ApiError::from)?;
+
+    info!(flow_id = %flow.id, name = %flow.name, nodes = node_count, edges = edge_count, "Flow imported");
+
+    Ok(Json(serde_json::json!({
+        "id": flow.id.to_string(),
+        "name": flow.name,
+        "description": flow.description,
+        "nodes": node_count,
+        "edges": edge_count,
+        "status": "idle",
+        "created_at": flow.created_at.to_rfc3339(),
+    })))
 }
 

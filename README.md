@@ -68,14 +68,18 @@ z8run is organized as a Rust workspace with focused crates:
 ```
 z8run/
 ├── crates/
-│   ├── z8run-core       # Flow engine, DAG validation, scheduler
+│   ├── z8run-core       # Flow engine, DAG validation, scheduler, 22 built-in nodes
 │   ├── z8run-protocol   # Binary WebSocket protocol (11-byte header)
 │   ├── z8run-storage    # SQLite / PostgreSQL persistence layer
 │   ├── z8run-runtime    # WASM plugin sandbox (wasmtime)
 │   └── z8run-api        # REST + WebSocket server (Axum)
 ├── bins/
 │   ├── z8run-cli        # Main CLI binary
-│   └── z8run-server     # Server with embedded frontend (coming soon)
+│   └── z8run-server     # Server with embedded frontend
+├── frontend/            # React + TypeScript visual editor
+│   ├── src/features/    # Editor canvas, node palette, config panel
+│   ├── src/stores/      # Zustand state management
+│   └── src/lib/         # Node definitions, utilities
 └── Cargo.toml           # Workspace root
 ```
 
@@ -128,19 +132,40 @@ z8run info               # Show system information
 
 Connect to `ws://localhost:7700/ws/engine` for real-time communication using the z8run binary protocol.
 
+## Built-in Nodes
+
+z8run ships with 22 native nodes across 6 categories:
+
+| Category | Nodes |
+|---|---|
+| **Input** | HTTP In, Timer, Webhook (HMAC-SHA256 signature validation) |
+| **Process** | Function, JSON Transform (parse/stringify/extract), HTTP Request (outbound), Filter |
+| **Output** | Debug, HTTP Response |
+| **Logic** | Switch (multi-rule routing), Delay |
+| **Data** | Database (PostgreSQL, MySQL, SQLite support) |
+| **AI** | LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen |
+
 ## Roadmap
 
 - [x] Core engine with DAG validation and topological scheduling
 - [x] Binary WebSocket protocol
 - [x] REST API (Axum 0.8)
-- [x] SQLite persistence
-- [ ] Visual node editor (web frontend)
-- [ ] Built-in nodes (HTTP, MQTT, Timer, Debug, JSON, etc.)
+- [x] SQLite / PostgreSQL persistence
+- [x] Visual node editor (React Flow + Zustand + Tailwind)
+- [x] 22 built-in nodes (HTTP In/Out/Request, Debug, Function, Switch, Filter, Delay, Timer, Webhook, JSON Transform, Database + 10 AI nodes)
+- [x] Real-time WebSocket execution events
+- [x] Namespaced hook routes (`/hook/{flow_id}/{path}`)
+- [x] Smart config UI (dropdowns, password fields, code editors)
+- [x] Multi-database support (PostgreSQL, MySQL, SQLite)
+- [x] Flow management UI (list, create, delete from browser)
+- [x] Deploy & test from UI (save, deploy, stop buttons)
+- [x] Authentication & multi-user (JWT + argon2)
+- [x] Credential vault (AES-256-GCM encrypted connections)
+- [x] Flow import/export (JSON)
 - [ ] WASM plugin execution
-- [ ] PostgreSQL support
-- [ ] Flow import/export
-- [ ] Authentication & multi-user
-- [ ] Cloud deployment mode
+- [ ] MQTT node
+- [x] AI suite: LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen
+- [ ] Cloud deployment mode (Docker, Helm)
 - [ ] Plugin marketplace
 
 ## Contributing

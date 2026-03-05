@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use z8run_core::engine::FlowEngine;
 use z8run_core::nodes::http_out::{self, WebhookResponders};
-use z8run_storage::repository::FlowRepository;
+use z8run_storage::repository::{FlowRepository, UserRepository};
 
 /// Global application state, shared between handlers.
 pub struct AppState {
@@ -13,6 +13,8 @@ pub struct AppState {
     pub engine: FlowEngine,
     /// Storage backend (SQLite or PostgreSQL).
     pub storage: Arc<dyn FlowRepository>,
+    /// User storage backend for authentication.
+    pub user_storage: Arc<dyn UserRepository>,
     /// Secret for signing JWT tokens.
     pub jwt_secret: String,
     /// Server port.
@@ -22,7 +24,12 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(storage: Arc<dyn FlowRepository>, jwt_secret: String, port: u16) -> Self {
+    pub fn new(
+        storage: Arc<dyn FlowRepository>,
+        user_storage: Arc<dyn UserRepository>,
+        jwt_secret: String,
+        port: u16,
+    ) -> Self {
         let responders: WebhookResponders = Arc::new(RwLock::new(HashMap::new()));
         // Initialize the global responder map so http-out nodes can access it
         http_out::init_webhook_responders(Arc::clone(&responders));
@@ -30,6 +37,7 @@ impl AppState {
         Self {
             engine: FlowEngine::new(),
             storage,
+            user_storage,
             jwt_secret,
             port,
             webhook_responders: responders,

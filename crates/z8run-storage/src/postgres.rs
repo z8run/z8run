@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use z8run_core::flow::Flow;
 
-use crate::repository::{ExecutionRecord, ExecutionRepository, FlowRepository};
+use crate::repository::{ExecutionRecord, ExecutionRepository, FlowRepository, UserRecord, UserRepository};
 use crate::StorageError;
 
 /// PostgreSQL-backed storage for flows and executions.
@@ -140,6 +140,96 @@ impl FlowRepository for PgStorage {
 
         Ok(flows)
     }
+
+    async fn save_flow_with_user(&self, flow: &Flow, user_id: Uuid) -> Result<(), StorageError> {
+        let id = flow.id.to_string();
+        let user_id_str = user_id.to_string();
+        let data = serde_json::to_value(flow)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let status = flow.status.to_string();
+
+        sqlx::query(
+            r#"
+            INSERT INTO flows (id, name, description, version, data, status, user_id, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+            ON CONFLICT(id) DO UPDATE SET
+                name = EXCLUDED.name,
+                description = EXCLUDED.description,
+                version = EXCLUDED.version,
+                data = EXCLUDED.data,
+                status = EXCLUDED.status,
+                updated_at = NOW()
+            "#,
+        )
+        .bind(&id)
+        .bind(&flow.name)
+        .bind(&flow.description)
+        .bind(&flow.version)
+        .bind(&data)
+        .bind(&status)
+        .bind(&user_id_str)
+        .bind(&flow.created_at)
+        .execute(&self.pool)
+        .await?;
+
+        tracing::debug!(flow_id = %id, user_id = %user_id, "Flow saved with user");
+        Ok(())
+    }
+
+    async fn list_flows_by_user(&self, user_id: Uuid) -> Result<Vec<Flow>, StorageError> {
+        let user_id_str = user_id.to_string();
+
+        let rows: Vec<(serde_json::Value,)> =
+            sqlx::query_as("SELECT data FROM flows WHERE user_id = $1 ORDER BY updated_at DESC")
+                .bind(&user_id_str)
+                .fetch_all(&self.pool)
+                .await?;
+
+        let mut flows = Vec::with_capacity(rows.len());
+        for (data,) in rows {
+            let flow: Flow = serde_json::from_value(data)
+                .map_err(|e| StorageError::Serialization(e.to_string()))?;
+            flows.push(flow);
+        }
+
+        Ok(flows)
+    }
+
+    async fn get_flow_for_user(&self, id: Uuid, user_id: Uuid) -> Result<Flow, StorageError> {
+        let id_str = id.to_string();
+        let user_id_str = user_id.to_string();
+
+        let row: (serde_json::Value,) =
+            sqlx::query_as("SELECT data FROM flows WHERE id = $1 AND user_id = $2")
+                .bind(&id_str)
+                .bind(&user_id_str)
+                .fetch_optional(&self.pool)
+                .await?
+                .ok_or(StorageError::FlowNotFound(id))?;
+
+        let flow: Flow = serde_json::from_value(row.0)
+            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+
+        Ok(flow)
+    }
+
+    async fn delete_flow_for_user(&self, id: Uuid, user_id: Uuid) -> Result<(), StorageError> {
+        let id_str = id.to_string();
+        let user_id_str = user_id.to_string();
+
+        let result = sqlx::query("DELETE FROM flows WHERE id = $1 AND user_id = $2")
+            .bind(&id_str)
+            .bind(&user_id_str)
+            .execute(&self.pool)
+            .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(StorageError::FlowNotFound(id));
+        }
+
+        tracing::debug!(flow_id = %id, user_id = %user_id, "Flow deleted");
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -235,5 +325,84 @@ impl ExecutionRepository for PgStorage {
         }
 
         Ok(records)
+    }
+}
+
+#[async_trait::async_trait]
+impl UserRepository for PgStorage {
+    async fn create_user(&self, user: &UserRecord) -> Result<(), StorageError> {
+        sqlx::query(
+            r#"INSERT INTO users (id, email, username, password_hash, roles, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)"#
+        )
+        .bind(&user.id.to_string())
+        .bind(&user.email)
+        .bind(&user.username)
+        .bind(&user.password_hash)
+        .bind(&user.roles.join(","))
+        .bind(&user.created_at)
+        .bind(&user.updated_at)
+        .execute(&self.pool)
+        .await?;
+
+        tracing::debug!(user_id = %user.id, "User created in PostgreSQL");
+        Ok(())
+    }
+
+    async fn get_user_by_id(&self, id: Uuid) -> Result<UserRecord, StorageError> {
+        let row: (String, String, String, String, String, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+            sqlx::query_as("SELECT id, email, username, password_hash, roles, created_at, updated_at FROM users WHERE id = $1")
+                .bind(&id.to_string())
+                .fetch_optional(&self.pool)
+                .await?
+                .ok_or(StorageError::UserNotFound(id.to_string()))?;
+
+        Ok(UserRecord {
+            id: Uuid::parse_str(&row.0).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            email: row.1,
+            username: row.2,
+            password_hash: row.3,
+            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            created_at: row.5,
+            updated_at: row.6,
+        })
+    }
+
+    async fn get_user_by_email(&self, email: &str) -> Result<UserRecord, StorageError> {
+        let row: (String, String, String, String, String, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+            sqlx::query_as("SELECT id, email, username, password_hash, roles, created_at, updated_at FROM users WHERE email = $1")
+                .bind(email)
+                .fetch_optional(&self.pool)
+                .await?
+                .ok_or(StorageError::UserNotFound(email.to_string()))?;
+
+        Ok(UserRecord {
+            id: Uuid::parse_str(&row.0).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            email: row.1,
+            username: row.2,
+            password_hash: row.3,
+            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            created_at: row.5,
+            updated_at: row.6,
+        })
+    }
+
+    async fn get_user_by_username(&self, username: &str) -> Result<UserRecord, StorageError> {
+        let row: (String, String, String, String, String, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+            sqlx::query_as("SELECT id, email, username, password_hash, roles, created_at, updated_at FROM users WHERE username = $1")
+                .bind(username)
+                .fetch_optional(&self.pool)
+                .await?
+                .ok_or(StorageError::UserNotFound(username.to_string()))?;
+
+        Ok(UserRecord {
+            id: Uuid::parse_str(&row.0).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            email: row.1,
+            username: row.2,
+            password_hash: row.3,
+            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            created_at: row.5,
+            updated_at: row.6,
+        })
     }
 }

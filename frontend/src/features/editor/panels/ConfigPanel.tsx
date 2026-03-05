@@ -31,14 +31,6 @@ const DB_TYPES = [
   { value: "mssql", label: "SQL Server" },
 ];
 
-/** Default ports per database type */
-const DB_DEFAULT_PORTS: Record<string, number> = {
-  postgres: 5432,
-  mysql: 3306,
-  sqlite: 0,
-  mssql: 1433,
-};
-
 /** Common HTTP status codes for dropdown */
 const HTTP_STATUS_CODES = [
   { value: 200, label: "200 — OK" },
@@ -259,16 +251,424 @@ function SmartConfigField({
     );
   }
 
+  // --- AI NODES: shared fields ---
+  const AI_NODE_TYPES = ["llm", "embeddings", "classifier", "structured-output", "summarizer", "ai-agent", "image-gen"];
+
+  // AI Provider dropdown
+  if (fieldKey === "provider" && AI_NODE_TYPES.includes(nodeType)) {
+    const providers = nodeType === "image-gen"
+      ? [{ value: "openai", label: "OpenAI (DALL-E)" }, { value: "stability", label: "Stability AI" }]
+      : [{ value: "openai", label: "OpenAI" }, { value: "anthropic", label: "Anthropic" }, { value: "ollama", label: "Ollama (Local)" }];
+    return (
+      <select
+        value={String(value ?? "openai")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        {providers.map((p) => (
+          <option key={p.value} value={p.value}>{p.label}</option>
+        ))}
+      </select>
+    );
+  }
+
+  // AI Model input
+  if (fieldKey === "model" && AI_NODE_TYPES.includes(nodeType)) {
+    const placeholders: Record<string, string> = {
+      "openai-llm": "gpt-4o-mini",
+      "openai-embeddings": "text-embedding-3-small",
+      "openai-structured-output": "gpt-4o-mini",
+      "openai-summarizer": "gpt-4o-mini",
+      "openai-ai-agent": "gpt-4o",
+      "openai-image-gen": "dall-e-3",
+      "anthropic-llm": "claude-sonnet-4-20250514",
+      "anthropic-ai-agent": "claude-sonnet-4-20250514",
+      "ollama-llm": "llama3",
+    };
+    const placeholder = placeholders[`${String(value ?? "openai").split("-")[0] || "openai"}-${nodeType}`] || "Model name";
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={inputClass}
+      />
+    );
+  }
+
+  // API Key (password field)
+  if (fieldKey === "apiKey" && AI_NODE_TYPES.includes(nodeType)) {
+    return (
+      <input
+        type="password"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="sk-..."
+        className={inputClass}
+      />
+    );
+  }
+
+  // Base URL
+  if (fieldKey === "baseUrl" && AI_NODE_TYPES.includes(nodeType)) {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Custom endpoint (optional)"
+        className={inputClass}
+      />
+    );
+  }
+
+  // System Prompt (textarea) — LLM, AI Agent
+  if (fieldKey === "systemPrompt" && ["llm", "ai-agent"].includes(nodeType)) {
+    return (
+      <textarea
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="You are a helpful assistant..."
+        rows={4}
+        className={`${inputClass} resize-y`}
+        spellCheck={false}
+      />
+    );
+  }
+
+  // Temperature — LLM, Classifier, AI Agent
+  if (fieldKey === "temperature" && ["llm", "classifier", "ai-agent"].includes(nodeType)) {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 0.7)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        step="0.1"
+        min="0"
+        max="2"
+        className={inputClass}
+      />
+    );
+  }
+
+  // Max Tokens — LLM, Classifier
+  if (fieldKey === "maxTokens" && ["llm", "classifier"].includes(nodeType)) {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 1024)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+        min={1}
+      />
+    );
+  }
+
+  // Categories (classifier)
+  if (fieldKey === "categories" && nodeType === "classifier") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="positive, negative, neutral"
+        className={inputClass}
+      />
+    );
+  }
+
+  // Context (classifier)
+  if (fieldKey === "context" && nodeType === "classifier") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="What are you classifying?"
+        className={inputClass}
+      />
+    );
+  }
+
+  // --- PROMPT TEMPLATE ---
+  if (fieldKey === "template" && nodeType === "prompt-template") {
+    return (
+      <textarea
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Hello {{name}}, you asked: {{prompt}}"
+        rows={5}
+        className={`${inputClass} resize-y`}
+        spellCheck={false}
+      />
+    );
+  }
+
+  if (fieldKey === "strictMode" && nodeType === "prompt-template") {
+    return null; // handled by generic boolean renderer
+  }
+
+  // --- TEXT SPLITTER ---
+  if (fieldKey === "strategy" && nodeType === "text-splitter") {
+    return (
+      <select
+        value={String(value ?? "fixed")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="fixed">Fixed size</option>
+        <option value="sentences">By sentences</option>
+        <option value="paragraphs">By paragraphs</option>
+        <option value="tokens">By tokens (approx)</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "chunkSize" && nodeType === "text-splitter") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={Number(value ?? 512)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={`${inputClass} flex-1`}
+          min={50}
+          step={50}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">chars</span>
+      </div>
+    );
+  }
+
+  if (fieldKey === "overlap" && nodeType === "text-splitter") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={Number(value ?? 50)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={`${inputClass} flex-1`}
+          min={0}
+          step={10}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">chars</span>
+      </div>
+    );
+  }
+
+  // --- VECTOR STORE ---
+  if (fieldKey === "action" && nodeType === "vector-store") {
+    return (
+      <select
+        value={String(value ?? "store")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="store">Store embedding</option>
+        <option value="search">Search similar</option>
+        <option value="delete">Delete entry</option>
+        <option value="clear">Clear collection</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "collection" && nodeType === "vector-store") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "default")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Collection name"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "topK" && nodeType === "vector-store") {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 5)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+        min={1}
+        max={100}
+      />
+    );
+  }
+
+  if (fieldKey === "minScore" && nodeType === "vector-store") {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 0.0)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+        min={0}
+        max={1}
+        step={0.05}
+      />
+    );
+  }
+
+  // --- STRUCTURED OUTPUT ---
+  if (fieldKey === "schema" && nodeType === "structured-output") {
+    return (
+      <textarea
+        value={String(value ?? "{}")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder='{"type":"object","properties":{"name":{"type":"string"}}}'
+        rows={5}
+        className={`${inputClass} resize-y`}
+        spellCheck={false}
+      />
+    );
+  }
+
+  if (fieldKey === "retries" && nodeType === "structured-output") {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 2)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+        min={0}
+        max={5}
+      />
+    );
+  }
+
+  // --- SUMMARIZER ---
+  if (fieldKey === "strategy" && nodeType === "summarizer") {
+    return (
+      <select
+        value={String(value ?? "simple")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="simple">Simple (full text)</option>
+        <option value="map-reduce">Map-Reduce (long docs)</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "maxLength" && nodeType === "summarizer") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={Number(value ?? 200)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={`${inputClass} flex-1`}
+          min={50}
+          step={50}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">words</span>
+      </div>
+    );
+  }
+
+  if (fieldKey === "language" && nodeType === "summarizer") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Output language (empty = same as input)"
+        className={inputClass}
+      />
+    );
+  }
+
+  // --- AI AGENT ---
+  if (fieldKey === "tools" && nodeType === "ai-agent") {
+    return (
+      <textarea
+        value={String(value ?? "[]")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder='[{"name":"search","description":"Search the web","parameters":{"type":"object","properties":{"query":{"type":"string"}}}}]'
+        rows={6}
+        className={`${inputClass} resize-y`}
+        spellCheck={false}
+      />
+    );
+  }
+
+  if (fieldKey === "maxIterations" && nodeType === "ai-agent") {
+    return (
+      <input
+        type="number"
+        value={Number(value ?? 5)}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+        min={1}
+        max={20}
+      />
+    );
+  }
+
+  // --- IMAGE GEN ---
+  if (fieldKey === "size" && nodeType === "image-gen") {
+    return (
+      <select
+        value={String(value ?? "1024x1024")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="1024x1024">1024 x 1024 (Square)</option>
+        <option value="1024x1792">1024 x 1792 (Portrait)</option>
+        <option value="1792x1024">1792 x 1024 (Landscape)</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "quality" && nodeType === "image-gen") {
+    return (
+      <select
+        value={String(value ?? "standard")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="standard">Standard</option>
+        <option value="hd">HD</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "style" && nodeType === "image-gen") {
+    return (
+      <select
+        value={String(value ?? "vivid")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="vivid">Vivid</option>
+        <option value="natural">Natural</option>
+      </select>
+    );
+  }
+
   // No smart field
   return null;
 }
 
 /** Check if a key has a smart field renderer */
 function hasSmartField(key: string, nodeType: string): boolean {
+  const AI_NODES = ["llm", "embeddings", "classifier", "structured-output", "summarizer", "ai-agent", "image-gen"];
   return ["method", "statusCode", "url", "timeout"].includes(key)
     || (key === "action" && nodeType === "json")
     || key === "unit"
-    || (nodeType === "database" && ["dbType", "host", "port", "database", "user", "password", "query"].includes(key));
+    || (nodeType === "database" && ["dbType", "host", "port", "database", "user", "password", "query"].includes(key))
+    || (AI_NODES.includes(nodeType) &&
+        ["provider", "model", "apiKey", "baseUrl", "systemPrompt", "temperature", "maxTokens", "categories", "context"].includes(key))
+    || (nodeType === "prompt-template" && ["template"].includes(key))
+    || (nodeType === "text-splitter" && ["strategy", "chunkSize", "overlap"].includes(key))
+    || (nodeType === "vector-store" && ["action", "collection", "topK", "minScore"].includes(key))
+    || (nodeType === "structured-output" && ["schema", "retries"].includes(key))
+    || (nodeType === "summarizer" && ["strategy", "maxLength", "language"].includes(key))
+    || (nodeType === "ai-agent" && ["tools", "maxIterations"].includes(key))
+    || (nodeType === "image-gen" && ["size", "quality", "style"].includes(key));
 }
 
 /** Available switch operators with human-friendly labels */

@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2, Play, Clock, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Play, Clock, AlertTriangle, LogOut, Download, Upload } from "lucide-react";
 import { useFlowListStore } from "@/stores/flowListStore";
+import { useAuthStore } from "@/stores/authStore";
+import { flowsApi } from "@/api/flows";
 
 export function FlowListPage() {
   const { flows, loading, fetchFlows, createFlow, deleteFlow } =
     useFlowListStore();
+  const { logout, user } = useAuthStore();
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchFlows();
@@ -23,8 +27,54 @@ export function FlowListPage() {
     navigate(`/flow/${id}`);
   };
 
+  const handleExport = async (e: React.MouseEvent, flowId: string, flowName: string) => {
+    e.stopPropagation();
+    try {
+      const data = await flowsApi.export(flowId);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${flowName.replace(/[^a-zA-Z0-9_-]/g, "_")}.z8flow.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed:", err);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.flow) {
+        alert("Invalid z8run export file");
+        return;
+      }
+      const result = await flowsApi.import(data);
+      await fetchFlows();
+      navigate(`/flow/${result.id}`);
+    } catch (err) {
+      console.error("Import failed:", err);
+      alert("Failed to import flow. Make sure the file is a valid z8run export.");
+    }
+    // Reset input so the same file can be re-imported
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
     <div className="min-h-screen bg-slate-950">
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,.z8flow.json"
+        className="hidden"
+        onChange={handleImport}
+      />
+
       {/* Top bar */}
       <div className="border-b border-slate-800">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -37,15 +87,38 @@ export function FlowListPage() {
               <p className="text-xs text-slate-500">Flow Engine</p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-z8-600 hover:bg-z8-700
-              text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <Plus size={16} />
-            New Flow
-          </button>
+          <div className="flex items-center gap-3">
+            {user && (
+              <span className="text-xs text-slate-500">{user.email}</span>
+            )}
+            <button
+              type="button"
+              onClick={logout}
+              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-2 text-slate-300 hover:bg-slate-800
+                text-sm rounded-lg transition-colors border border-slate-700"
+              title="Import flow from JSON"
+            >
+              <Upload size={14} />
+              Import
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-z8-600 hover:bg-z8-700
+                text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Plus size={16} />
+              New Flow
+            </button>
+          </div>
         </div>
       </div>
 
@@ -103,16 +176,27 @@ export function FlowListPage() {
               No flows yet
             </h2>
             <p className="text-sm text-slate-500 mb-4">
-              Create your first flow to get started
+              Create your first flow or import one
             </p>
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className="px-4 py-2 bg-z8-600 hover:bg-z8-700 text-white text-sm
-                font-medium rounded-lg transition-colors"
-            >
-              Create Flow
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="px-4 py-2 bg-z8-600 hover:bg-z8-700 text-white text-sm
+                  font-medium rounded-lg transition-colors"
+              >
+                Create Flow
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 text-slate-300 hover:bg-slate-800
+                  text-sm rounded-lg transition-colors border border-slate-700"
+              >
+                <Upload size={14} />
+                Import
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid gap-3">
@@ -153,6 +237,15 @@ export function FlowListPage() {
                     >
                       {flow.status}
                     </span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleExport(e, flow.id, flow.name)}
+                      className="p-1.5 hover:bg-slate-800 rounded transition-colors opacity-0
+                        group-hover:opacity-100"
+                      title="Export flow"
+                    >
+                      <Download size={14} className="text-slate-400" />
+                    </button>
                     <button
                       type="button"
                       onClick={(e) => {

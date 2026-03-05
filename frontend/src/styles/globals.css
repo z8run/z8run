@@ -12,32 +12,45 @@
   body {
     @apply bg-slate-950 text-slate-50;
   }
+}
 
-  /* React Flow overrides */
-  .react-flow__background {
-    background-color: #0b1120 !important;
-  }
+/* React Flow overrides — OUTSIDE @layer so they beat xyflow's styles */
+.react-flow__background {
+  background-color: #0b1120 !important;
+}
 
-  .react-flow__minimap {
-    background-color: #1e293b !important;
-    border-radius: 8px;
-    border: 1px solid #334155;
-  }
+.react-flow__minimap {
+  background-color: #1e293b !important;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
 
-  .react-flow__controls {
-    border-radius: 8px;
-    border: 1px solid #334155;
-    overflow: hidden;
-  }
+.react-flow__controls {
+  background: #1e293b !important;
+  border-radius: 8px;
+  border: 1px solid #334155 !important;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
 
-  .react-flow__controls-button {
-    background-color: #1e293b !important;
-    border-color: #334155 !important;
-    color: #94a3b8 !important;
-  }
+.react-flow__controls-button {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  border-bottom: 1px solid #334155 !important;
+  color: #94a3b8 !important;
+  fill: #94a3b8 !important;
+  width: 28px !important;
+  height: 28px !important;
+}
 
-  .react-flow__controls-button:hover {
-    background-color: #334155 !important;
-    color: #f8fafc !important;
-  }
+.react-flow__controls-button:hover {
+  background-color: #334155 !important;
+  color: #f8fafc !important;
+  fill: #f8fafc !important;
+}
+
+.react-flow__controls-button svg {
+  fill: inherit !important;
+  max-width: 14px;
+  max-height: 14px;
 }

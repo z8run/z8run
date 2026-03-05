@@ -37,4 +37,10 @@ export const flowsApi = {
 
   stop: (id: string) =>
     api.post(`flows/${id}/stop`).json<{ flow_id: string; status: string }>(),
+
+  export: (id: string) =>
+    api.get(`flows/${id}/export`).json<{ z8run_version: string; export_format: number; flow: unknown }>(),
+
+  import: (data: unknown) =>
+    api.post("flows/import", { json: data }).json<CreateFlowResponse>(),
 };

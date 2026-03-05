@@ -21,6 +21,9 @@ pub enum StorageError {
     #[error("Flow not found: {0}")]
     FlowNotFound(uuid::Uuid),
 
+    #[error("User not found: {0}")]
+    UserNotFound(String),
+
     #[error("Serialization error: {0}")]
     Serialization(String),
 

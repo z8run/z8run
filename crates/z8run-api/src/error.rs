@@ -39,6 +39,13 @@ impl ApiError {
             message: msg.into(),
         }
     }
+
+    pub fn conflict(msg: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            message: msg.into(),
+        }
+    }
 }
 
 impl IntoResponse for ApiError {
@@ -63,6 +70,7 @@ impl From<z8run_storage::StorageError> for ApiError {
     fn from(e: z8run_storage::StorageError) -> Self {
         match &e {
             z8run_storage::StorageError::FlowNotFound(_) => Self::not_found(e.to_string()),
+            z8run_storage::StorageError::UserNotFound(_) => Self::not_found(e.to_string()),
             _ => Self::internal(e.to_string()),
         }
     }

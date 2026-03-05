@@ -16,6 +16,14 @@ export default defineConfig({
         target: "http://localhost:7700",
         changeOrigin: true,
       },
+      "/auth": {
+        target: "http://localhost:7700",
+        changeOrigin: true,
+      },
+      "/hook": {
+        target: "http://localhost:7700",
+        changeOrigin: true,
+      },
       "/ws": {
         target: "http://localhost:7700",
         ws: true,
