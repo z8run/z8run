@@ -23,7 +23,7 @@
 
 ## What is z8run?
 
-z8run is an open-source visual flow engine built from the ground up in **Rust** for performance, safety, and extensibility. Think of it as the next evolution of tools like Node-RED — designed for developers who need real-time automation with a modern stack.
+z8run is an open-source visual flow engine built from the ground up in **Rust** for performance, safety, and extensibility. Inspired by tools like Node-RED, z8run is designed for developers who need real-time automation with a modern stack.
 
 **Key principles:**
 
