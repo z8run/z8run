@@ -165,7 +165,9 @@ async fn cmd_serve(
             let dev_secret: String = (0..32)
                 .map(|_| format!("{:02x}", rand::random::<u8>()))
                 .collect();
-            tracing::warn!("No Z8_JWT_SECRET set — generated ephemeral secret (tokens won't survive restarts)");
+            tracing::warn!(
+                "No Z8_JWT_SECRET set — generated ephemeral secret (tokens won't survive restarts)"
+            );
             dev_secret
         }
     };

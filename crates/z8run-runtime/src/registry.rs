@@ -155,8 +155,9 @@ impl PluginRegistry {
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown");
             let plugin_dir = self.plugins_dir.join(stem);
-            std::fs::create_dir_all(&plugin_dir)
-                .map_err(|e| RuntimeError::ModuleLoad(format!("Failed to create plugin dir: {}", e)))?;
+            std::fs::create_dir_all(&plugin_dir).map_err(|e| {
+                RuntimeError::ModuleLoad(format!("Failed to create plugin dir: {}", e))
+            })?;
 
             let wasm_filename = source
                 .file_name()
@@ -230,9 +231,8 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), RuntimeError> {
         if src_path.is_dir() {
             copy_dir_recursive(&src_path, &dst_path)?;
         } else {
-            std::fs::copy(&src_path, &dst_path).map_err(|e| {
-                RuntimeError::ModuleLoad(format!("Failed to copy file: {}", e))
-            })?;
+            std::fs::copy(&src_path, &dst_path)
+                .map_err(|e| RuntimeError::ModuleLoad(format!("Failed to copy file: {}", e)))?;
         }
     }
 
