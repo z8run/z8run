@@ -103,12 +103,10 @@ impl NodeExecutor for HttpRequestNode {
                 // Parse response body as JSON, fallback to string
                 let body_text = response.text().await.unwrap_or_default();
                 let body_json: serde_json::Value =
-                    serde_json::from_str(&body_text).unwrap_or_else(|_| {
-                        if body_text.is_empty() {
-                            serde_json::Value::Null
-                        } else {
-                            serde_json::Value::String(body_text)
-                        }
+                    serde_json::from_str(&body_text).unwrap_or(if body_text.is_empty() {
+                        serde_json::Value::Null
+                    } else {
+                        serde_json::Value::String(body_text)
                     });
 
                 info!(

@@ -107,7 +107,7 @@ impl DatabaseNode {
             // Mask everything between :// and @
             self.connection_string
                 .split('@')
-                .last()
+                .next_back()
                 .unwrap_or("***")
                 .to_string()
         }

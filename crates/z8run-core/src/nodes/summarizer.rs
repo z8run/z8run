@@ -247,7 +247,7 @@ impl SummarizerNode {
 /// Split text into chunks for map phase (sentence-aware).
 fn split_text_for_summarization(text: &str, chunk_size: usize) -> Vec<String> {
     let sentences: Vec<&str> = text
-        .split(|c| c == '.' || c == '!' || c == '?')
+        .split(['.', '!', '?'])
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .collect();
@@ -280,6 +280,7 @@ fn split_text_for_summarization(text: &str, chunk_size: usize) -> Vec<String> {
 }
 
 /// Call LLM with system and user prompts (same pattern as classifier.rs).
+#[allow(clippy::too_many_arguments)]
 async fn call_llm(
     client: &reqwest::Client,
     provider: &str,

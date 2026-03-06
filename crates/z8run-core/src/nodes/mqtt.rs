@@ -149,14 +149,7 @@ impl MqttNode {
         let (client, mut eventloop) = AsyncClient::new(opts, 10);
 
         // Spawn eventloop polling in background
-        let handle = tokio::spawn(async move {
-            loop {
-                match eventloop.poll().await {
-                    Ok(_) => continue,
-                    Err(_) => break,
-                }
-            }
-        });
+        let handle = tokio::spawn(async move { while eventloop.poll().await.is_ok() {} });
 
         // Publish message
         let qos = match self.qos {
@@ -362,10 +355,7 @@ impl NodeExecutorFactory for MqttNodeFactory {
             port: 1883,
             topic: "z8run/default".to_string(),
             qos: 0,
-            client_id: format!(
-                "z8run-{}",
-                uuid::Uuid::new_v4().to_string()[..8].to_string()
-            ),
+            client_id: format!("z8run-{}", &uuid::Uuid::new_v4().to_string()[..8]),
             username: String::new(),
             password: String::new(),
             use_tls: false,

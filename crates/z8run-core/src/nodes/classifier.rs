@@ -153,6 +153,7 @@ impl NodeExecutor for ClassifierNode {
 }
 
 /// Shared LLM call function (OpenAI-compatible, Anthropic, or Ollama).
+#[allow(clippy::too_many_arguments)]
 async fn call_llm(
     client: &reqwest::Client,
     provider: &str,

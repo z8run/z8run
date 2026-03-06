@@ -89,16 +89,16 @@ fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
 
     // Inner hash: SHA256((key XOR ipad) || message)
     let mut inner_input = Vec::with_capacity(BLOCK_SIZE + message.len());
-    for i in 0..BLOCK_SIZE {
-        inner_input.push(key_block[i] ^ IPAD);
+    for &b in key_block.iter().take(BLOCK_SIZE) {
+        inner_input.push(b ^ IPAD);
     }
     inner_input.write_all(message).unwrap();
     let inner_hash = sha256(&inner_input);
 
     // Outer hash: SHA256((key XOR opad) || inner_hash)
     let mut outer_input = Vec::with_capacity(BLOCK_SIZE + 32);
-    for i in 0..BLOCK_SIZE {
-        outer_input.push(key_block[i] ^ OPAD);
+    for &b in key_block.iter().take(BLOCK_SIZE) {
+        outer_input.push(b ^ OPAD);
     }
     outer_input.write_all(&inner_hash).unwrap();
     sha256(&outer_input)
@@ -204,7 +204,7 @@ impl NodeExecutor for WebhookNode {
         // 1. Signature validation (if secret is configured)
         if !self.secret.is_empty() {
             let sig = headers
-                .and_then(|h| h.get(&self.signature_header.to_lowercase()))
+                .and_then(|h| h.get(self.signature_header.to_lowercase().as_str()))
                 .or_else(|| headers.and_then(|h| h.get(&self.signature_header)))
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
@@ -241,7 +241,7 @@ impl NodeExecutor for WebhookNode {
         // 2. Extract event type
         let event_type = if !self.event_header.is_empty() {
             headers
-                .and_then(|h| h.get(&self.event_header.to_lowercase()))
+                .and_then(|h| h.get(self.event_header.to_lowercase().as_str()))
                 .or_else(|| headers.and_then(|h| h.get(&self.event_header)))
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown")

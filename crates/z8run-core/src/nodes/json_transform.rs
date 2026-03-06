@@ -61,13 +61,12 @@ impl NodeExecutor for JsonTransformNode {
                 }
             }
             "stringify" => {
-                let s = if msg.payload.is_string() {
+                if msg.payload.is_string() {
                     // Already a string, pass through
                     msg.payload.clone()
                 } else {
                     Value::String(serde_json::to_string(&msg.payload).unwrap_or_default())
-                };
-                s
+                }
             }
             "extract" => {
                 if self.path.is_empty() {

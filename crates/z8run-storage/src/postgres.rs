@@ -69,7 +69,7 @@ impl FlowRepository for PgStorage {
         .bind(&flow.version)
         .bind(&data)
         .bind(&status)
-        .bind(&flow.created_at)
+        .bind(flow.created_at)
         .execute(&self.pool)
         .await?;
 
@@ -170,7 +170,7 @@ impl FlowRepository for PgStorage {
         .bind(&data)
         .bind(&status)
         .bind(&user_id_str)
-        .bind(&flow.created_at)
+        .bind(flow.created_at)
         .execute(&self.pool)
         .await?;
 
@@ -337,13 +337,13 @@ impl UserRepository for PgStorage {
             r#"INSERT INTO users (id, email, username, password_hash, roles, created_at, updated_at)
                VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
         )
-        .bind(&user.id.to_string())
+        .bind(user.id.to_string())
         .bind(&user.email)
         .bind(&user.username)
         .bind(&user.password_hash)
-        .bind(&user.roles.join(","))
-        .bind(&user.created_at)
-        .bind(&user.updated_at)
+        .bind(user.roles.join(","))
+        .bind(user.created_at)
+        .bind(user.updated_at)
         .execute(&self.pool)
         .await?;
 
@@ -354,7 +354,7 @@ impl UserRepository for PgStorage {
     async fn get_user_by_id(&self, id: Uuid) -> Result<UserRecord, StorageError> {
         let row: (String, String, String, String, String, chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
             sqlx::query_as("SELECT id, email, username, password_hash, roles, created_at, updated_at FROM users WHERE id = $1")
-                .bind(&id.to_string())
+                .bind(id.to_string())
                 .fetch_optional(&self.pool)
                 .await?
                 .ok_or(StorageError::UserNotFound(id.to_string()))?;

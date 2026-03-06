@@ -26,8 +26,7 @@ impl NodeExecutor for WasmNodeExecutor {
         let mut instance = self.instance.lock().await;
 
         // Serialize the message payload to JSON
-        let payload_json =
-            serde_json::to_string(&msg.payload).map_err(|e| Z8Error::Serialization(e))?;
+        let payload_json = serde_json::to_string(&msg.payload).map_err(Z8Error::Serialization)?;
 
         debug!(
             payload_len = payload_json.len(),
@@ -73,7 +72,7 @@ impl NodeExecutor for WasmNodeExecutor {
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
         let mut instance = self.instance.lock().await;
 
-        let config_json = serde_json::to_string(&config).map_err(|e| Z8Error::Serialization(e))?;
+        let config_json = serde_json::to_string(&config).map_err(Z8Error::Serialization)?;
 
         debug!(config_len = config_json.len(), "Configuring WASM node");
 

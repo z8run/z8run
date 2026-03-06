@@ -234,8 +234,8 @@ impl CredentialVault for PgCredentialVault {
         .bind(key)
         .bind(&ciphertext)
         .bind(&nonce)
-        .bind(&now)
-        .bind(&now)
+        .bind(now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
 
@@ -332,8 +332,8 @@ impl CredentialVault for SqliteCredentialVault {
         .bind(key)
         .bind(&ciphertext)
         .bind(&nonce)
-        .bind(&now)
-        .bind(&now)
+        .bind(now.clone())
+        .bind(now)
         .execute(&self.pool)
         .await?;
 

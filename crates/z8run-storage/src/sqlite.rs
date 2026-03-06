@@ -352,11 +352,11 @@ impl UserRepository for SqliteStorage {
             r#"INSERT INTO users (id, email, username, password_hash, roles, created_at, updated_at)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
         )
-        .bind(&user.id.to_string())
+        .bind(user.id.to_string())
         .bind(&user.email)
         .bind(&user.username)
         .bind(&user.password_hash)
-        .bind(&user.roles.join(","))
+        .bind(user.roles.join(","))
         .bind(&created_at)
         .bind(&updated_at)
         .execute(&self.pool)
@@ -369,7 +369,7 @@ impl UserRepository for SqliteStorage {
     async fn get_user_by_id(&self, id: Uuid) -> Result<UserRecord, StorageError> {
         let row: (String, String, String, String, String, String, String) =
             sqlx::query_as("SELECT id, email, username, password_hash, roles, created_at, updated_at FROM users WHERE id = ?1")
-                .bind(&id.to_string())
+                .bind(id.to_string())
                 .fetch_optional(&self.pool)
                 .await?
                 .ok_or(StorageError::UserNotFound(id.to_string()))?;

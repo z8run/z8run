@@ -168,6 +168,7 @@ impl NodeExecutor for StructuredOutputNode {
 }
 
 /// Call LLM with system and user prompts (same as classifier.rs pattern).
+#[allow(clippy::too_many_arguments)]
 async fn call_llm(
     client: &reqwest::Client,
     provider: &str,

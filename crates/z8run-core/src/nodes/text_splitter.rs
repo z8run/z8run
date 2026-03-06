@@ -139,7 +139,7 @@ fn split_by_sentences(
     overlap: usize,
 ) -> Vec<(String, usize, usize)> {
     let sentences: Vec<&str> = text
-        .split(|c| c == '.' || c == '!' || c == '?')
+        .split(['.', '!', '?'])
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .collect();

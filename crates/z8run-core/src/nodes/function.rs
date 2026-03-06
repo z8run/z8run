@@ -44,11 +44,7 @@ fn resolve_template(template: &Value, data: &Value) -> Value {
             // Replace all {path} placeholders with their string representations
             let mut result = s.clone();
             // Simple placeholder replacement using manual scanning
-            loop {
-                let start = match result.find('{') {
-                    Some(i) => i,
-                    None => break,
-                };
+            while let Some(start) = result.find('{') {
                 let end = match result[start..].find('}') {
                     Some(i) => start + i,
                     None => break,

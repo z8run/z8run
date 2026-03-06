@@ -33,11 +33,10 @@ pub struct VectorEntry {
 }
 
 // Global in-memory vector store
-static GLOBAL_STORE: OnceLock<
-    std::sync::Arc<tokio::sync::RwLock<HashMap<String, Vec<VectorEntry>>>>,
-> = OnceLock::new();
+type VectorStoreMap = std::sync::Arc<tokio::sync::RwLock<HashMap<String, Vec<VectorEntry>>>>;
+static GLOBAL_STORE: OnceLock<VectorStoreMap> = OnceLock::new();
 
-fn get_store() -> &'static std::sync::Arc<tokio::sync::RwLock<HashMap<String, Vec<VectorEntry>>>> {
+fn get_store() -> &'static VectorStoreMap {
     GLOBAL_STORE.get_or_init(|| std::sync::Arc::new(tokio::sync::RwLock::new(HashMap::new())))
 }
 
