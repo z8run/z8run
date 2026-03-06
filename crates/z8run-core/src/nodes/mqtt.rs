@@ -18,7 +18,7 @@ use tracing::{info, warn};
 
 pub struct MqttNode {
     name: String,
-    action: String,           // "subscribe" or "publish"
+    action: String, // "subscribe" or "publish"
     broker: String,
     port: u16,
     topic: String,
@@ -90,12 +90,10 @@ impl NodeExecutor for MqttNode {
 
     async fn validate(&self) -> Z8Result<()> {
         if self.action != "subscribe" && self.action != "publish" {
-            return Err(crate::error::Z8Error::Internal(
-                format!(
-                    "MQTT action must be 'subscribe' or 'publish', got: {}",
-                    self.action
-                ),
-            ));
+            return Err(crate::error::Z8Error::Internal(format!(
+                "MQTT action must be 'subscribe' or 'publish', got: {}",
+                self.action
+            )));
         }
         if self.broker.is_empty() {
             return Err(crate::error::Z8Error::Internal(
@@ -248,11 +246,8 @@ impl MqttNode {
 
         // Wait for one message with timeout
         let timeout = Duration::from_millis(self.timeout_ms);
-        let wait_result = tokio::time::timeout(
-            timeout,
-            self.poll_for_message(&mut eventloop),
-        )
-        .await;
+        let wait_result =
+            tokio::time::timeout(timeout, self.poll_for_message(&mut eventloop)).await;
 
         match wait_result {
             Ok(Ok(Some((publish_payload, retain)))) => {
@@ -367,7 +362,10 @@ impl NodeExecutorFactory for MqttNodeFactory {
             port: 1883,
             topic: "z8run/default".to_string(),
             qos: 0,
-            client_id: format!("z8run-{}", uuid::Uuid::new_v4().to_string()[..8].to_string()),
+            client_id: format!(
+                "z8run-{}",
+                uuid::Uuid::new_v4().to_string()[..8].to_string()
+            ),
             username: String::new(),
             password: String::new(),
             use_tls: false,

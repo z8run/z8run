@@ -4,11 +4,11 @@
 //! Provides a common abstraction that makes backend switching
 //! transparent to the rest of the system.
 
-pub mod repository;
 pub mod credential_vault;
 pub mod migration;
-pub mod sqlite;
 pub mod postgres;
+pub mod repository;
+pub mod sqlite;
 
 use thiserror::Error;
 

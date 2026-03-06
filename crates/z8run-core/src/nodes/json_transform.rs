@@ -106,9 +106,10 @@ impl NodeExecutor for JsonTransformNode {
 
     async fn validate(&self) -> Z8Result<()> {
         if !["parse", "stringify", "extract"].contains(&self.action.as_str()) {
-            return Err(crate::error::Z8Error::Internal(
-                format!("Invalid JSON transform action: '{}'. Expected: parse, stringify, extract", self.action),
-            ));
+            return Err(crate::error::Z8Error::Internal(format!(
+                "Invalid JSON transform action: '{}'. Expected: parse, stringify, extract",
+                self.action
+            )));
         }
         if self.action == "extract" && self.path.is_empty() {
             return Err(crate::error::Z8Error::Internal(

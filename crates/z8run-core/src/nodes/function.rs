@@ -30,7 +30,10 @@ fn resolve_template(template: &Value, data: &Value) -> Value {
 
             // Check if the entire string is a single placeholder like "{req.body.name}"
             let trimmed = s.trim();
-            if trimmed.starts_with('{') && trimmed.ends_with('}') && trimmed.matches('{').count() == 1 {
+            if trimmed.starts_with('{')
+                && trimmed.ends_with('}')
+                && trimmed.matches('{').count() == 1
+            {
                 let path = &trimmed[1..trimmed.len() - 1];
                 let looked_up = json_path_lookup(data, path);
                 if !looked_up.is_null() {
@@ -75,9 +78,7 @@ fn resolve_template(template: &Value, data: &Value) -> Value {
                 .collect();
             Value::Object(resolved)
         }
-        Value::Array(arr) => {
-            Value::Array(arr.iter().map(|v| resolve_template(v, data)).collect())
-        }
+        Value::Array(arr) => Value::Array(arr.iter().map(|v| resolve_template(v, data)).collect()),
         // Pass through numbers, bools, null as-is
         other => other.clone(),
     }
@@ -217,7 +218,10 @@ mod tests {
     #[test]
     fn test_nested_lookup() {
         let data = serde_json::json!({"a": {"b": {"c": "deep"}}});
-        assert_eq!(json_path_lookup(&data, "a.b.c"), Value::String("deep".into()));
+        assert_eq!(
+            json_path_lookup(&data, "a.b.c"),
+            Value::String("deep".into())
+        );
         assert_eq!(json_path_lookup(&data, "a.b.missing"), Value::Null);
     }
 }

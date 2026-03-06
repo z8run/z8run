@@ -1,7 +1,5 @@
 //! REST API v1 routes.
 
-use std::collections::HashMap;
-use std::sync::Arc;
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -9,29 +7,37 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use std::collections::HashMap;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::Claims;
 use crate::error::ApiError;
 use crate::state::AppState;
-use z8run_core::flow::{Flow, Edge};
+use tracing::{error, info, warn};
+use z8run_core::flow::{Edge, Flow};
 use z8run_core::message::FlowMessage;
 use z8run_core::node::{Node, PortType};
-use tracing::{info, warn, error};
 
 /// Mounts the REST API routes (protected by JWT).
 pub fn api_routes() -> Router<Arc<AppState>> {
     Router::new()
         // Flows
         .route("/flows", get(list_flows).post(create_flow))
-        .route("/flows/{id}", get(get_flow).put(update_flow).delete(delete_flow))
+        .route(
+            "/flows/{id}",
+            get(get_flow).put(update_flow).delete(delete_flow),
+        )
         .route("/flows/{id}/start", post(start_flow))
         .route("/flows/{id}/stop", post(stop_flow))
         .route("/flows/{id}/export", get(export_flow))
         .route("/flows/import", post(import_flow))
         // Vault
         .route("/vault", get(list_credentials).post(store_credential))
-        .route("/vault/{key}", get(get_credential).delete(delete_credential))
+        .route(
+            "/vault/{key}",
+            get(get_credential).delete(delete_credential),
+        )
 }
 
 /// Mounts public API routes (no authentication required).
@@ -65,9 +71,7 @@ async fn health_check() -> Json<serde_json::Value> {
 }
 
 /// GET /api/v1/info
-async fn server_info(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+async fn server_info(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let active_flows = state.engine.active_flow_ids().await;
     Json(serde_json::json!({
         "service": "z8run",
@@ -82,18 +86,26 @@ async fn list_flows(
     State(state): State<Arc<AppState>>,
     axum::Extension(claims): axum::Extension<Claims>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let flows = state.storage.list_flows_by_user(claims.sub).await.map_err(ApiError::from)?;
+    let flows = state
+        .storage
+        .list_flows_by_user(claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
     let flow_summaries: Vec<serde_json::Value> = flows
         .iter()
         .map(|f| {
             // Count canvas nodes/edges from metadata (where the frontend stores them)
-            let canvas_node_count = f.metadata.positions
+            let canvas_node_count = f
+                .metadata
+                .positions
                 .get("canvas_nodes")
                 .and_then(|v| v.as_array())
                 .map(|a| a.len())
                 .unwrap_or(f.nodes.len());
-            let canvas_edge_count = f.metadata.positions
+            let canvas_edge_count = f
+                .metadata
+                .positions
                 .get("canvas_edges")
                 .and_then(|v| v.as_array())
                 .map(|a| a.len())
@@ -134,7 +146,11 @@ async fn create_flow(
     flow.description = description.to_string();
 
     // Persist to database with user ownership
-    state.storage.save_flow_with_user(&flow, claims.sub).await.map_err(ApiError::from)?;
+    state
+        .storage
+        .save_flow_with_user(&flow, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
     Ok(Json(serde_json::json!({
         "id": flow.id.to_string(),
@@ -153,7 +169,11 @@ async fn update_flow(
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Load existing flow (only if owned by user)
-    let mut flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
+    let mut flow = state
+        .storage
+        .get_flow_for_user(id, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
     // Update name if provided
     if let Some(name) = payload["name"].as_str() {
@@ -168,31 +188,32 @@ async fn update_flow(
     // Store the React Flow canvas state in metadata
     // This preserves the full frontend state (positions, data, selections)
     if let Some(canvas_nodes) = payload.get("canvas_nodes") {
-        flow.metadata.positions.insert(
-            "canvas_nodes".to_string(),
-            canvas_nodes.clone(),
-        );
+        flow.metadata
+            .positions
+            .insert("canvas_nodes".to_string(), canvas_nodes.clone());
     }
 
     if let Some(canvas_edges) = payload.get("canvas_edges") {
-        flow.metadata.positions.insert(
-            "canvas_edges".to_string(),
-            canvas_edges.clone(),
-        );
+        flow.metadata
+            .positions
+            .insert("canvas_edges".to_string(), canvas_edges.clone());
     }
 
     if let Some(viewport) = payload.get("viewport") {
-        flow.metadata.positions.insert(
-            "viewport".to_string(),
-            viewport.clone(),
-        );
+        flow.metadata
+            .positions
+            .insert("viewport".to_string(), viewport.clone());
     }
 
     // Update timestamp
     flow.updated_at = chrono::Utc::now();
 
     // Persist
-    state.storage.save_flow(&flow).await.map_err(ApiError::from)?;
+    state
+        .storage
+        .save_flow(&flow)
+        .await
+        .map_err(ApiError::from)?;
 
     Ok(Json(serde_json::json!({
         "id": flow.id.to_string(),
@@ -208,16 +229,29 @@ async fn get_flow(
     axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
+    let flow = state
+        .storage
+        .get_flow_for_user(id, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
     // Extract canvas state from metadata for the frontend
-    let canvas_nodes = flow.metadata.positions.get("canvas_nodes")
+    let canvas_nodes = flow
+        .metadata
+        .positions
+        .get("canvas_nodes")
         .cloned()
         .unwrap_or(serde_json::json!([]));
-    let canvas_edges = flow.metadata.positions.get("canvas_edges")
+    let canvas_edges = flow
+        .metadata
+        .positions
+        .get("canvas_edges")
         .cloned()
         .unwrap_or(serde_json::json!([]));
-    let viewport = flow.metadata.positions.get("viewport")
+    let viewport = flow
+        .metadata
+        .positions
+        .get("viewport")
         .cloned()
         .unwrap_or(serde_json::json!({"x": 0, "y": 0, "zoom": 1}));
 
@@ -244,7 +278,11 @@ async fn delete_flow(
     axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state.storage.delete_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
+    state
+        .storage
+        .delete_flow_for_user(id, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
     Ok(Json(serde_json::json!({
         "deleted": id.to_string(),
@@ -257,7 +295,11 @@ async fn start_flow(
     axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let stored_flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
+    let stored_flow = state
+        .storage
+        .get_flow_for_user(id, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
     // Build an executable Flow from canvas state (returns id_map for frontend feedback)
     let (exec_flow, id_map) = canvas_to_flow(&stored_flow)?;
@@ -292,7 +334,11 @@ async fn start_flow(
         })))
     } else {
         // No input nodes — execute immediately (manual/cron flow).
-        let trace_id = state.engine.execute(exec_flow).await.map_err(ApiError::from)?;
+        let trace_id = state
+            .engine
+            .execute(exec_flow)
+            .await
+            .map_err(ApiError::from)?;
         Ok(Json(serde_json::json!({
             "flow_id": id.to_string(),
             "trace_id": trace_id.to_string(),
@@ -305,13 +351,13 @@ async fn start_flow(
 /// Scans canvas_nodes for http-in nodes and returns their hook URLs.
 /// Each flow gets its own namespace: /hook/{flow_id}/{path}
 /// No conflict detection needed — namespaces prevent collisions.
-fn register_hook_routes(
-    stored: &Flow,
-    flow_id: Uuid,
-) -> Vec<serde_json::Value> {
+fn register_hook_routes(stored: &Flow, flow_id: Uuid) -> Vec<serde_json::Value> {
     let mut registered = Vec::new();
 
-    let canvas_nodes = match stored.metadata.positions.get("canvas_nodes")
+    let canvas_nodes = match stored
+        .metadata
+        .positions
+        .get("canvas_nodes")
         .and_then(|v| v.as_array())
     {
         Some(nodes) => nodes,
@@ -354,13 +400,19 @@ fn register_hook_routes(
 
 /// Converts the frontend canvas state (stored in metadata) into
 /// an executable core Flow with proper Nodes and Edges.
-fn canvas_to_flow(stored: &Flow) -> Result<(Flow, std::collections::HashMap<String, Uuid>), ApiError> {
-    let canvas_nodes = stored.metadata.positions
+fn canvas_to_flow(
+    stored: &Flow,
+) -> Result<(Flow, std::collections::HashMap<String, Uuid>), ApiError> {
+    let canvas_nodes = stored
+        .metadata
+        .positions
         .get("canvas_nodes")
         .and_then(|v| v.as_array())
         .ok_or_else(|| ApiError::bad_request("No canvas nodes found. Save the flow first."))?;
 
-    let canvas_edges = stored.metadata.positions
+    let canvas_edges = stored
+        .metadata
+        .positions
         .get("canvas_edges")
         .and_then(|v| v.as_array())
         .unwrap_or(&Vec::new())
@@ -383,7 +435,8 @@ fn canvas_to_flow(stored: &Flow) -> Result<(Flow, std::collections::HashMap<Stri
         let data = &canvas_node["data"];
 
         // Extract the node type (try "type" first, then "nodeType" for curl-created nodes)
-        let node_type_str = data["type"].as_str()
+        let node_type_str = data["type"]
+            .as_str()
             .or_else(|| data["nodeType"].as_str())
             .unwrap_or("function");
         let label = data["label"].as_str().unwrap_or("Node");
@@ -438,7 +491,11 @@ fn canvas_to_flow(stored: &Flow) -> Result<(Flow, std::collections::HashMap<Stri
             let edge = Edge::new(from_id, source_handle, to_id, target_handle);
             flow.edges.push(edge);
         } else {
-            warn!(source = source, target = target, "Skipping edge with unknown nodes");
+            warn!(
+                source = source,
+                target = target,
+                "Skipping edge with unknown nodes"
+            );
         }
     }
 
@@ -463,7 +520,10 @@ async fn list_credentials(
     State(state): State<Arc<AppState>>,
     axum::Extension(_claims): axum::Extension<Claims>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let keys = state.vault.list_keys().await
+    let keys = state
+        .vault
+        .list_keys()
+        .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
     Ok(Json(serde_json::json!({ "keys": keys })))
 }
@@ -476,12 +536,17 @@ async fn store_credential(
     axum::Extension(_claims): axum::Extension<Claims>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let key = body["key"].as_str()
+    let key = body["key"]
+        .as_str()
         .ok_or_else(|| ApiError::bad_request("Missing 'key' field"))?;
-    let value = body["value"].as_str()
+    let value = body["value"]
+        .as_str()
         .ok_or_else(|| ApiError::bad_request("Missing 'value' field"))?;
 
-    state.vault.store(key, value).await
+    state
+        .vault
+        .store(key, value)
+        .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
 
     Ok(Json(serde_json::json!({ "status": "stored", "key": key })))
@@ -494,7 +559,10 @@ async fn get_credential(
     axum::Extension(_claims): axum::Extension<Claims>,
     Path(key): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let value = state.vault.retrieve(&key).await
+    let value = state
+        .vault
+        .retrieve(&key)
+        .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
     Ok(Json(serde_json::json!({ "key": key, "value": value })))
 }
@@ -506,7 +574,10 @@ async fn delete_credential(
     axum::Extension(_claims): axum::Extension<Claims>,
     Path(key): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state.vault.delete(&key).await
+    state
+        .vault
+        .delete(&key)
+        .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
     Ok(Json(serde_json::json!({ "status": "deleted", "key": key })))
 }
@@ -564,7 +635,8 @@ async fn hook_handler(
     };
 
     // Sub-path from the wildcard capture (e.g. "branch" or "users/123")
-    let sub_path = params.get("path")
+    let sub_path = params
+        .get("path")
         .map(|p| format!("/{}", p))
         .unwrap_or_else(|| "/".to_string());
 
@@ -595,28 +667,36 @@ async fn hook_handler(
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": format!("Failed to compile flow: {}", e.message)})),
+                Json(
+                    serde_json::json!({"error": format!("Failed to compile flow: {}", e.message)}),
+                ),
             );
         }
     };
 
     // Parse body as JSON (or wrap raw string)
-    let body_json: serde_json::Value = serde_json::from_str(&body)
-        .unwrap_or_else(|_| if body.is_empty() { serde_json::json!(null) } else { serde_json::json!(body) });
+    let body_json: serde_json::Value = serde_json::from_str(&body).unwrap_or_else(|_| {
+        if body.is_empty() {
+            serde_json::json!(null)
+        } else {
+            serde_json::json!(body)
+        }
+    });
 
     // Convert headers to JSON map
     let headers_json: serde_json::Map<String, serde_json::Value> = headers
         .iter()
         .filter_map(|(name, value)| {
-            value.to_str().ok().map(|v| {
-                (name.to_string(), serde_json::Value::String(v.to_string()))
-            })
+            value
+                .to_str()
+                .ok()
+                .map(|v| (name.to_string(), serde_json::Value::String(v.to_string())))
         })
         .collect();
 
     // Convert query params to JSON
-    let query_json: serde_json::Value = serde_json::to_value(&query_params)
-        .unwrap_or(serde_json::json!({}));
+    let query_json: serde_json::Value =
+        serde_json::to_value(&query_params).unwrap_or(serde_json::json!({}));
 
     // Create the trigger message with real HTTP data
     let trace_id = Uuid::now_v7();
@@ -628,19 +708,18 @@ async fn hook_handler(
         "body": body_json,
     });
 
-    let trigger_msg = FlowMessage::new(
-        Uuid::nil(),
-        "hook",
-        trigger_payload,
-        trace_id,
-    );
+    let trigger_msg = FlowMessage::new(Uuid::nil(), "hook", trigger_payload, trace_id);
 
     // Create oneshot channel for the response
     let (tx, rx) = tokio::sync::oneshot::channel();
     state.webhook_responders.write().await.insert(trace_id, tx);
 
     // Execute the flow with the trigger message
-    match state.engine.execute_with_trigger(exec_flow, Some(trigger_msg)).await {
+    match state
+        .engine
+        .execute_with_trigger(exec_flow, Some(trigger_msg))
+        .await
+    {
         Ok(_) => {}
         Err(e) => {
             state.webhook_responders.write().await.remove(&trace_id);
@@ -669,8 +748,7 @@ async fn await_flow_response(
                 status = response.status,
                 "Flow response sent"
             );
-            let status = StatusCode::from_u16(response.status)
-                .unwrap_or(StatusCode::OK);
+            let status = StatusCode::from_u16(response.status).unwrap_or(StatusCode::OK);
             (status, Json(response.body))
         }
         Ok(Err(_)) => {
@@ -702,15 +780,28 @@ async fn export_flow(
     axum::Extension(claims): axum::Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let flow = state.storage.get_flow_for_user(id, claims.sub).await.map_err(ApiError::from)?;
+    let flow = state
+        .storage
+        .get_flow_for_user(id, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
-    let canvas_nodes = flow.metadata.positions.get("canvas_nodes")
+    let canvas_nodes = flow
+        .metadata
+        .positions
+        .get("canvas_nodes")
         .cloned()
         .unwrap_or(serde_json::json!([]));
-    let canvas_edges = flow.metadata.positions.get("canvas_edges")
+    let canvas_edges = flow
+        .metadata
+        .positions
+        .get("canvas_edges")
         .cloned()
         .unwrap_or(serde_json::json!([]));
-    let viewport = flow.metadata.positions.get("viewport")
+    let viewport = flow
+        .metadata
+        .positions
+        .get("viewport")
         .cloned()
         .unwrap_or(serde_json::json!({"x": 0, "y": 0, "zoom": 1}));
 
@@ -741,20 +832,41 @@ async fn import_flow(
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validate export format
-    let flow_data = payload.get("flow")
+    let flow_data = payload
+        .get("flow")
         .ok_or_else(|| ApiError::bad_request("Invalid export: missing 'flow' key"))?;
 
-    let name = flow_data["name"].as_str()
+    let name = flow_data["name"]
+        .as_str()
         .ok_or_else(|| ApiError::bad_request("Invalid export: missing flow name"))?;
     let description = flow_data["description"].as_str().unwrap_or("");
     let version = flow_data["version"].as_str().unwrap_or("0.1.0");
 
     // Validate node types — reject unknown nodes before creating the flow
     const VALID_NODE_TYPES: &[&str] = &[
-        "http-in", "http-out", "http-request", "function", "debug",
-        "switch", "filter", "delay", "timer", "webhook", "json", "database", "mqtt",
-        "llm", "embeddings", "classifier", "prompt-template", "text-splitter",
-        "vector-store", "structured-output", "summarizer", "ai-agent", "image-gen",
+        "http-in",
+        "http-out",
+        "http-request",
+        "function",
+        "debug",
+        "switch",
+        "filter",
+        "delay",
+        "timer",
+        "webhook",
+        "json",
+        "database",
+        "mqtt",
+        "llm",
+        "embeddings",
+        "classifier",
+        "prompt-template",
+        "text-splitter",
+        "vector-store",
+        "structured-output",
+        "summarizer",
+        "ai-agent",
+        "image-gen",
     ];
 
     if let Some(canvas_nodes) = flow_data["canvas_nodes"].as_array() {
@@ -786,21 +898,37 @@ async fn import_flow(
 
     // Restore canvas state into metadata
     if let Some(nodes) = flow_data.get("canvas_nodes") {
-        flow.metadata.positions.insert("canvas_nodes".to_string(), nodes.clone());
+        flow.metadata
+            .positions
+            .insert("canvas_nodes".to_string(), nodes.clone());
     }
     if let Some(edges) = flow_data.get("canvas_edges") {
-        flow.metadata.positions.insert("canvas_edges".to_string(), edges.clone());
+        flow.metadata
+            .positions
+            .insert("canvas_edges".to_string(), edges.clone());
     }
     if let Some(vp) = flow_data.get("viewport") {
-        flow.metadata.positions.insert("viewport".to_string(), vp.clone());
+        flow.metadata
+            .positions
+            .insert("viewport".to_string(), vp.clone());
     }
 
     // Count imported nodes/edges for the response
-    let node_count = flow_data["canvas_nodes"].as_array().map(|a| a.len()).unwrap_or(0);
-    let edge_count = flow_data["canvas_edges"].as_array().map(|a| a.len()).unwrap_or(0);
+    let node_count = flow_data["canvas_nodes"]
+        .as_array()
+        .map(|a| a.len())
+        .unwrap_or(0);
+    let edge_count = flow_data["canvas_edges"]
+        .as_array()
+        .map(|a| a.len())
+        .unwrap_or(0);
 
     // Save with user ownership
-    state.storage.save_flow_with_user(&flow, claims.sub).await.map_err(ApiError::from)?;
+    state
+        .storage
+        .save_flow_with_user(&flow, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
 
     info!(flow_id = %flow.id, name = %flow.name, nodes = node_count, edges = edge_count, "Flow imported");
 
@@ -814,4 +942,3 @@ async fn import_flow(
         "created_at": flow.created_at.to_rfc3339(),
     })))
 }
-

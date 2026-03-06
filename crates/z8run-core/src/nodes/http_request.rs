@@ -8,10 +8,10 @@
 //!   - "response" port: successful HTTP response (any status code)
 //!   - "error" port: network/timeout/parse errors
 
+use super::switch::json_path_lookup;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
-use super::switch::json_path_lookup;
 use tracing::{info, warn};
 
 /// Regex for `{path.to.field}` placeholders in URLs.
@@ -93,16 +93,17 @@ impl NodeExecutor for HttpRequestNode {
                     .headers()
                     .iter()
                     .filter_map(|(name, value)| {
-                        value.to_str().ok().map(|v| {
-                            (name.to_string(), serde_json::Value::String(v.to_string()))
-                        })
+                        value
+                            .to_str()
+                            .ok()
+                            .map(|v| (name.to_string(), serde_json::Value::String(v.to_string())))
                     })
                     .collect();
 
                 // Parse response body as JSON, fallback to string
                 let body_text = response.text().await.unwrap_or_default();
-                let body_json: serde_json::Value = serde_json::from_str(&body_text)
-                    .unwrap_or_else(|_| {
+                let body_json: serde_json::Value =
+                    serde_json::from_str(&body_text).unwrap_or_else(|_| {
                         if body_text.is_empty() {
                             serde_json::Value::Null
                         } else {

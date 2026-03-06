@@ -13,13 +13,13 @@ use tracing::{info, warn};
 
 pub struct ImageGenNode {
     name: String,
-    provider: String,         // "openai" or "stability"
-    model: String,            // e.g. "dall-e-3", "dall-e-2"
+    provider: String, // "openai" or "stability"
+    model: String,    // e.g. "dall-e-3", "dall-e-2"
     api_key: String,
     base_url: String,
-    size: String,             // e.g. "1024x1024"
-    quality: String,          // "standard", "hd"
-    style: String,            // "natural", "vivid"
+    size: String,    // e.g. "1024x1024"
+    quality: String, // "standard", "hd"
+    style: String,   // "natural", "vivid"
     timeout_ms: u64,
 }
 
@@ -167,10 +167,7 @@ impl ImageGenNode {
             serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
 
         // Extract URL and revised prompt
-        let url = json["data"][0]["url"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let url = json["data"][0]["url"].as_str().unwrap_or("").to_string();
 
         let revised_prompt = json["data"][0]["revised_prompt"]
             .as_str()
@@ -209,10 +206,7 @@ impl ImageGenNode {
         // Parse size into width and height
         let (width, height) = parse_size(&self.size);
 
-        let url = format!(
-            "{}/generation/{}/text-to-image",
-            base, self.model
-        );
+        let url = format!("{}/generation/{}/text-to-image", base, self.model);
 
         let body = serde_json::json!({
             "text_prompts": [

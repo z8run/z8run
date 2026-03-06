@@ -8,12 +8,12 @@
 //!   - "tool_call" port: When agent wants to call a tool (tool_name, arguments, iteration)
 //!   - "error" port: API or configuration errors
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory, EngineEvent};
+use crate::engine::{EngineEvent, NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
 use serde::{Deserialize, Serialize};
-use tracing::{info, warn};
 use tokio::sync::broadcast;
+use tracing::{info, warn};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct ToolDefinition {
 #[allow(dead_code)]
 pub struct AiAgentNode {
     name: String,
-    provider: String,         // "openai", "anthropic", "ollama"
+    provider: String, // "openai", "anthropic", "ollama"
     model: String,
     api_key: String,
     base_url: String,
@@ -67,9 +67,18 @@ impl NodeExecutor for AiAgentNode {
         // For v1, we do a single LLM call
         // In a real agent loop, you'd iterate on tool calls and feed results back
         let result = match self.provider.as_str() {
-            "anthropic" => self.call_anthropic_agent(&client, &user_message, timeout).await,
-            "ollama" => self.call_ollama_agent(&client, &user_message, timeout).await,
-            _ => self.call_openai_agent(&client, &user_message, timeout).await,
+            "anthropic" => {
+                self.call_anthropic_agent(&client, &user_message, timeout)
+                    .await
+            }
+            "ollama" => {
+                self.call_ollama_agent(&client, &user_message, timeout)
+                    .await
+            }
+            _ => {
+                self.call_openai_agent(&client, &user_message, timeout)
+                    .await
+            }
         };
 
         match result {

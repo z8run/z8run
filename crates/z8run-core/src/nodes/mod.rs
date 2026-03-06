@@ -27,8 +27,8 @@ pub mod timer;
 pub mod vector_store;
 pub mod webhook;
 
-use std::sync::Arc;
 use crate::engine::{FlowEngine, NodeExecutorFactory};
+use std::sync::Arc;
 
 /// Registers all built-in node types with the engine.
 pub async fn register_builtin_nodes(engine: &FlowEngine) {
@@ -54,10 +54,14 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .register_node_type(Arc::new(filter::FilterNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
     engine
-        .register_node_type(Arc::new(http_request::HttpRequestNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(http_request::HttpRequestNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
-        .register_node_type(Arc::new(json_transform::JsonTransformNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(json_transform::JsonTransformNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
         .register_node_type(Arc::new(timer::TimerNodeFactory) as Arc<dyn NodeExecutorFactory>)
@@ -75,25 +79,38 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .register_node_type(Arc::new(mqtt::MqttNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
     engine
-        .register_node_type(Arc::new(embeddings::EmbeddingsNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(embeddings::EmbeddingsNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
-        .register_node_type(Arc::new(classifier::ClassifierNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(classifier::ClassifierNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
-        .register_node_type(Arc::new(prompt_template::PromptTemplateNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(prompt_template::PromptTemplateNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
-        .register_node_type(Arc::new(text_splitter::TextSplitterNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(text_splitter::TextSplitterNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
-        .register_node_type(Arc::new(structured_output::StructuredOutputNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(Arc::new(structured_output::StructuredOutputNodeFactory)
+            as Arc<dyn NodeExecutorFactory>)
         .await;
     engine
-        .register_node_type(Arc::new(summarizer::SummarizerNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(summarizer::SummarizerNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
-        .register_node_type(Arc::new(vector_store::VectorStoreNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(vector_store::VectorStoreNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
     engine
         .register_node_type(Arc::new(ai_agent::AiAgentNodeFactory) as Arc<dyn NodeExecutorFactory>)

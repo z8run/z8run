@@ -4,7 +4,7 @@
 //! with the z8run flow engine.
 
 use crate::manifest::PluginManifest;
-use crate::sandbox::{WasmInstance, WasmSandbox, SandboxConfig};
+use crate::sandbox::{SandboxConfig, WasmInstance, WasmSandbox};
 use crate::RuntimeError;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -26,8 +26,8 @@ impl NodeExecutor for WasmNodeExecutor {
         let mut instance = self.instance.lock().await;
 
         // Serialize the message payload to JSON
-        let payload_json = serde_json::to_string(&msg.payload)
-            .map_err(|e| Z8Error::Serialization(e))?;
+        let payload_json =
+            serde_json::to_string(&msg.payload).map_err(|e| Z8Error::Serialization(e))?;
 
         debug!(
             payload_len = payload_json.len(),
@@ -45,22 +45,23 @@ impl NodeExecutor for WasmNodeExecutor {
             .map_err(|e| Z8Error::Internal(format!("Failed to parse WASM response: {}", e)))?;
 
         // Expect an array of output messages: [{port: string, payload: Value}, ...]
-        let outputs = response
-            .as_array()
-            .ok_or_else(|| Z8Error::Internal("WASM process must return a JSON array".to_string()))?;
+        let outputs = response.as_array().ok_or_else(|| {
+            Z8Error::Internal("WASM process must return a JSON array".to_string())
+        })?;
 
         let mut messages = Vec::new();
         for output in outputs {
             let port = output
                 .get("port")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| Z8Error::Internal("Missing or invalid 'port' field in output".to_string()))?
+                .ok_or_else(|| {
+                    Z8Error::Internal("Missing or invalid 'port' field in output".to_string())
+                })?
                 .to_string();
 
-            let payload = output
-                .get("payload")
-                .cloned()
-                .ok_or_else(|| Z8Error::Internal("Missing 'payload' field in output".to_string()))?;
+            let payload = output.get("payload").cloned().ok_or_else(|| {
+                Z8Error::Internal("Missing 'payload' field in output".to_string())
+            })?;
 
             messages.push(msg.derive(msg.source_node, port, payload));
         }
@@ -72,8 +73,7 @@ impl NodeExecutor for WasmNodeExecutor {
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
         let mut instance = self.instance.lock().await;
 
-        let config_json = serde_json::to_string(&config)
-            .map_err(|e| Z8Error::Serialization(e))?;
+        let config_json = serde_json::to_string(&config).map_err(|e| Z8Error::Serialization(e))?;
 
         debug!(config_len = config_json.len(), "Configuring WASM node");
 

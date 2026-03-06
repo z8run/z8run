@@ -133,7 +133,11 @@ fn split_by_fixed(text: &str, chunk_size: usize, overlap: usize) -> Vec<(String,
 }
 
 /// Split text by sentence boundaries.
-fn split_by_sentences(text: &str, chunk_size: usize, overlap: usize) -> Vec<(String, usize, usize)> {
+fn split_by_sentences(
+    text: &str,
+    chunk_size: usize,
+    overlap: usize,
+) -> Vec<(String, usize, usize)> {
     let sentences: Vec<&str> = text
         .split(|c| c == '.' || c == '!' || c == '?')
         .map(|s| s.trim())

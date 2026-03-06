@@ -92,7 +92,9 @@ impl Z8Codec {
             ProtocolMessage::ExecNodeError { .. } => MessageType::ExecNodeError as u16,
             ProtocolMessage::ExecCompleted { .. } => MessageType::ExecCompleted as u16,
             ProtocolMessage::DebugSetBreakpoint { .. } => MessageType::DebugSetBreakpoint as u16,
-            ProtocolMessage::DebugRemoveBreakpoint { .. } => MessageType::DebugRemoveBreakpoint as u16,
+            ProtocolMessage::DebugRemoveBreakpoint { .. } => {
+                MessageType::DebugRemoveBreakpoint as u16
+            }
             ProtocolMessage::DebugInspect { .. } => MessageType::DebugInspect as u16,
             ProtocolMessage::DebugInspectResult { .. } => MessageType::DebugInspectResult as u16,
             ProtocolMessage::Ok { .. } => MessageType::Ok as u16,

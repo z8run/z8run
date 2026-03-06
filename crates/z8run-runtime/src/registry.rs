@@ -43,8 +43,9 @@ impl PluginRegistry {
     pub async fn scan(&self) -> Result<usize, RuntimeError> {
         let dir = &self.plugins_dir;
         if !dir.exists() {
-            std::fs::create_dir_all(dir)
-                .map_err(|e| RuntimeError::ModuleLoad(format!("Could not create plugins directory: {}", e)))?;
+            std::fs::create_dir_all(dir).map_err(|e| {
+                RuntimeError::ModuleLoad(format!("Could not create plugins directory: {}", e))
+            })?;
             return Ok(0);
         }
 

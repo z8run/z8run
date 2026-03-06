@@ -91,8 +91,7 @@ async fn main() -> anyhow::Result<()> {
     // Configure tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(&cli.log_level)),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&cli.log_level)),
         )
         .with_target(true)
         .with_thread_ids(false)
@@ -143,20 +142,15 @@ async fn cmd_serve(
     std::fs::create_dir_all(format!("{}/plugins", data_dir))?;
 
     // Scan plugins
-    let registry = z8run_runtime::registry::PluginRegistry::new(
-        format!("{}/plugins", data_dir),
-    );
+    let registry = z8run_runtime::registry::PluginRegistry::new(format!("{}/plugins", data_dir));
     let plugin_count = registry.scan().await.unwrap_or(0);
     tracing::info!(plugins = plugin_count, "Plugins scanned");
 
     // Initialize storage (PostgreSQL or SQLite based on URL)
-    let url = db_url.unwrap_or_else(|| {
-        format!("sqlite://{}/z8run.db?mode=rwc", data_dir)
-    });
+    let url = db_url.unwrap_or_else(|| format!("sqlite://{}/z8run.db?mode=rwc", data_dir));
 
     let jwt_secret = "z8run-dev-secret".to_string(); // TODO: generate or load from config
-    let vault_secret = std::env::var("Z8_VAULT_SECRET")
-        .unwrap_or_else(|_| jwt_secret.clone());
+    let vault_secret = std::env::var("Z8_VAULT_SECRET").unwrap_or_else(|_| jwt_secret.clone());
 
     let (storage, user_storage, vault): (
         Arc<dyn z8run_storage::repository::FlowRepository>,
@@ -168,20 +162,30 @@ async fn cmd_serve(
         pg.migrate().await?;
         tracing::info!("PostgreSQL ready");
         let pg_arc = Arc::new(pg);
-        let vault_pg = Arc::new(z8run_storage::credential_vault::PgCredentialVault::new(pg_arc.pool().clone(), &vault_secret));
-        (pg_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
-         pg_arc as Arc<dyn z8run_storage::repository::UserRepository>,
-         vault_pg as Arc<dyn z8run_storage::credential_vault::CredentialVault>)
+        let vault_pg = Arc::new(z8run_storage::credential_vault::PgCredentialVault::new(
+            pg_arc.pool().clone(),
+            &vault_secret,
+        ));
+        (
+            pg_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
+            pg_arc as Arc<dyn z8run_storage::repository::UserRepository>,
+            vault_pg as Arc<dyn z8run_storage::credential_vault::CredentialVault>,
+        )
     } else {
         tracing::info!(url = %url, "Connecting to SQLite");
         let sqlite = z8run_storage::sqlite::SqliteStorage::new(&url).await?;
         sqlite.migrate().await?;
         tracing::info!("SQLite ready");
         let sqlite_arc = Arc::new(sqlite);
-        let vault_sqlite = Arc::new(z8run_storage::credential_vault::SqliteCredentialVault::new(sqlite_arc.pool().clone(), &vault_secret));
-        (sqlite_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
-         sqlite_arc as Arc<dyn z8run_storage::repository::UserRepository>,
-         vault_sqlite as Arc<dyn z8run_storage::credential_vault::CredentialVault>)
+        let vault_sqlite = Arc::new(z8run_storage::credential_vault::SqliteCredentialVault::new(
+            sqlite_arc.pool().clone(),
+            &vault_secret,
+        ));
+        (
+            sqlite_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
+            sqlite_arc as Arc<dyn z8run_storage::repository::UserRepository>,
+            vault_sqlite as Arc<dyn z8run_storage::credential_vault::CredentialVault>,
+        )
     };
     tracing::info!("Credential vault initialized");
 
@@ -215,9 +219,7 @@ async fn cmd_serve(
 /// Run database migrations.
 async fn cmd_migrate(db_url: Option<String>, data_dir: &str) -> anyhow::Result<()> {
     std::fs::create_dir_all(data_dir)?;
-    let url = db_url.unwrap_or_else(|| {
-        format!("sqlite://{}/z8run.db?mode=rwc", data_dir)
-    });
+    let url = db_url.unwrap_or_else(|| format!("sqlite://{}/z8run.db?mode=rwc", data_dir));
     tracing::info!(url = %url, "Running migrations...");
 
     if url.starts_with("postgres") {
@@ -234,9 +236,7 @@ async fn cmd_migrate(db_url: Option<String>, data_dir: &str) -> anyhow::Result<(
 
 /// Plugin management.
 async fn cmd_plugin(action: PluginAction, data_dir: &str) -> anyhow::Result<()> {
-    let registry = z8run_runtime::registry::PluginRegistry::new(
-        format!("{}/plugins", data_dir),
-    );
+    let registry = z8run_runtime::registry::PluginRegistry::new(format!("{}/plugins", data_dir));
 
     match action {
         PluginAction::List => {

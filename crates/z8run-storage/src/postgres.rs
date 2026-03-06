@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 use z8run_core::flow::Flow;
 
-use crate::repository::{ExecutionRecord, ExecutionRepository, FlowRepository, UserRecord, UserRepository};
+use crate::repository::{
+    ExecutionRecord, ExecutionRepository, FlowRepository, UserRecord, UserRepository,
+};
 use crate::StorageError;
 
 /// PostgreSQL-backed storage for flows and executions.
@@ -22,7 +24,9 @@ impl PgStorage {
             .max_connections(10)
             .connect(database_url)
             .await
-            .map_err(|e| StorageError::Database(format!("Failed to connect to PostgreSQL: {}", e)))?;
+            .map_err(|e| {
+                StorageError::Database(format!("Failed to connect to PostgreSQL: {}", e))
+            })?;
 
         Ok(Self { pool })
     }
@@ -42,8 +46,8 @@ impl PgStorage {
 impl FlowRepository for PgStorage {
     async fn save_flow(&self, flow: &Flow) -> Result<(), StorageError> {
         let id = flow.id.to_string();
-        let data = serde_json::to_value(flow)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let data =
+            serde_json::to_value(flow).map_err(|e| StorageError::Serialization(e.to_string()))?;
         let status = flow.status.to_string();
 
         sqlx::query(
@@ -76,12 +80,11 @@ impl FlowRepository for PgStorage {
     async fn get_flow(&self, id: Uuid) -> Result<Flow, StorageError> {
         let id_str = id.to_string();
 
-        let row: (serde_json::Value,) =
-            sqlx::query_as("SELECT data FROM flows WHERE id = $1")
-                .bind(&id_str)
-                .fetch_optional(&self.pool)
-                .await?
-                .ok_or(StorageError::FlowNotFound(id))?;
+        let row: (serde_json::Value,) = sqlx::query_as("SELECT data FROM flows WHERE id = $1")
+            .bind(&id_str)
+            .fetch_optional(&self.pool)
+            .await?
+            .ok_or(StorageError::FlowNotFound(id))?;
 
         let flow: Flow = serde_json::from_value(row.0)
             .map_err(|e| StorageError::Serialization(e.to_string()))?;
@@ -124,12 +127,11 @@ impl FlowRepository for PgStorage {
     async fn search_flows(&self, query: &str) -> Result<Vec<Flow>, StorageError> {
         let pattern = format!("%{}%", query);
 
-        let rows: Vec<(serde_json::Value,)> = sqlx::query_as(
-            "SELECT data FROM flows WHERE name ILIKE $1 ORDER BY updated_at DESC",
-        )
-        .bind(&pattern)
-        .fetch_all(&self.pool)
-        .await?;
+        let rows: Vec<(serde_json::Value,)> =
+            sqlx::query_as("SELECT data FROM flows WHERE name ILIKE $1 ORDER BY updated_at DESC")
+                .bind(&pattern)
+                .fetch_all(&self.pool)
+                .await?;
 
         let mut flows = Vec::with_capacity(rows.len());
         for (data,) in rows {
@@ -144,8 +146,8 @@ impl FlowRepository for PgStorage {
     async fn save_flow_with_user(&self, flow: &Flow, user_id: Uuid) -> Result<(), StorageError> {
         let id = flow.id.to_string();
         let user_id_str = user_id.to_string();
-        let data = serde_json::to_value(flow)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let data =
+            serde_json::to_value(flow).map_err(|e| StorageError::Serialization(e.to_string()))?;
         let status = flow.status.to_string();
 
         sqlx::query(
@@ -333,7 +335,7 @@ impl UserRepository for PgStorage {
     async fn create_user(&self, user: &UserRecord) -> Result<(), StorageError> {
         sqlx::query(
             r#"INSERT INTO users (id, email, username, password_hash, roles, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)"#
+               VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
         )
         .bind(&user.id.to_string())
         .bind(&user.email)
@@ -362,7 +364,12 @@ impl UserRepository for PgStorage {
             email: row.1,
             username: row.2,
             password_hash: row.3,
-            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            roles: row
+                .4
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             created_at: row.5,
             updated_at: row.6,
         })
@@ -381,7 +388,12 @@ impl UserRepository for PgStorage {
             email: row.1,
             username: row.2,
             password_hash: row.3,
-            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            roles: row
+                .4
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             created_at: row.5,
             updated_at: row.6,
         })
@@ -400,7 +412,12 @@ impl UserRepository for PgStorage {
             email: row.1,
             username: row.2,
             password_hash: row.3,
-            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            roles: row
+                .4
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             created_at: row.5,
             updated_at: row.6,
         })

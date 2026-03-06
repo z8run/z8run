@@ -99,7 +99,10 @@ impl DatabaseNode {
     /// Returns a safe version of the connection string for error messages (no password).
     fn safe_connection_info(&self) -> String {
         if self.connection_string.is_empty() {
-            format!("{}://{}@{}:{}/{}", self.db_type, self.user, self.host, self.port, self.database)
+            format!(
+                "{}://{}@{}:{}/{}",
+                self.db_type, self.user, self.host, self.port, self.database
+            )
         } else {
             // Mask everything between :// and @
             self.connection_string
@@ -188,9 +191,7 @@ impl NodeExecutor for DatabaseNode {
                 "Database node requires a 'query'".to_string(),
             ));
         }
-        if self.connection_string.is_empty()
-            && self.database.is_empty()
-            && self.db_type != "sqlite"
+        if self.connection_string.is_empty() && self.database.is_empty() && self.db_type != "sqlite"
         {
             return Err(crate::error::Z8Error::Internal(
                 "Database node requires either a 'connectionString' or 'database' name".to_string(),
@@ -207,7 +208,11 @@ impl NodeExecutor for DatabaseNode {
 // ---------- PostgreSQL ----------
 
 impl DatabaseNode {
-    async fn execute_postgres(&self, msg: &FlowMessage, conn_str: &str) -> Z8Result<Vec<FlowMessage>> {
+    async fn execute_postgres(
+        &self,
+        msg: &FlowMessage,
+        conn_str: &str,
+    ) -> Z8Result<Vec<FlowMessage>> {
         let pool = match sqlx::postgres::PgPoolOptions::new()
             .max_connections(2)
             .acquire_timeout(std::time::Duration::from_secs(5))
@@ -314,7 +319,11 @@ impl DatabaseNode {
         Ok(vec![out])
     }
 
-    async fn execute_sqlite(&self, msg: &FlowMessage, conn_str: &str) -> Z8Result<Vec<FlowMessage>> {
+    async fn execute_sqlite(
+        &self,
+        msg: &FlowMessage,
+        conn_str: &str,
+    ) -> Z8Result<Vec<FlowMessage>> {
         let pool = match sqlx::sqlite::SqlitePoolOptions::new()
             .max_connections(1)
             .connect(conn_str)
@@ -391,25 +400,49 @@ fn bind_pg_value<'q>(
 }
 
 fn pg_row_to_json(row: &sqlx::postgres::PgRow) -> Value {
-    use sqlx::{Row, Column, TypeInfo};
+    use sqlx::{Column, Row, TypeInfo};
     let mut obj = serde_json::Map::new();
     for col in row.columns() {
         let name = col.name().to_string();
         let type_name = col.type_info().name();
         let val: Value = match type_name {
-            "INT4" | "INT2" => row.try_get::<i32, _>(name.as_str()).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "INT8" => row.try_get::<i64, _>(name.as_str()).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "FLOAT4" | "FLOAT8" => row.try_get::<f64, _>(name.as_str()).map(|v| serde_json::json!(v)).unwrap_or(Value::Null),
-            "BOOL" => row.try_get::<bool, _>(name.as_str()).map(Value::Bool).unwrap_or(Value::Null),
-            "JSON" | "JSONB" => row.try_get::<Value, _>(name.as_str()).unwrap_or(Value::Null),
-            "UUID" => row.try_get::<uuid::Uuid, _>(name.as_str()).map(|v| Value::String(v.to_string())).unwrap_or(Value::Null),
+            "INT4" | "INT2" => row
+                .try_get::<i32, _>(name.as_str())
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "INT8" => row
+                .try_get::<i64, _>(name.as_str())
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "FLOAT4" | "FLOAT8" => row
+                .try_get::<f64, _>(name.as_str())
+                .map(|v| serde_json::json!(v))
+                .unwrap_or(Value::Null),
+            "BOOL" => row
+                .try_get::<bool, _>(name.as_str())
+                .map(Value::Bool)
+                .unwrap_or(Value::Null),
+            "JSON" | "JSONB" => row
+                .try_get::<Value, _>(name.as_str())
+                .unwrap_or(Value::Null),
+            "UUID" => row
+                .try_get::<uuid::Uuid, _>(name.as_str())
+                .map(|v| Value::String(v.to_string()))
+                .unwrap_or(Value::Null),
             "TIMESTAMPTZ" | "TIMESTAMP" => row
                 .try_get::<chrono::NaiveDateTime, _>(name.as_str())
                 .map(|v| Value::String(v.to_string()))
                 .ok()
-                .or_else(|| row.try_get::<chrono::DateTime<chrono::Utc>, _>(name.as_str()).map(|v| Value::String(v.to_rfc3339())).ok())
+                .or_else(|| {
+                    row.try_get::<chrono::DateTime<chrono::Utc>, _>(name.as_str())
+                        .map(|v| Value::String(v.to_rfc3339()))
+                        .ok()
+                })
                 .unwrap_or(Value::Null),
-            _ => row.try_get::<String, _>(name.as_str()).map(Value::String).unwrap_or(Value::Null),
+            _ => row
+                .try_get::<String, _>(name.as_str())
+                .map(Value::String)
+                .unwrap_or(Value::Null),
         };
         obj.insert(name, val);
     }
@@ -440,22 +473,39 @@ fn bind_mysql_value<'q>(
 }
 
 fn mysql_row_to_json(row: &sqlx::mysql::MySqlRow) -> Value {
-    use sqlx::{Row, Column, TypeInfo};
+    use sqlx::{Column, Row, TypeInfo};
     let mut obj = serde_json::Map::new();
     for col in row.columns() {
         let name = col.name().to_string();
         let type_name = col.type_info().name();
         let val: Value = match type_name {
-            "INT" | "SMALLINT" | "MEDIUMINT" | "TINYINT" => row.try_get::<i32, _>(name.as_str()).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "BIGINT" => row.try_get::<i64, _>(name.as_str()).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "FLOAT" | "DOUBLE" | "DECIMAL" => row.try_get::<f64, _>(name.as_str()).map(|v| serde_json::json!(v)).unwrap_or(Value::Null),
-            "BOOLEAN" => row.try_get::<bool, _>(name.as_str()).map(Value::Bool).unwrap_or(Value::Null),
-            "JSON" => row.try_get::<Value, _>(name.as_str()).unwrap_or(Value::Null),
+            "INT" | "SMALLINT" | "MEDIUMINT" | "TINYINT" => row
+                .try_get::<i32, _>(name.as_str())
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "BIGINT" => row
+                .try_get::<i64, _>(name.as_str())
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "FLOAT" | "DOUBLE" | "DECIMAL" => row
+                .try_get::<f64, _>(name.as_str())
+                .map(|v| serde_json::json!(v))
+                .unwrap_or(Value::Null),
+            "BOOLEAN" => row
+                .try_get::<bool, _>(name.as_str())
+                .map(Value::Bool)
+                .unwrap_or(Value::Null),
+            "JSON" => row
+                .try_get::<Value, _>(name.as_str())
+                .unwrap_or(Value::Null),
             "DATETIME" | "TIMESTAMP" => row
                 .try_get::<chrono::NaiveDateTime, _>(name.as_str())
                 .map(|v| Value::String(v.to_string()))
                 .unwrap_or(Value::Null),
-            _ => row.try_get::<String, _>(name.as_str()).map(Value::String).unwrap_or(Value::Null),
+            _ => row
+                .try_get::<String, _>(name.as_str())
+                .map(Value::String)
+                .unwrap_or(Value::Null),
         };
         obj.insert(name, val);
     }
@@ -486,17 +536,32 @@ fn bind_sqlite_value<'q>(
 }
 
 fn sqlite_row_to_json(row: &sqlx::sqlite::SqliteRow) -> Value {
-    use sqlx::{Row, Column, TypeInfo};
+    use sqlx::{Column, Row, TypeInfo};
     let mut obj = serde_json::Map::new();
     for col in row.columns() {
         let name = col.name().to_string();
         let type_name = col.type_info().name();
         let val: Value = match type_name {
-            "INTEGER" => row.try_get::<i64, _>(name.as_str()).map(|v| Value::Number(v.into())).unwrap_or(Value::Null),
-            "REAL" => row.try_get::<f64, _>(name.as_str()).map(|v| serde_json::json!(v)).unwrap_or(Value::Null),
-            "BOOLEAN" => row.try_get::<bool, _>(name.as_str()).map(Value::Bool).unwrap_or(Value::Null),
-            "TEXT" => row.try_get::<String, _>(name.as_str()).map(Value::String).unwrap_or(Value::Null),
-            _ => row.try_get::<String, _>(name.as_str()).map(Value::String).unwrap_or(Value::Null),
+            "INTEGER" => row
+                .try_get::<i64, _>(name.as_str())
+                .map(|v| Value::Number(v.into()))
+                .unwrap_or(Value::Null),
+            "REAL" => row
+                .try_get::<f64, _>(name.as_str())
+                .map(|v| serde_json::json!(v))
+                .unwrap_or(Value::Null),
+            "BOOLEAN" => row
+                .try_get::<bool, _>(name.as_str())
+                .map(Value::Bool)
+                .unwrap_or(Value::Null),
+            "TEXT" => row
+                .try_get::<String, _>(name.as_str())
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+            _ => row
+                .try_get::<String, _>(name.as_str())
+                .map(Value::String)
+                .unwrap_or(Value::Null),
         };
         obj.insert(name, val);
     }

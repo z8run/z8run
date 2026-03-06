@@ -92,7 +92,11 @@ impl NodeExecutor for StructuredOutputNode {
                                 if let Ok(retry_response) = retry_result {
                                     if let Ok(json) = parse_json_from_response(&retry_response) {
                                         info!(node = %self.name, attempt = attempt, "Structured output parsed on retry");
-                                        return Ok(vec![msg.derive(msg.source_node, "output", json)]);
+                                        return Ok(vec![msg.derive(
+                                            msg.source_node,
+                                            "output",
+                                            json,
+                                        )]);
                                     }
                                 }
                             }

@@ -25,7 +25,7 @@ impl Default for SandboxConfig {
     fn default() -> Self {
         Self {
             memory_limit: 256 * 1024 * 1024, // 256 MB
-            fuel_limit: 0,                     // no limit by default
+            fuel_limit: 0,                   // no limit by default
             capabilities: PluginCapabilities::default(),
             debug_mode: false,
         }
@@ -57,10 +57,15 @@ impl WasmSandbox {
             wasmtime_config.consume_fuel(true);
         }
 
-        let engine = Engine::new(&wasmtime_config)
-            .map_err(|e| RuntimeError::ModuleLoad(format!("Failed to create wasmtime engine: {}", e)))?;
+        let engine = Engine::new(&wasmtime_config).map_err(|e| {
+            RuntimeError::ModuleLoad(format!("Failed to create wasmtime engine: {}", e))
+        })?;
 
-        debug!(memory_limit_mb = config.memory_limit / 1024 / 1024, fuel_limit = config.fuel_limit, "WASM sandbox created");
+        debug!(
+            memory_limit_mb = config.memory_limit / 1024 / 1024,
+            fuel_limit = config.fuel_limit,
+            "WASM sandbox created"
+        );
 
         Ok(Self { engine, config })
     }
@@ -98,14 +103,14 @@ impl WasmSandbox {
         let linker = Linker::new(&self.engine);
 
         // Instantiate the module
-        let instance = linker
-            .instantiate(&mut store, &module)
-            .map_err(|e| RuntimeError::Instantiation(format!("Failed to instantiate module: {}", e)))?;
+        let instance = linker.instantiate(&mut store, &module).map_err(|e| {
+            RuntimeError::Instantiation(format!("Failed to instantiate module: {}", e))
+        })?;
 
         // Get the module's exported memory
-        let memory = instance
-            .get_memory(&mut store, "memory")
-            .ok_or_else(|| RuntimeError::Instantiation("Module does not export 'memory'".to_string()))?;
+        let memory = instance.get_memory(&mut store, "memory").ok_or_else(|| {
+            RuntimeError::Instantiation("Module does not export 'memory'".to_string())
+        })?;
 
         debug!("WASM module instantiated successfully");
 
@@ -140,7 +145,9 @@ impl WasmInstance {
             .map_err(|e| RuntimeError::Execution(format!("z8_alloc failed: {}", e)))?;
 
         if ptr < 0 {
-            return Err(RuntimeError::Execution("z8_alloc returned negative pointer".to_string()));
+            return Err(RuntimeError::Execution(
+                "z8_alloc returned negative pointer".to_string(),
+            ));
         }
 
         // Write data to the allocated memory
@@ -164,7 +171,9 @@ impl WasmInstance {
         let mut len_bytes = [0u8; 4];
         self.memory
             .read(&self.store, ptr_usize, &mut len_bytes)
-            .map_err(|e| RuntimeError::Execution(format!("Failed to read length from memory: {}", e)))?;
+            .map_err(|e| {
+                RuntimeError::Execution(format!("Failed to read length from memory: {}", e))
+            })?;
 
         let len = u32::from_le_bytes(len_bytes) as usize;
 
@@ -180,7 +189,9 @@ impl WasmInstance {
         let mut data = vec![0u8; len];
         self.memory
             .read(&self.store, ptr_usize + 4, &mut data)
-            .map_err(|e| RuntimeError::Execution(format!("Failed to read data from memory: {}", e)))?;
+            .map_err(|e| {
+                RuntimeError::Execution(format!("Failed to read data from memory: {}", e))
+            })?;
 
         // Free the memory
         let dealloc_fn = self
@@ -217,8 +228,8 @@ impl WasmInstance {
 
         // Read result
         let result_json_bytes = self.read_from_memory(result_ptr)?;
-        let result_json =
-            String::from_utf8(result_json_bytes).map_err(|e| RuntimeError::Execution(e.to_string()))?;
+        let result_json = String::from_utf8(result_json_bytes)
+            .map_err(|e| RuntimeError::Execution(e.to_string()))?;
 
         Ok(result_json)
     }
@@ -285,8 +296,8 @@ impl WasmInstance {
             .map_err(|e| RuntimeError::Execution(format!("z8_node_type failed: {}", e)))?;
 
         let node_type_bytes = self.read_from_memory(ptr)?;
-        let node_type =
-            String::from_utf8(node_type_bytes).map_err(|e| RuntimeError::Execution(e.to_string()))?;
+        let node_type = String::from_utf8(node_type_bytes)
+            .map_err(|e| RuntimeError::Execution(e.to_string()))?;
 
         Ok(node_type)
     }

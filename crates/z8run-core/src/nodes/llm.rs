@@ -6,21 +6,21 @@
 //!   - "response" port: AI model response
 //!   - "error" port: API errors
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory, EngineEvent};
+use crate::engine::{EngineEvent, NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
-use tracing::{info, warn};
-use tokio::sync::broadcast;
-use uuid::Uuid;
 use futures_util::StreamExt;
+use tokio::sync::broadcast;
+use tracing::{info, warn};
+use uuid::Uuid;
 
 #[allow(dead_code)]
 pub struct LlmNode {
     name: String,
-    provider: String,      // "openai", "anthropic", "ollama"
-    model: String,         // e.g. "gpt-4o", "claude-sonnet-4-20250514", "llama3"
+    provider: String, // "openai", "anthropic", "ollama"
+    model: String,    // e.g. "gpt-4o", "claude-sonnet-4-20250514", "llama3"
     api_key: String,
-    base_url: String,      // custom endpoint (for Ollama: http://localhost:11434)
+    base_url: String, // custom endpoint (for Ollama: http://localhost:11434)
     system_prompt: String,
     temperature: f64,
     max_tokens: u64,
@@ -57,9 +57,18 @@ impl NodeExecutor for LlmNode {
         let result = if self.event_tx.is_some() {
             // Use streaming variants when event_tx is available
             match self.provider.as_str() {
-                "anthropic" => self.stream_anthropic(&client, &prompt, timeout, flow_id, node_id).await,
-                "ollama" => self.stream_ollama(&client, &prompt, timeout, flow_id, node_id).await,
-                _ => self.stream_openai(&client, &prompt, timeout, flow_id, node_id).await,
+                "anthropic" => {
+                    self.stream_anthropic(&client, &prompt, timeout, flow_id, node_id)
+                        .await
+                }
+                "ollama" => {
+                    self.stream_ollama(&client, &prompt, timeout, flow_id, node_id)
+                        .await
+                }
+                _ => {
+                    self.stream_openai(&client, &prompt, timeout, flow_id, node_id)
+                        .await
+                }
             }
         } else {
             // Use non-streaming variants (original behavior)
@@ -457,7 +466,8 @@ impl LlmNode {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                         if let Some(event_type) = json.get("type").and_then(|v| v.as_str()) {
                             if event_type == "content_block_delta" {
-                                if let Some(delta_text) = json.get("delta")
+                                if let Some(delta_text) = json
+                                    .get("delta")
                                     .and_then(|d| d.get("text"))
                                     .and_then(|t| t.as_str())
                                 {
@@ -550,7 +560,8 @@ impl LlmNode {
             for line in text.lines() {
                 if !line.is_empty() {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
-                        if let Some(content) = json.get("message")
+                        if let Some(content) = json
+                            .get("message")
                             .and_then(|m| m.get("content"))
                             .and_then(|c| c.as_str())
                         {

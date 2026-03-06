@@ -9,7 +9,6 @@
 //! | 7      | 4 bytes  | payload_len    | Payload length in bytes        |
 //! | 11     | variable | payload        | Serialized data (bincode)      |
 
-
 use thiserror::Error;
 
 /// Current protocol version.
@@ -103,7 +102,11 @@ pub struct Frame {
 
 impl Frame {
     /// Creates a frame from a message type and serialized payload.
-    pub fn new(msg_type: u16, correlation_id: u32, payload: Vec<u8>) -> Result<Self, ProtocolError> {
+    pub fn new(
+        msg_type: u16,
+        correlation_id: u32,
+        payload: Vec<u8>,
+    ) -> Result<Self, ProtocolError> {
         let payload_len = payload.len() as u32;
         if payload_len > MAX_PAYLOAD_SIZE {
             return Err(ProtocolError::PayloadTooLarge { size: payload_len });

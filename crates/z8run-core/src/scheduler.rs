@@ -6,8 +6,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
 
-use crate::flow::Flow;
 use crate::error::Z8Result;
+use crate::flow::Flow;
 
 /// An execution step that can contain multiple nodes in parallel.
 #[derive(Debug, Clone)]
@@ -43,8 +43,7 @@ impl ExecutionPlan {
             .collect();
 
         // Calculate in-degree only for enabled nodes
-        let mut in_degree: HashMap<Uuid, usize> =
-            enabled_nodes.iter().map(|&id| (id, 0)).collect();
+        let mut in_degree: HashMap<Uuid, usize> = enabled_nodes.iter().map(|&id| (id, 0)).collect();
 
         for edge in &flow.edges {
             if enabled_nodes.contains(&edge.from_node) && enabled_nodes.contains(&edge.to_node) {
@@ -92,7 +91,11 @@ impl ExecutionPlan {
 
     /// Returns the maximum degree of parallelism of the plan.
     pub fn max_parallelism(&self) -> usize {
-        self.steps.iter().map(|s| s.node_ids.len()).max().unwrap_or(0)
+        self.steps
+            .iter()
+            .map(|s| s.node_ids.len())
+            .max()
+            .unwrap_or(0)
     }
 
     /// Returns the depth (number of sequential steps).
@@ -104,24 +107,22 @@ impl ExecutionPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{Node, PortType};
     use crate::flow::Flow;
+    use crate::node::{Node, PortType};
 
     #[test]
     fn test_parallel_execution_plan() {
         let mut flow = Flow::new("Parallel Test");
 
         // Trigger -> [A, B] -> Merge
-        let trigger = Node::new("Trigger", "trigger")
-            .with_output("out", PortType::Any);
+        let trigger = Node::new("Trigger", "trigger").with_output("out", PortType::Any);
         let a = Node::new("A", "process")
             .with_input("in", PortType::Any)
             .with_output("out", PortType::Any);
         let b = Node::new("B", "process")
             .with_input("in", PortType::Any)
             .with_output("out", PortType::Any);
-        let merge = Node::new("Merge", "merge")
-            .with_input("in", PortType::Any);
+        let merge = Node::new("Merge", "merge").with_input("in", PortType::Any);
 
         let t_id = trigger.id;
         let a_id = a.id;

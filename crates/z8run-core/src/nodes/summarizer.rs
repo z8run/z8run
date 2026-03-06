@@ -50,8 +50,7 @@ impl NodeExecutor for SummarizerNode {
         let summary_result = match self.strategy.as_str() {
             "map-reduce" => {
                 if text.len() > 4000 {
-                    self.summarize_map_reduce(&client, &text, timeout)
-                        .await
+                    self.summarize_map_reduce(&client, &text, timeout).await
                 } else {
                     self.summarize_simple(&client, &text, timeout).await
                 }

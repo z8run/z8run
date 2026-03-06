@@ -196,9 +196,10 @@ pub async fn run_pg_migrations(pool: &sqlx::PgPool) -> Result<(), StorageError> 
         tracing::info!("Applying PostgreSQL migration V1...");
 
         for stmt in &split_statements(PG_MIGRATION_V1) {
-            sqlx::query(stmt).execute(pool).await.map_err(|e| {
-                StorageError::Migration(format!("Failed to execute: {}", e))
-            })?;
+            sqlx::query(stmt)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Migration(format!("Failed to execute: {}", e)))?;
         }
 
         sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (1, NOW())")
@@ -219,9 +220,10 @@ pub async fn run_pg_migrations(pool: &sqlx::PgPool) -> Result<(), StorageError> 
         tracing::info!("Applying PostgreSQL migration V2...");
 
         for stmt in &split_statements(PG_MIGRATION_V2) {
-            sqlx::query(stmt).execute(pool).await.map_err(|e| {
-                StorageError::Migration(format!("Failed to execute: {}", e))
-            })?;
+            sqlx::query(stmt)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Migration(format!("Failed to execute: {}", e)))?;
         }
 
         sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (2, NOW())")
@@ -258,9 +260,10 @@ pub async fn run_sqlite_migrations(pool: &sqlx::SqlitePool) -> Result<(), Storag
         tracing::info!("Applying SQLite migration V1...");
 
         for stmt in &split_statements(SQLITE_MIGRATION_V1) {
-            sqlx::query(stmt).execute(pool).await.map_err(|e| {
-                StorageError::Migration(format!("Failed to execute: {}", e))
-            })?;
+            sqlx::query(stmt)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Migration(format!("Failed to execute: {}", e)))?;
         }
 
         let now = chrono::Utc::now().to_rfc3339();
@@ -284,7 +287,7 @@ pub async fn run_sqlite_migrations(pool: &sqlx::SqlitePool) -> Result<(), Storag
 
         for stmt in &split_statements(SQLITE_MIGRATION_V2) {
             match sqlx::query(stmt).execute(pool).await {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => {
                     // For SQLite, some statements like ALTER TABLE ADD COLUMN may fail
                     // if the column already exists. Log and continue.

@@ -33,13 +33,12 @@ pub struct VectorEntry {
 }
 
 // Global in-memory vector store
-static GLOBAL_STORE: OnceLock<std::sync::Arc<tokio::sync::RwLock<HashMap<String, Vec<VectorEntry>>>>> =
-    OnceLock::new();
+static GLOBAL_STORE: OnceLock<
+    std::sync::Arc<tokio::sync::RwLock<HashMap<String, Vec<VectorEntry>>>>,
+> = OnceLock::new();
 
 fn get_store() -> &'static std::sync::Arc<tokio::sync::RwLock<HashMap<String, Vec<VectorEntry>>>> {
-    GLOBAL_STORE.get_or_init(|| {
-        std::sync::Arc::new(tokio::sync::RwLock::new(HashMap::new()))
-    })
+    GLOBAL_STORE.get_or_init(|| std::sync::Arc::new(tokio::sync::RwLock::new(HashMap::new())))
 }
 
 /// Compute cosine similarity between two vectors.
@@ -61,10 +60,10 @@ fn cosine_similarity(a: &[f64], b: &[f64]) -> f64 {
 
 pub struct VectorStoreNode {
     name: String,
-    action: String,           // "store", "search", "delete", "clear"
-    collection: String,       // collection name
-    top_k: usize,            // for search: return top K results
-    min_score: f64,          // for search: minimum similarity threshold
+    action: String,     // "store", "search", "delete", "clear"
+    collection: String, // collection name
+    top_k: usize,       // for search: return top K results
+    min_score: f64,     // for search: minimum similarity threshold
 }
 
 #[async_trait::async_trait]
@@ -134,11 +133,8 @@ impl VectorStoreNode {
             .payload
             .get("embedding")
             .and_then(|v| {
-                v.as_array().map(|arr| {
-                    arr.iter()
-                        .filter_map(|x| x.as_f64())
-                        .collect::<Vec<f64>>()
-                })
+                v.as_array()
+                    .map(|arr| arr.iter().filter_map(|x| x.as_f64()).collect::<Vec<f64>>())
             })
             .unwrap_or_default();
 
@@ -213,11 +209,8 @@ impl VectorStoreNode {
             .payload
             .get("embedding")
             .and_then(|v| {
-                v.as_array().map(|arr| {
-                    arr.iter()
-                        .filter_map(|x| x.as_f64())
-                        .collect::<Vec<f64>>()
-                })
+                v.as_array()
+                    .map(|arr| arr.iter().filter_map(|x| x.as_f64()).collect::<Vec<f64>>())
             })
             .unwrap_or_default();
 
@@ -294,11 +287,7 @@ impl VectorStoreNode {
     async fn delete(&self, msg: &FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         let store = get_store();
 
-        let id = msg
-            .payload
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let id = msg.payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
         if id.is_empty() {
             let err = serde_json::json!({

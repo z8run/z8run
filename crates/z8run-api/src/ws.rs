@@ -1,14 +1,17 @@
 //! WebSocket server for real-time communication.
 
-use std::sync::Arc;
 use axum::{
-    extract::{ws::{Message, WebSocket, WebSocketUpgrade}, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
     response::IntoResponse,
     routing::get,
     Router,
 };
+use std::sync::Arc;
 use tokio::time::{interval, Duration};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 
 use crate::state::AppState;
 use z8run_core::engine::EngineEvent;
@@ -19,10 +22,7 @@ pub fn ws_routes() -> Router<Arc<AppState>> {
 }
 
 /// WebSocket upgrade handler.
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 
@@ -39,7 +39,12 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
             "flow_id": flow_id.to_string(),
             "node_id": node_id.to_string(),
         }),
-        EngineEvent::NodeCompleted { flow_id, node_id, duration_us, output_preview } => {
+        EngineEvent::NodeCompleted {
+            flow_id,
+            node_id,
+            duration_us,
+            output_preview,
+        } => {
             let mut v = serde_json::json!({
                 "type": "node_completed",
                 "flow_id": flow_id.to_string(),
@@ -50,19 +55,29 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
                 v["output"] = preview.clone();
             }
             v
-        },
+        }
         EngineEvent::NodeSkipped { flow_id, node_id } => serde_json::json!({
             "type": "node_skipped",
             "flow_id": flow_id.to_string(),
             "node_id": node_id.to_string(),
         }),
-        EngineEvent::NodeError { flow_id, node_id, error } => serde_json::json!({
+        EngineEvent::NodeError {
+            flow_id,
+            node_id,
+            error,
+        } => serde_json::json!({
             "type": "node_error",
             "flow_id": flow_id.to_string(),
             "node_id": node_id.to_string(),
             "error": error,
         }),
-        EngineEvent::MessageSent { flow_id, from_node, to_node, message_id, payload_preview } => {
+        EngineEvent::MessageSent {
+            flow_id,
+            from_node,
+            to_node,
+            message_id,
+            payload_preview,
+        } => {
             let mut v = serde_json::json!({
                 "type": "message_sent",
                 "flow_id": flow_id.to_string(),
@@ -74,20 +89,33 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
                 v["payload"] = preview.clone();
             }
             v
-        },
-        EngineEvent::FlowCompleted { flow_id, trace_id, duration_ms } => serde_json::json!({
+        }
+        EngineEvent::FlowCompleted {
+            flow_id,
+            trace_id,
+            duration_ms,
+        } => serde_json::json!({
             "type": "flow_completed",
             "flow_id": flow_id.to_string(),
             "trace_id": trace_id.to_string(),
             "duration_ms": duration_ms,
         }),
-        EngineEvent::FlowError { flow_id, trace_id, error } => serde_json::json!({
+        EngineEvent::FlowError {
+            flow_id,
+            trace_id,
+            error,
+        } => serde_json::json!({
             "type": "flow_error",
             "flow_id": flow_id.to_string(),
             "trace_id": trace_id.to_string(),
             "error": error,
         }),
-        EngineEvent::StreamChunk { flow_id, node_id, chunk, done } => serde_json::json!({
+        EngineEvent::StreamChunk {
+            flow_id,
+            node_id,
+            chunk,
+            done,
+        } => serde_json::json!({
             "type": "stream_chunk",
             "flow_id": flow_id.to_string(),
             "node_id": node_id.to_string(),

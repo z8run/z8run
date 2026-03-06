@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 use z8run_core::flow::Flow;
 
-use crate::repository::{ExecutionRecord, ExecutionRepository, FlowRepository, UserRecord, UserRepository};
+use crate::repository::{
+    ExecutionRecord, ExecutionRepository, FlowRepository, UserRecord, UserRepository,
+};
 use crate::StorageError;
 
 /// SQLite-backed storage for flows and executions.
@@ -42,8 +44,8 @@ impl SqliteStorage {
 impl FlowRepository for SqliteStorage {
     async fn save_flow(&self, flow: &Flow) -> Result<(), StorageError> {
         let id = flow.id.to_string();
-        let data = serde_json::to_string(flow)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let data =
+            serde_json::to_string(flow).map_err(|e| StorageError::Serialization(e.to_string()))?;
         let status = flow.status.to_string();
         let created_at = flow.created_at.to_rfc3339();
         let updated_at = chrono::Utc::now().to_rfc3339();
@@ -85,8 +87,8 @@ impl FlowRepository for SqliteStorage {
             .await?
             .ok_or(StorageError::FlowNotFound(id))?;
 
-        let flow: Flow = serde_json::from_str(&row.0)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let flow: Flow =
+            serde_json::from_str(&row.0).map_err(|e| StorageError::Serialization(e.to_string()))?;
 
         Ok(flow)
     }
@@ -126,12 +128,11 @@ impl FlowRepository for SqliteStorage {
     async fn search_flows(&self, query: &str) -> Result<Vec<Flow>, StorageError> {
         let pattern = format!("%{}%", query);
 
-        let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT data FROM flows WHERE name LIKE ?1 ORDER BY updated_at DESC",
-        )
-        .bind(&pattern)
-        .fetch_all(&self.pool)
-        .await?;
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT data FROM flows WHERE name LIKE ?1 ORDER BY updated_at DESC")
+                .bind(&pattern)
+                .fetch_all(&self.pool)
+                .await?;
 
         let mut flows = Vec::with_capacity(rows.len());
         for (data,) in rows {
@@ -146,8 +147,8 @@ impl FlowRepository for SqliteStorage {
     async fn save_flow_with_user(&self, flow: &Flow, user_id: Uuid) -> Result<(), StorageError> {
         let id = flow.id.to_string();
         let user_id_str = user_id.to_string();
-        let data = serde_json::to_string(flow)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let data =
+            serde_json::to_string(flow).map_err(|e| StorageError::Serialization(e.to_string()))?;
         let status = flow.status.to_string();
         let created_at = flow.created_at.to_rfc3339();
         let updated_at = chrono::Utc::now().to_rfc3339();
@@ -211,8 +212,8 @@ impl FlowRepository for SqliteStorage {
                 .await?
                 .ok_or(StorageError::FlowNotFound(id))?;
 
-        let flow: Flow = serde_json::from_str(&row.0)
-            .map_err(|e| StorageError::Serialization(e.to_string()))?;
+        let flow: Flow =
+            serde_json::from_str(&row.0).map_err(|e| StorageError::Serialization(e.to_string()))?;
 
         Ok(flow)
     }
@@ -349,7 +350,7 @@ impl UserRepository for SqliteStorage {
 
         sqlx::query(
             r#"INSERT INTO users (id, email, username, password_hash, roles, created_at, updated_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
         )
         .bind(&user.id.to_string())
         .bind(&user.email)
@@ -378,7 +379,12 @@ impl UserRepository for SqliteStorage {
             email: row.1,
             username: row.2,
             password_hash: row.3,
-            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            roles: row
+                .4
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.5)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?
                 .with_timezone(&chrono::Utc),
@@ -401,7 +407,12 @@ impl UserRepository for SqliteStorage {
             email: row.1,
             username: row.2,
             password_hash: row.3,
-            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            roles: row
+                .4
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.5)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?
                 .with_timezone(&chrono::Utc),
@@ -424,7 +435,12 @@ impl UserRepository for SqliteStorage {
             email: row.1,
             username: row.2,
             password_hash: row.3,
-            roles: row.4.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            roles: row
+                .4
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             created_at: chrono::DateTime::parse_from_rfc3339(&row.5)
                 .map_err(|e| StorageError::Serialization(e.to_string()))?
                 .with_timezone(&chrono::Utc),

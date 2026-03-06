@@ -248,16 +248,12 @@ impl Flow {
 
     /// Returns edges that enter a specific node.
     pub fn incoming_edges(&self, node_id: Uuid) -> Vec<&Edge> {
-        self.edges
-            .iter()
-            .filter(|e| e.to_node == node_id)
-            .collect()
+        self.edges.iter().filter(|e| e.to_node == node_id).collect()
     }
 
     /// Validates that the flow contains no cycles (is a DAG).
     pub fn validate_acyclic(&self) -> Z8Result<()> {
-        let node_ids: std::collections::HashSet<Uuid> =
-            self.nodes.iter().map(|n| n.id).collect();
+        let node_ids: std::collections::HashSet<Uuid> = self.nodes.iter().map(|n| n.id).collect();
 
         // Kahn's algorithm for cycle detection
         let mut in_degree: std::collections::HashMap<Uuid, usize> =
@@ -337,13 +333,12 @@ mod tests {
     fn create_test_flow() -> Flow {
         let mut flow = Flow::new("Test Flow");
 
-        let trigger = Node::new("HTTP Trigger", "http-trigger")
-            .with_output("response", PortType::Object);
+        let trigger =
+            Node::new("HTTP Trigger", "http-trigger").with_output("response", PortType::Object);
         let process = Node::new("JSON Parser", "json-parse")
             .with_input("input", PortType::Object)
             .with_output("parsed", PortType::Object);
-        let debug = Node::new("Debug", "debug")
-            .with_input("input", PortType::Any);
+        let debug = Node::new("Debug", "debug").with_input("input", PortType::Any);
 
         let trigger_id = trigger.id;
         let process_id = process.id;
@@ -353,8 +348,10 @@ mod tests {
         flow.add_node(process);
         flow.add_node(debug);
 
-        flow.connect(trigger_id, "response", process_id, "input").unwrap();
-        flow.connect(process_id, "parsed", debug_id, "input").unwrap();
+        flow.connect(trigger_id, "response", process_id, "input")
+            .unwrap();
+        flow.connect(process_id, "parsed", debug_id, "input")
+            .unwrap();
 
         flow
     }

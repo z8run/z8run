@@ -14,7 +14,7 @@ use tracing::info;
 use z8run_core::engine::FlowEngine;
 
 pub use executor::{WasmNodeExecutor, WasmNodeFactory};
-pub use manifest::{PluginCapabilities, PluginManifest, ManifestPort};
+pub use manifest::{ManifestPort, PluginCapabilities, PluginManifest};
 pub use registry::{PluginRegistry, RegisteredPlugin};
 pub use sandbox::{SandboxConfig, WasmSandbox};
 

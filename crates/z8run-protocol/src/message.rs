@@ -101,34 +101,89 @@ pub enum ProtocolMessage {
     // ── Control ──
     Ping,
     Pong,
-    Authenticate { token: String },
-    AuthResult { success: bool, user_id: Option<Uuid> },
+    Authenticate {
+        token: String,
+    },
+    AuthResult {
+        success: bool,
+        user_id: Option<Uuid>,
+    },
 
     // ── Flow Commands ──
-    FlowCreate { flow: serde_json::Value },
-    FlowUpdate { flow_id: Uuid, changes: serde_json::Value },
-    FlowDelete { flow_id: Uuid },
-    FlowStart { flow_id: Uuid },
-    FlowStop { flow_id: Uuid },
+    FlowCreate {
+        flow: serde_json::Value,
+    },
+    FlowUpdate {
+        flow_id: Uuid,
+        changes: serde_json::Value,
+    },
+    FlowDelete {
+        flow_id: Uuid,
+    },
+    FlowStart {
+        flow_id: Uuid,
+    },
+    FlowStop {
+        flow_id: Uuid,
+    },
     FlowList,
-    FlowGet { flow_id: Uuid },
+    FlowGet {
+        flow_id: Uuid,
+    },
 
     // ── Execution Events ──
-    ExecStarted { flow_id: Uuid, trace_id: Uuid },
-    ExecNodeStarted { flow_id: Uuid, node_id: Uuid },
-    ExecNodeCompleted { flow_id: Uuid, node_id: Uuid, duration_us: u64 },
-    ExecNodeError { flow_id: Uuid, node_id: Uuid, error: String },
-    ExecCompleted { flow_id: Uuid, trace_id: Uuid, duration_ms: u64 },
+    ExecStarted {
+        flow_id: Uuid,
+        trace_id: Uuid,
+    },
+    ExecNodeStarted {
+        flow_id: Uuid,
+        node_id: Uuid,
+    },
+    ExecNodeCompleted {
+        flow_id: Uuid,
+        node_id: Uuid,
+        duration_us: u64,
+    },
+    ExecNodeError {
+        flow_id: Uuid,
+        node_id: Uuid,
+        error: String,
+    },
+    ExecCompleted {
+        flow_id: Uuid,
+        trace_id: Uuid,
+        duration_ms: u64,
+    },
 
     // ── Debug ──
-    DebugSetBreakpoint { flow_id: Uuid, node_id: Uuid },
-    DebugRemoveBreakpoint { flow_id: Uuid, node_id: Uuid },
-    DebugInspect { flow_id: Uuid, node_id: Uuid },
-    DebugInspectResult { node_id: Uuid, data: serde_json::Value },
+    DebugSetBreakpoint {
+        flow_id: Uuid,
+        node_id: Uuid,
+    },
+    DebugRemoveBreakpoint {
+        flow_id: Uuid,
+        node_id: Uuid,
+    },
+    DebugInspect {
+        flow_id: Uuid,
+        node_id: Uuid,
+    },
+    DebugInspectResult {
+        node_id: Uuid,
+        data: serde_json::Value,
+    },
 
     // ── Responses ──
-    Ok { correlation_id: u32, data: Option<serde_json::Value> },
-    Error { correlation_id: u32, code: u16, message: String },
+    Ok {
+        correlation_id: u32,
+        data: Option<serde_json::Value>,
+    },
+    Error {
+        correlation_id: u32,
+        code: u16,
+        message: String,
+    },
 }
 
 impl ProtocolMessage {

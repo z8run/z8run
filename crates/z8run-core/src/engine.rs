@@ -5,9 +5,9 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, broadcast, RwLock};
+use tokio::sync::{broadcast, mpsc, RwLock};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
-use tracing::{info, warn, error, debug, instrument};
 
 use crate::error::{Z8Error, Z8Result};
 use crate::flow::{Flow, FlowStatus};
@@ -30,10 +30,7 @@ pub enum EngineEvent {
         output_preview: Option<serde_json::Value>,
     },
     /// A node was skipped (received no message in a conditional branch).
-    NodeSkipped {
-        flow_id: Uuid,
-        node_id: Uuid,
-    },
+    NodeSkipped { flow_id: Uuid, node_id: Uuid },
     /// A node failed.
     NodeError {
         flow_id: Uuid,
@@ -235,7 +232,9 @@ impl FlowEngine {
         }
 
         // Emit startup event
-        let _ = self.event_tx.send(EngineEvent::FlowStarted { flow_id, trace_id });
+        let _ = self
+            .event_tx
+            .send(EngineEvent::FlowStarted { flow_id, trace_id });
 
         let engine = self.clone_refs();
         let flow_clone = flow.clone();
@@ -244,7 +243,10 @@ impl FlowEngine {
         tokio::spawn(async move {
             let start = std::time::Instant::now();
 
-            match engine.execute_plan(&flow_clone, &plan, trace_id, trigger_msg.as_ref()).await {
+            match engine
+                .execute_plan(&flow_clone, &plan, trace_id, trigger_msg.as_ref())
+                .await
+            {
                 Ok(()) => {
                     let duration_ms = start.elapsed().as_millis() as u64;
                     info!(duration_ms, "Flow completed successfully");
@@ -283,20 +285,15 @@ impl FlowEngine {
         let mut receivers: HashMap<Uuid, mpsc::Receiver<FlowMessage>> = HashMap::new();
 
         // Determine which nodes have incoming edges (non-root nodes)
-        let nodes_with_incoming: std::collections::HashSet<Uuid> = flow
-            .edges
-            .iter()
-            .map(|e| e.to_node)
-            .collect();
+        let nodes_with_incoming: std::collections::HashSet<Uuid> =
+            flow.edges.iter().map(|e| e.to_node).collect();
 
         // Create channels ONLY for nodes that have incoming edges.
         // Root nodes (no incoming edges) won't get a receiver,
         // so they'll take the "generate trigger message" path.
         for node in &flow.nodes {
             if node.enabled && nodes_with_incoming.contains(&node.id) {
-                let (tx, rx) = mpsc::channel(
-                    flow.config.buffer_size.max(self.default_buffer_size),
-                );
+                let (tx, rx) = mpsc::channel(flow.config.buffer_size.max(self.default_buffer_size));
                 channels.insert(node.id, tx);
                 receivers.insert(node.id, rx);
             }
@@ -304,7 +301,11 @@ impl FlowEngine {
 
         // Execute each step of the plan
         for step in &plan.steps {
-            debug!(step = step.step, nodes = step.node_ids.len(), "Executing step");
+            debug!(
+                step = step.step,
+                nodes = step.node_ids.len(),
+                "Executing step"
+            );
 
             let mut handles = Vec::new();
 
@@ -327,9 +328,9 @@ impl FlowEngine {
                 let out_channels: Vec<(String, Uuid, mpsc::Sender<FlowMessage>)> = outgoing
                     .iter()
                     .filter_map(|edge| {
-                        channels.get(&edge.to_node).map(|tx| {
-                            (edge.from_port.clone(), edge.to_node, tx.clone())
-                        })
+                        channels
+                            .get(&edge.to_node)
+                            .map(|tx| (edge.from_port.clone(), edge.to_node, tx.clone()))
                     })
                     .collect();
 
@@ -345,7 +346,8 @@ impl FlowEngine {
                         match receiver.recv().await {
                             Some(msg) => {
                                 // Node will process — emit NodeStarted
-                                let _ = event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
+                                let _ =
+                                    event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
 
                                 let reg = registry.read().await;
                                 let factory = reg.get(&node_type_str).ok_or_else(|| {
@@ -362,7 +364,8 @@ impl FlowEngine {
                                 // Channel closed — this node is on an inactive branch.
                                 // Emit NodeSkipped instead of NodeStarted + NodeCompleted.
                                 debug!(node_id = %node_id, "Node skipped (no message received)");
-                                let _ = event_tx.send(EngineEvent::NodeSkipped { flow_id, node_id });
+                                let _ =
+                                    event_tx.send(EngineEvent::NodeSkipped { flow_id, node_id });
                                 return Ok(());
                             }
                         }

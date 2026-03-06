@@ -52,10 +52,7 @@ impl NodeExecutor for TimerNode {
             .and_then(|v| v.as_u64())
             .unwrap_or(5000);
 
-        let unit = config
-            .get("unit")
-            .and_then(|v| v.as_str())
-            .unwrap_or("ms");
+        let unit = config.get("unit").and_then(|v| v.as_str()).unwrap_or("ms");
 
         self.interval_ms = match unit {
             "s" => raw_interval * 1000,

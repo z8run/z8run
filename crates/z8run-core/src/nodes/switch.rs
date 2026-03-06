@@ -275,47 +275,80 @@ mod tests {
     #[test]
     fn test_json_path_lookup() {
         let data = serde_json::json!({"req": {"body": {"action": "create", "count": 5}}});
-        assert_eq!(json_path_lookup(&data, "req.body.action"), Value::String("create".into()));
-        assert_eq!(json_path_lookup(&data, "req.body.count"), serde_json::json!(5));
+        assert_eq!(
+            json_path_lookup(&data, "req.body.action"),
+            Value::String("create".into())
+        );
+        assert_eq!(
+            json_path_lookup(&data, "req.body.count"),
+            serde_json::json!(5)
+        );
         assert_eq!(json_path_lookup(&data, "req.body.missing"), Value::Null);
     }
 
     #[test]
     fn test_eq_rule() {
-        let rule = SwitchRule { rule_type: "eq".into(), value: serde_json::json!("create"), port: "out1".into() };
+        let rule = SwitchRule {
+            rule_type: "eq".into(),
+            value: serde_json::json!("create"),
+            port: "out1".into(),
+        };
         assert!(evaluate_rule(&serde_json::json!("create"), &rule));
         assert!(!evaluate_rule(&serde_json::json!("delete"), &rule));
     }
 
     #[test]
     fn test_numeric_comparison() {
-        let gt = SwitchRule { rule_type: "gt".into(), value: serde_json::json!(10), port: "out1".into() };
+        let gt = SwitchRule {
+            rule_type: "gt".into(),
+            value: serde_json::json!(10),
+            port: "out1".into(),
+        };
         assert!(evaluate_rule(&serde_json::json!(15), &gt));
         assert!(!evaluate_rule(&serde_json::json!(5), &gt));
     }
 
     #[test]
     fn test_contains_string() {
-        let rule = SwitchRule { rule_type: "contains".into(), value: serde_json::json!("error"), port: "out1".into() };
-        assert!(evaluate_rule(&serde_json::json!("an error occurred"), &rule));
+        let rule = SwitchRule {
+            rule_type: "contains".into(),
+            value: serde_json::json!("error"),
+            port: "out1".into(),
+        };
+        assert!(evaluate_rule(
+            &serde_json::json!("an error occurred"),
+            &rule
+        ));
         assert!(!evaluate_rule(&serde_json::json!("all good"), &rule));
     }
 
     #[test]
     fn test_empty_notempty() {
-        let empty_rule = SwitchRule { rule_type: "empty".into(), value: Value::Null, port: "out1".into() };
+        let empty_rule = SwitchRule {
+            rule_type: "empty".into(),
+            value: Value::Null,
+            port: "out1".into(),
+        };
         assert!(evaluate_rule(&Value::Null, &empty_rule));
         assert!(evaluate_rule(&serde_json::json!(""), &empty_rule));
         assert!(!evaluate_rule(&serde_json::json!("hi"), &empty_rule));
 
-        let notempty_rule = SwitchRule { rule_type: "notempty".into(), value: Value::Null, port: "out1".into() };
+        let notempty_rule = SwitchRule {
+            rule_type: "notempty".into(),
+            value: Value::Null,
+            port: "out1".into(),
+        };
         assert!(!evaluate_rule(&Value::Null, &notempty_rule));
         assert!(evaluate_rule(&serde_json::json!("hi"), &notempty_rule));
     }
 
     #[test]
     fn test_truthy_falsy() {
-        let truthy = SwitchRule { rule_type: "true".into(), value: Value::Null, port: "out1".into() };
+        let truthy = SwitchRule {
+            rule_type: "true".into(),
+            value: Value::Null,
+            port: "out1".into(),
+        };
         assert!(evaluate_rule(&serde_json::json!(true), &truthy));
         assert!(evaluate_rule(&serde_json::json!(1), &truthy));
         assert!(evaluate_rule(&serde_json::json!("yes"), &truthy));
@@ -327,7 +360,13 @@ mod tests {
     #[test]
     fn test_type_coerced_equality() {
         // Number string vs number
-        assert!(values_equal(&serde_json::json!("30"), &serde_json::json!(30)));
-        assert!(values_equal(&serde_json::json!(30), &serde_json::json!(30.0)));
+        assert!(values_equal(
+            &serde_json::json!("30"),
+            &serde_json::json!(30)
+        ));
+        assert!(values_equal(
+            &serde_json::json!(30),
+            &serde_json::json!(30.0)
+        ));
     }
 }

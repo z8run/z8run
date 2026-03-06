@@ -37,7 +37,13 @@ pub struct Claims {
 
 impl Claims {
     /// Creates claims for a user.
-    pub fn new(user_id: Uuid, name: String, email: String, roles: Vec<String>, ttl_hours: i64) -> Self {
+    pub fn new(
+        user_id: Uuid,
+        name: String,
+        email: String,
+        roles: Vec<String>,
+        ttl_hours: i64,
+    ) -> Self {
         let now = chrono::Utc::now().timestamp();
         Self {
             sub: user_id,
@@ -123,10 +129,14 @@ async fn register(
         return Err(ApiError::bad_request("Email cannot be empty"));
     }
     if payload.username.len() < 3 {
-        return Err(ApiError::bad_request("Username must be at least 3 characters"));
+        return Err(ApiError::bad_request(
+            "Username must be at least 3 characters",
+        ));
     }
     if payload.password.len() < 8 {
-        return Err(ApiError::bad_request("Password must be at least 8 characters"));
+        return Err(ApiError::bad_request(
+            "Password must be at least 8 characters",
+        ));
     }
 
     // Hash password with argon2
@@ -150,24 +160,20 @@ async fn register(
     };
 
     // Save to database
-    state
-        .user_storage
-        .create_user(&user)
-        .await
-        .map_err(|e| {
-            let msg = e.to_string().to_lowercase();
-            if msg.contains("unique") || msg.contains("duplicate") || msg.contains("already exists") {
-                if msg.contains("email") {
-                    ApiError::conflict("An account with this email already exists")
-                } else if msg.contains("username") {
-                    ApiError::conflict("This username is already taken")
-                } else {
-                    ApiError::conflict("An account with these credentials already exists")
-                }
+    state.user_storage.create_user(&user).await.map_err(|e| {
+        let msg = e.to_string().to_lowercase();
+        if msg.contains("unique") || msg.contains("duplicate") || msg.contains("already exists") {
+            if msg.contains("email") {
+                ApiError::conflict("An account with this email already exists")
+            } else if msg.contains("username") {
+                ApiError::conflict("This username is already taken")
             } else {
-                ApiError::from(e)
+                ApiError::conflict("An account with these credentials already exists")
             }
-        })?;
+        } else {
+            ApiError::from(e)
+        }
+    })?;
 
     // Create JWT token
     let claims = Claims::new(
@@ -241,9 +247,7 @@ async fn login(
 
 /// Returns the authenticated user's information.
 /// GET /auth/me
-async fn me(
-    axum::Extension(claims): axum::Extension<Claims>,
-) -> Result<Json<UserInfo>, ApiError> {
+async fn me(axum::Extension(claims): axum::Extension<Claims>) -> Result<Json<UserInfo>, ApiError> {
     Ok(Json(UserInfo {
         id: claims.sub.to_string(),
         email: claims.email,
@@ -264,7 +268,8 @@ pub async fn jwt_middleware(
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "));
 
-    let token = auth_header.ok_or_else(|| ApiError::unauthorized("Missing authorization header"))?;
+    let token =
+        auth_header.ok_or_else(|| ApiError::unauthorized("Missing authorization header"))?;
     let claims = decode_jwt(token, &state.jwt_secret)?;
 
     // Check if token is expired
@@ -285,6 +290,5 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
 
 /// Mounts protected authentication routes (requires JWT).
 pub fn auth_protected_routes() -> Router<Arc<AppState>> {
-    Router::new()
-        .route("/me", get(me))
+    Router::new().route("/me", get(me))
 }
