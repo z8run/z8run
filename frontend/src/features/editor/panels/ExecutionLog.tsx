@@ -1,10 +1,21 @@
-import { useRef, useEffect, useState, useCallback } from "react";
 import { useEngineStore } from "@/hooks/useEngineSocket";
 import type { EngineEvent, NodeInfo } from "@/hooks/useEngineSocket";
 import {
-  Trash2, ChevronUp, ChevronDown, ChevronRight,
-  Play, CheckCircle2, XCircle, ArrowRight, Zap, AlertTriangle, SkipForward, Globe, MessageSquare,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Globe,
+  MessageSquare,
+  Play,
+  SkipForward,
+  Trash2,
+  XCircle,
+  Zap,
 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ResolveFn = (id: string) => NodeInfo | undefined;
 
@@ -17,8 +28,10 @@ interface EventDisplay {
 
 /** Extract payload data from an event (if any). */
 function getEventPayload(event: EngineEvent): unknown | undefined {
-  if (event.type === "node_completed" && event.output != null) return event.output;
-  if (event.type === "message_sent" && event.payload != null) return event.payload;
+  if (event.type === "node_completed" && event.output != null)
+    return event.output;
+  if (event.type === "message_sent" && event.payload != null)
+    return event.payload;
   return undefined;
 }
 
@@ -27,7 +40,7 @@ function formatPreview(value: unknown): string {
   if (value == null) return "";
   try {
     const s = JSON.stringify(value);
-    return s.length > 120 ? s.substring(0, 117) + "..." : s;
+    return s.length > 120 ? `${s.substring(0, 117)}...` : s;
   } catch {
     return String(value);
   }
@@ -39,8 +52,12 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
     color: "text-purple-400",
     label: "ROUTES",
     detail: (e, _r) => {
-      const routes = (e as unknown as Record<string, unknown>).routes as string | undefined;
-      return routes ? `Registered endpoints:\n${routes}` : "No routes registered";
+      const routes = (e as unknown as Record<string, unknown>).routes as
+        | string
+        | undefined;
+      return routes
+        ? `Registered endpoints:\n${routes}`
+        : "No routes registered";
     },
   },
   flow_started: {
@@ -79,7 +96,10 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
     label: "NODE DONE",
     detail: (e, resolve) => {
       const info = e.node_id ? resolve(e.node_id) : undefined;
-      const dur = e.duration_us != null ? ` — ${(e.duration_us / 1000).toFixed(1)}ms` : "";
+      const dur =
+        e.duration_us != null
+          ? ` — ${(e.duration_us / 1000).toFixed(1)}ms`
+          : "";
       return info
         ? `"${info.label}" completed${dur}`
         : `Node ${e.node_id?.substring(0, 8) ?? "?"} completed${dur}`;
@@ -102,7 +122,9 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
     label: "NODE ERROR",
     detail: (e, resolve) => {
       const info = e.node_id ? resolve(e.node_id) : undefined;
-      const name = info ? `"${info.label}"` : `Node ${e.node_id?.substring(0, 8) ?? "?"}`;
+      const name = info
+        ? `"${info.label}"`
+        : `Node ${e.node_id?.substring(0, 8) ?? "?"}`;
       return `${name} failed: ${e.error ?? "Unknown error"}`;
     },
   },
@@ -125,7 +147,9 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
     detail: (e, resolve) => {
       const info = e.node_id ? resolve(e.node_id) : undefined;
       if (e.done) {
-        return info ? `"${info.label}" finished streaming` : "Streaming finished";
+        return info
+          ? `"${info.label}" finished streaming`
+          : "Streaming finished";
       }
       return info ? `"${info.label}" streaming...` : "Streaming...";
     },
@@ -165,6 +189,15 @@ function LogEntry({
           hasPayload ? "cursor-pointer" : ""
         }`}
         onClick={hasPayload ? () => setOpen(!open) : undefined}
+        onKeyDown={
+          hasPayload
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") setOpen(!open);
+              }
+            : undefined
+        }
+        role={hasPayload ? "button" : undefined}
+        tabIndex={hasPayload ? 0 : undefined}
       >
         <span className="text-slate-600 shrink-0 w-[72px]">{time}</span>
         {hasPayload ? (
@@ -213,12 +246,14 @@ export function ExecutionLog() {
     [nodeInfoMap],
   );
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom when new logs arrive
+  const logCount = logs.length;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: logCount triggers scroll on new logs
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [logs]);
+  }, [logCount]);
 
   // Drag-to-resize handler
   const onDragStart = useCallback(
@@ -232,7 +267,12 @@ export function ExecutionLog() {
         if (!dragging.current) return;
         // Dragging up = increasing height (Y decreases)
         const delta = startY.current - ev.clientY;
-        setHeight(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, startHeight.current + delta)));
+        setHeight(
+          Math.min(
+            MAX_HEIGHT,
+            Math.max(MIN_HEIGHT, startHeight.current + delta),
+          ),
+        );
       };
       const onUp = () => {
         dragging.current = false;

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { LogIn, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { Loader2, LogIn } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 export function LoginPage() {
   const { login, loading, error, token, clearError } = useAuthStore();
@@ -48,10 +48,14 @@ export function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">
+              <label
+                htmlFor="login-email"
+                className="block text-xs text-slate-400 mb-1.5"
+              >
                 Email
               </label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -62,10 +66,14 @@ export function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">
+              <label
+                htmlFor="login-password"
+                className="block text-xs text-slate-400 mb-1.5"
+              >
                 Password
               </label>
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

@@ -1,9 +1,9 @@
-import { useCallback, useState, useRef, useEffect } from "react";
-import { Play, Square, Save, ChevronLeft, Loader2, Check } from "lucide-react";
-import { useReactFlow } from "@xyflow/react";
-import { useFlowStore } from "@/stores/flowStore";
-import { useEngineStore } from "@/hooks/useEngineSocket";
 import { flowsApi } from "@/api/flows";
+import { useEngineStore } from "@/hooks/useEngineSocket";
+import { useFlowStore } from "@/stores/flowStore";
+import { useReactFlow } from "@xyflow/react";
+import { Check, ChevronLeft, Loader2, Play, Save, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 export function Header() {
@@ -91,7 +91,9 @@ export function Header() {
 
         {/* Connection status */}
         <div className="flex items-center gap-1.5 ml-4">
-          <div className={`w-1.5 h-1.5 rounded-full ${wsConnected ? "bg-green-500" : "bg-red-500"}`} />
+          <div
+            className={`w-1.5 h-1.5 rounded-full ${wsConnected ? "bg-green-500" : "bg-red-500"}`}
+          />
           <span className="text-[10px] text-slate-500">
             {wsConnected ? "Connected" : "Disconnected"}
           </span>
@@ -137,11 +139,17 @@ export function Header() {
               }
               // Log registered routes for visibility
               if (res.routes && res.routes.length > 0) {
-                const port = window.location.port === "5173" ? "7700" : window.location.port;
+                const port =
+                  window.location.port === "5173"
+                    ? "7700"
+                    : window.location.port;
                 const base = `${window.location.protocol}//${window.location.hostname}:${port}`;
-                const routeList = res.routes.map((r: { method: string; path: string }) =>
-                  `  ${r.method} ${base}${r.path}`
-                ).join("\n");
+                const routeList = res.routes
+                  .map(
+                    (r: { method: string; path: string }) =>
+                      `  ${r.method} ${base}${r.path}`,
+                  )
+                  .join("\n");
                 useEngineStore.getState().addLog({
                   type: "routes_registered",
                   flow_id: flowId,

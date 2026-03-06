@@ -1,18 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { vaultApi } from "@/api/vault";
+import { useAuthStore } from "@/stores/authStore";
 import {
-  Shield,
-  Plus,
-  Trash2,
+  AlertTriangle,
+  Copy,
   Eye,
   EyeOff,
-  Copy,
-  LogOut,
-  AlertTriangle,
   Loader2,
+  LogOut,
+  Plus,
+  Shield,
+  Trash2,
 } from "lucide-react";
-import { useAuthStore } from "@/stores/authStore";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export function VaultPage() {
   const navigate = useNavigate();
@@ -24,7 +24,9 @@ export function VaultPage() {
   const [newValue, setNewValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
+  const [revealedValues, setRevealedValues] = useState<Record<string, string>>(
+    {},
+  );
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,7 +146,9 @@ export function VaultPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {user && <span className="text-xs text-slate-500">{user.email}</span>}
+            {user && (
+              <span className="text-xs text-slate-500">{user.email}</span>
+            )}
             <button
               type="button"
               onClick={() => navigate("/")}
@@ -178,7 +182,8 @@ export function VaultPage() {
                 Credential Vault
               </h2>
               <p className="text-xs text-slate-500 mt-1">
-                Securely store and manage API keys and secrets (AES-256-GCM encrypted)
+                Securely store and manage API keys and secrets (AES-256-GCM
+                encrypted)
               </p>
             </div>
           </div>
@@ -196,7 +201,10 @@ export function VaultPage() {
         {/* Error banner */}
         {error && (
           <div className="mb-6 bg-red-900/20 border border-red-700 rounded-lg p-4 flex items-start gap-3">
-            <AlertTriangle size={16} className="text-red-400 mt-0.5 flex-shrink-0" />
+            <AlertTriangle
+              size={16}
+              className="text-red-400 mt-0.5 flex-shrink-0"
+            />
             <div>
               <p className="text-sm text-red-300">{error}</p>
             </div>
@@ -211,10 +219,14 @@ export function VaultPage() {
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-2">
+                <label
+                  htmlFor="vault-key"
+                  className="block text-xs font-medium text-slate-400 mb-2"
+                >
                   Key Name
                 </label>
                 <input
+                  id="vault-key"
                   type="text"
                   value={newKey}
                   onChange={(e) => setNewKey(e.target.value)}
@@ -225,14 +237,17 @@ export function VaultPage() {
                   className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2
                     text-sm text-slate-200 placeholder-slate-500 focus:outline-none
                     focus:border-z8-500"
-                  autoFocus
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-2">
+                <label
+                  htmlFor="vault-value"
+                  className="block text-xs font-medium text-slate-400 mb-2"
+                >
                   Secret Value
                 </label>
                 <textarea
+                  id="vault-value"
                   value={newValue}
                   onChange={(e) => setNewValue(e.target.value)}
                   placeholder="Your API key or secret..."
@@ -319,13 +334,17 @@ export function VaultPage() {
                       </h4>
                       <div className="mt-2">
                         {isVisible && value ? (
-                          <code className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded
-                            block break-all max-w-lg overflow-x-auto font-mono">
+                          <code
+                            className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded
+                            block break-all max-w-lg overflow-x-auto font-mono"
+                          >
                             {value}
                           </code>
                         ) : (
-                          <code className="text-xs bg-slate-800 text-slate-600 px-2 py-1 rounded
-                            block font-mono">
+                          <code
+                            className="text-xs bg-slate-800 text-slate-600 px-2 py-1 rounded
+                            block font-mono"
+                          >
                             ••••••••••••••••
                           </code>
                         )}
@@ -339,11 +358,7 @@ export function VaultPage() {
                           rounded transition-colors opacity-0 group-hover:opacity-100"
                         title={isVisible ? "Hide" : "Reveal"}
                       >
-                        {isVisible ? (
-                          <EyeOff size={16} />
-                        ) : (
-                          <Eye size={16} />
-                        )}
+                        {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                       <button
                         type="button"

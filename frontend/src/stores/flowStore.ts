@@ -1,17 +1,17 @@
-import { create } from "zustand";
+import { type SaveFlowRequest, flowsApi } from "@/api/flows";
+import type { NodeStatus, Z8NodeData } from "@/types/flow";
 import {
-  type Node,
-  type Edge,
   type Connection,
+  type Edge,
+  type EdgeChange,
+  type Node,
+  type NodeChange,
   type XYPosition,
   addEdge,
-  applyNodeChanges,
   applyEdgeChanges,
-  type NodeChange,
-  type EdgeChange,
+  applyNodeChanges,
 } from "@xyflow/react";
-import type { Z8NodeData, NodeStatus } from "@/types/flow";
-import { flowsApi, type SaveFlowRequest } from "@/api/flows";
+import { create } from "zustand";
 
 interface FlowState {
   // Current flow metadata
@@ -25,7 +25,12 @@ interface FlowState {
   edges: Edge[];
 
   // Actions
-  setFlow: (id: string, name: string, nodes: Node<Z8NodeData>[], edges: Edge[]) => void;
+  setFlow: (
+    id: string,
+    name: string,
+    nodes: Node<Z8NodeData>[],
+    edges: Edge[],
+  ) => void;
   onNodesChange: (changes: NodeChange<Node<Z8NodeData>>[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -59,7 +64,10 @@ export const useFlowStore = create<FlowState>((set, get) => ({
     set({ edges: applyEdgeChanges(changes, get().edges), dirty: true }),
 
   onConnect: (connection) =>
-    set({ edges: addEdge({ ...connection, animated: true }, get().edges), dirty: true }),
+    set({
+      edges: addEdge({ ...connection, animated: true }, get().edges),
+      dirty: true,
+    }),
 
   addNode: (_type, data, position) => {
     nodeIdCounter++;
@@ -105,7 +113,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       dirty: true,
     }),
 
-  clear: () => set({ flowId: null, flowName: "Untitled Flow", nodes: [], edges: [], dirty: false }),
+  clear: () =>
+    set({
+      flowId: null,
+      flowName: "Untitled Flow",
+      nodes: [],
+      edges: [],
+      dirty: false,
+    }),
 
   saveFlow: async (viewport) => {
     const { flowId, flowName, nodes, edges } = get();

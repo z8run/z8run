@@ -1,6 +1,6 @@
-import { create } from "zustand";
 import { flowsApi } from "@/api/flows";
 import type { FlowSummary } from "@/types/flow";
+import { create } from "zustand";
 
 interface FlowListState {
   flows: FlowSummary[];

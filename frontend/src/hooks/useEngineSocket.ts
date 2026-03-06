@@ -1,6 +1,6 @@
+import { useFlowStore } from "@/stores/flowStore";
 import { useEffect } from "react";
 import { create } from "zustand";
-import { useFlowStore } from "@/stores/flowStore";
 
 /** Engine event received from the WebSocket. */
 export interface EngineEvent {
@@ -101,7 +101,8 @@ export const useEngineStore = create<EngineStore>((set, get) => ({
 
     // Get canvas nodes from flowStore to resolve names
     const canvasNodes = useFlowStore.getState().nodes;
-    const nodeDataById: Record<string, { label: string; nodeType: string }> = {};
+    const nodeDataById: Record<string, { label: string; nodeType: string }> =
+      {};
     for (const n of canvasNodes) {
       const d = n.data as Record<string, unknown>;
       nodeDataById[n.id] = {
@@ -174,10 +175,7 @@ export const useEngineStore = create<EngineStore>((set, get) => ({
       set({ running: true });
       pendingNodeEvents = []; // clear any stale queue
       useFlowStore.getState().resetAllNodeStatus();
-    } else if (
-      event.type === "flow_completed" ||
-      event.type === "flow_error"
-    ) {
+    } else if (event.type === "flow_completed" || event.type === "flow_error") {
       set({ running: false });
       // Keep success/error visible for 4 seconds, then reset to idle
       if (resetTimer) clearTimeout(resetTimer);

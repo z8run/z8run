@@ -1,23 +1,58 @@
-import { useState, useCallback } from "react";
-import { Search } from "lucide-react";
 import {
-  NODE_DEFINITIONS,
   NODE_CATEGORIES,
+  NODE_DEFINITIONS,
   type NodeDefinition,
 } from "@/lib/nodeDefinitions";
 import { CATEGORY_COLORS, type NodeCategory } from "@/types/flow";
+import { Search } from "lucide-react";
 import {
-  Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database, Radio,
-  Brain, Fingerprint, Tags, FileText, Scissors,
-  AlignLeft, Bot, Image,
+  AlignLeft,
+  Bot,
+  Braces,
+  Brain,
+  Bug,
+  Clock,
+  Code,
+  Database,
+  FileText,
+  Filter,
+  Fingerprint,
+  GitBranch,
+  Globe,
+  Image,
+  Radio,
+  Scissors,
+  Send,
+  Tags,
+  Timer,
+  Webhook,
 } from "lucide-react";
+import { useCallback, useState } from "react";
 
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
-  Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database, Radio,
-  Brain, Fingerprint, Tags, FileText, Scissors,
-  AlignLeft, Bot, Image,
+const ICON_MAP: Record<
+  string,
+  React.ComponentType<{ size?: number; className?: string }>
+> = {
+  Globe,
+  Clock,
+  Webhook,
+  Code,
+  Braces,
+  Filter,
+  Bug,
+  Send,
+  GitBranch,
+  Timer,
+  Database,
+  Radio,
+  Brain,
+  Fingerprint,
+  Tags,
+  FileText,
+  Scissors,
+  AlignLeft,
+  Bot,
+  Image,
 };
 
 function PaletteNode({ def }: { def: NodeDefinition }) {
@@ -106,7 +141,9 @@ export function NodePalette() {
             <div className="flex items-center gap-2 px-2 py-1 mb-1">
               <div
                 className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: CATEGORY_COLORS[group.id as NodeCategory] }}
+                style={{
+                  backgroundColor: CATEGORY_COLORS[group.id as NodeCategory],
+                }}
               />
               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
                 {group.label}

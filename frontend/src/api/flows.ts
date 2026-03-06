@@ -1,10 +1,10 @@
-import { api } from "./client";
 import type {
-  FlowListResponse,
-  FlowDetail,
   CreateFlowRequest,
   CreateFlowResponse,
+  FlowDetail,
+  FlowListResponse,
 } from "@/types/flow";
+import { api } from "./client";
 
 export interface SaveFlowRequest {
   name?: string;
@@ -23,7 +23,9 @@ export const flowsApi = {
     api.post("flows", { json: data }).json<CreateFlowResponse>(),
 
   update: (id: string, data: SaveFlowRequest) =>
-    api.put(`flows/${id}`, { json: data }).json<{ id: string; updated_at: string }>(),
+    api
+      .put(`flows/${id}`, { json: data })
+      .json<{ id: string; updated_at: string }>(),
 
   delete: (id: string) => api.delete(`flows/${id}`).json<{ deleted: string }>(),
 
@@ -40,7 +42,9 @@ export const flowsApi = {
     api.post(`flows/${id}/stop`).json<{ flow_id: string; status: string }>(),
 
   export: (id: string) =>
-    api.get(`flows/${id}/export`).json<{ z8run_version: string; export_format: number; flow: unknown }>(),
+    api
+      .get(`flows/${id}/export`)
+      .json<{ z8run_version: string; export_format: number; flow: unknown }>(),
 
   import: (data: unknown) =>
     api.post("flows/import", { json: data }).json<CreateFlowResponse>(),

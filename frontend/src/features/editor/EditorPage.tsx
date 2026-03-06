@@ -1,17 +1,22 @@
-import { useEffect, useCallback } from "react";
-import { useParams } from "react-router-dom";
-import { ReactFlowProvider, useReactFlow, type Node, type Edge } from "@xyflow/react";
+import { flowsApi } from "@/api/flows";
 import { Header } from "@/components/layout/Header";
-import { FlowCanvas } from "./canvas/FlowCanvas";
-import { NodePalette } from "./toolbar/NodePalette";
-import { ConfigPanel } from "./panels/ConfigPanel";
-import { ExecutionLog } from "./panels/ExecutionLog";
+import { useEngineSocket } from "@/hooks/useEngineSocket";
+import { NODE_DEFINITIONS } from "@/lib/nodeDefinitions";
 import { useFlowStore } from "@/stores/flowStore";
 import { useUIStore } from "@/stores/uiStore";
-import { useEngineSocket } from "@/hooks/useEngineSocket";
-import { flowsApi } from "@/api/flows";
 import type { Z8NodeData } from "@/types/flow";
-import { NODE_DEFINITIONS } from "@/lib/nodeDefinitions";
+import {
+  type Edge,
+  type Node,
+  ReactFlowProvider,
+  useReactFlow,
+} from "@xyflow/react";
+import { useCallback, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import { FlowCanvas } from "./canvas/FlowCanvas";
+import { ConfigPanel } from "./panels/ConfigPanel";
+import { ExecutionLog } from "./panels/ExecutionLog";
+import { NodePalette } from "./toolbar/NodePalette";
 
 /** Inner component that has access to ReactFlow context for Ctrl+S */
 function EditorInner() {
@@ -29,7 +34,8 @@ function EditorInner() {
       const rawNodes = (flow.canvas_nodes ?? []) as Node<Z8NodeData>[];
       const nodes = rawNodes.map((node) => {
         const data = node.data;
-        const nodeType = data.type ?? (data as Record<string, unknown>).nodeType as string;
+        const nodeType =
+          data.type ?? ((data as Record<string, unknown>).nodeType as string);
         // If inputs/outputs are missing, look them up from NODE_DEFINITIONS
         if (nodeType && (!data.inputs?.length || !data.outputs?.length)) {
           const def = NODE_DEFINITIONS.find((d) => d.type === nodeType);

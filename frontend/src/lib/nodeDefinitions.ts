@@ -76,7 +76,13 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { id: "response", name: "Response", type: "object" },
       { id: "error", name: "Error", type: "any" },
     ],
-    defaultConfig: { url: "https://httpbin.org/post", method: "POST", headers: {}, bodyPath: "req.body", timeout: 5000 },
+    defaultConfig: {
+      url: "https://httpbin.org/post",
+      method: "POST",
+      headers: {},
+      bodyPath: "req.body",
+      timeout: 5000,
+    },
   },
   {
     type: "filter",
@@ -127,10 +133,13 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { id: "out2", name: "Case 2", type: "any" },
       { id: "default", name: "Default", type: "any" },
     ],
-    defaultConfig: { property: "req.body.action", rules: [
-      { type: "eq", value: "create", port: "out1" },
-      { type: "eq", value: "update", port: "out2" },
-    ] },
+    defaultConfig: {
+      property: "req.body.action",
+      rules: [
+        { type: "eq", value: "create", port: "out1" },
+        { type: "eq", value: "update", port: "out2" },
+      ],
+    },
   },
   {
     type: "delay",
@@ -327,7 +336,8 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       model: "gpt-4o-mini",
       apiKey: "",
       baseUrl: "",
-      schema: '{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"number"}}}',
+      schema:
+        '{"type":"object","properties":{"name":{"type":"string"},"score":{"type":"number"}}}',
       retries: 2,
       timeout: 30000,
     },

@@ -1,9 +1,19 @@
-import { useEffect, useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Plus, Trash2, Play, Clock, AlertTriangle, LogOut, Download, Upload, Shield } from "lucide-react";
-import { useFlowListStore } from "@/stores/flowListStore";
-import { useAuthStore } from "@/stores/authStore";
 import { flowsApi } from "@/api/flows";
+import { useAuthStore } from "@/stores/authStore";
+import { useFlowListStore } from "@/stores/flowListStore";
+import {
+  AlertTriangle,
+  Clock,
+  Download,
+  LogOut,
+  Play,
+  Plus,
+  Shield,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 export function FlowListPage() {
   const { flows, loading, fetchFlows, createFlow, deleteFlow } =
@@ -12,7 +22,10 @@ export function FlowListPage() {
   const navigate = useNavigate();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -27,11 +40,17 @@ export function FlowListPage() {
     navigate(`/flow/${id}`);
   };
 
-  const handleExport = async (e: React.MouseEvent, flowId: string, flowName: string) => {
+  const handleExport = async (
+    e: React.MouseEvent,
+    flowId: string,
+    flowName: string,
+  ) => {
     e.stopPropagation();
     try {
       const data = await flowsApi.export(flowId);
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -58,7 +77,9 @@ export function FlowListPage() {
       navigate(`/flow/${result.id}`);
     } catch (err) {
       console.error("Import failed:", err);
-      alert("Failed to import flow. Make sure the file is a valid z8run export.");
+      alert(
+        "Failed to import flow. Make sure the file is a valid z8run export.",
+      );
     }
     // Reset input so the same file can be re-imported
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -147,7 +168,6 @@ export function FlowListPage() {
                 className="flex-1 bg-slate-800 border border-slate-700 rounded-md px-3 py-2
                   text-sm text-slate-200 placeholder-slate-500 focus:outline-none
                   focus:border-z8-500"
-                autoFocus
               />
               <button
                 type="button"
@@ -208,16 +228,12 @@ export function FlowListPage() {
         ) : (
           <div className="grid gap-3">
             {flows.map((flow) => (
-              <div
+              <button
+                type="button"
                 key={flow.id}
                 onClick={() => navigate(`/flow/${flow.id}`)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && navigate(`/flow/${flow.id}`)
-                }
-                role="button"
-                tabIndex={0}
                 className="bg-slate-900 border border-slate-800 hover:border-slate-700
-                  rounded-lg p-4 cursor-pointer transition-colors group"
+                  rounded-lg p-4 cursor-pointer transition-colors group text-left w-full"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -266,7 +282,7 @@ export function FlowListPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -281,12 +297,20 @@ export function FlowListPage() {
                 <AlertTriangle size={20} className="text-red-400" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-slate-200">Delete Flow</h3>
-                <p className="text-xs text-slate-400 mt-0.5">This action cannot be undone</p>
+                <h3 className="text-sm font-semibold text-slate-200">
+                  Delete Flow
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  This action cannot be undone
+                </p>
               </div>
             </div>
             <p className="text-sm text-slate-300 mb-6">
-              Are you sure you want to delete <span className="font-medium text-white">"{deleteTarget.name}"</span>?
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-white">
+                "{deleteTarget.name}"
+              </span>
+              ?
             </p>
             <div className="flex justify-end gap-3">
               <button

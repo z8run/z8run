@@ -1,20 +1,53 @@
-import { memo, useCallback } from "react";
-import { Handle, Position, type NodeProps, useReactFlow } from "@xyflow/react";
+import { useUIStore } from "@/stores/uiStore";
 import type { Z8NodeData } from "@/types/flow";
 import { CATEGORY_COLORS, PORT_COLORS } from "@/types/flow";
-import { useUIStore } from "@/stores/uiStore";
+import { Handle, type NodeProps, Position, useReactFlow } from "@xyflow/react";
 import {
-  Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database, Radio, X,
-  Brain, Fingerprint, Tags, FileText, Scissors,
-  AlignLeft, Bot, Image,
+  AlignLeft,
+  Bot,
+  Braces,
+  Brain,
+  Bug,
+  Clock,
+  Code,
+  Database,
+  FileText,
+  Filter,
+  Fingerprint,
+  GitBranch,
+  Globe,
+  Image,
+  Radio,
+  Scissors,
+  Send,
+  Tags,
+  Timer,
+  Webhook,
+  X,
 } from "lucide-react";
+import { memo, useCallback } from "react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
-  Globe, Clock, Webhook, Code, Braces, Filter,
-  Bug, Send, GitBranch, Timer, Database, Radio,
-  Brain, Fingerprint, Tags, FileText, Scissors,
-  AlignLeft, Bot, Image,
+  Globe,
+  Clock,
+  Webhook,
+  Code,
+  Braces,
+  Filter,
+  Bug,
+  Send,
+  GitBranch,
+  Timer,
+  Database,
+  Radio,
+  Brain,
+  Fingerprint,
+  Tags,
+  FileText,
+  Scissors,
+  AlignLeft,
+  Bot,
+  Image,
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -51,7 +84,8 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
     const label = nodeData?.label ?? nodeData?.type ?? "Node";
 
     const Icon = ICON_MAP[icon];
-    const categoryColor = (CATEGORY_COLORS as Record<string, string>)[category] ?? "#6366f1";
+    const categoryColor =
+      (CATEGORY_COLORS as Record<string, string>)[category] ?? "#6366f1";
     const status = nodeData?.status ?? "idle";
     const statusStyle = STATUS_STYLES[status] || STATUS_STYLES.idle;
 
@@ -120,19 +154,23 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
             const out = outputs[i];
             return (
               <div
-                key={i}
+                key={inp?.id ?? out?.id ?? `port-${i}`}
                 className="flex items-center justify-between px-3 gap-4"
                 style={{ height: ROW_H }}
               >
                 <span
                   className="text-[9px] font-mono truncate"
-                  style={{ color: inp ? getPortColor(inp.id, inp.type) : "transparent" }}
+                  style={{
+                    color: inp ? getPortColor(inp.id, inp.type) : "transparent",
+                  }}
                 >
                   {inp?.name ?? ""}
                 </span>
                 <span
                   className="text-[9px] font-mono truncate text-right"
-                  style={{ color: out ? getPortColor(out.id, out.type) : "transparent" }}
+                  style={{
+                    color: out ? getPortColor(out.id, out.type) : "transparent",
+                  }}
                 >
                   {out?.name ?? ""}
                 </span>
@@ -183,8 +221,30 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
     return (
       <div className="bg-slate-800 rounded-lg border-2 border-red-500 p-3 min-w-[140px]">
         <span className="text-xs text-red-400">Error rendering node</span>
-        <Handle type="target" position={Position.Left} id="input" style={{ top: "50%", background: "#94A3B8", width: 10, height: 10, border: "2px solid #1e293b" }} />
-        <Handle type="source" position={Position.Right} id="output" style={{ top: "50%", background: "#94A3B8", width: 10, height: 10, border: "2px solid #1e293b" }} />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="input"
+          style={{
+            top: "50%",
+            background: "#94A3B8",
+            width: 10,
+            height: 10,
+            border: "2px solid #1e293b",
+          }}
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="output"
+          style={{
+            top: "50%",
+            background: "#94A3B8",
+            width: 10,
+            height: 10,
+            border: "2px solid #1e293b",
+          }}
+        />
       </div>
     );
   }

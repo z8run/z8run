@@ -1,10 +1,27 @@
-import { X, Settings, Zap, AlertCircle, CheckCircle2, Loader2, Circle, Plus, Trash2 } from "lucide-react";
-import { useUIStore } from "@/stores/uiStore";
 import { useFlowStore } from "@/stores/flowStore";
-import type { Z8NodeData, NodeStatus } from "@/types/flow";
+import { useUIStore } from "@/stores/uiStore";
+import type { NodeStatus, Z8NodeData } from "@/types/flow";
 import { CATEGORY_COLORS, PORT_COLORS } from "@/types/flow";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Circle,
+  Loader2,
+  Plus,
+  Settings,
+  Trash2,
+  X,
+  Zap,
+} from "lucide-react";
 
-const STATUS_BADGES: Record<NodeStatus, { label: string; color: string; Icon: React.ComponentType<{ size?: number; className?: string }> }> = {
+const STATUS_BADGES: Record<
+  NodeStatus,
+  {
+    label: string;
+    color: string;
+    Icon: React.ComponentType<{ size?: number; className?: string }>;
+  }
+> = {
   idle: { label: "Idle", color: "text-slate-500", Icon: Circle },
   running: { label: "Running", color: "text-blue-400", Icon: Loader2 },
   success: { label: "Success", color: "text-green-400", Icon: CheckCircle2 },
@@ -70,7 +87,9 @@ function SmartConfigField({
         className={selectClass}
       >
         {HTTP_METHODS.map((m) => (
-          <option key={m} value={m}>{m}</option>
+          <option key={m} value={m}>
+            {m}
+          </option>
         ))}
       </select>
     );
@@ -86,7 +105,9 @@ function SmartConfigField({
         className={selectClass}
       >
         {HTTP_STATUS_CODES.map((s) => (
-          <option key={s.value} value={s.value}>{s.label}</option>
+          <option key={s.value} value={s.value}>
+            {s.label}
+          </option>
         ))}
         {/* If current value isn't in the list, show it too */}
         {!HTTP_STATUS_CODES.some((s) => s.value === current) && (
@@ -150,7 +171,9 @@ function SmartConfigField({
         className={selectClass}
       >
         {DB_TYPES.map((db) => (
-          <option key={db.value} value={db.value}>{db.label}</option>
+          <option key={db.value} value={db.value}>
+            {db.label}
+          </option>
         ))}
       </select>
     );
@@ -252,13 +275,29 @@ function SmartConfigField({
   }
 
   // --- AI NODES: shared fields ---
-  const AI_NODE_TYPES = ["llm", "embeddings", "classifier", "structured-output", "summarizer", "ai-agent", "image-gen"];
+  const AI_NODE_TYPES = [
+    "llm",
+    "embeddings",
+    "classifier",
+    "structured-output",
+    "summarizer",
+    "ai-agent",
+    "image-gen",
+  ];
 
   // AI Provider dropdown
   if (fieldKey === "provider" && AI_NODE_TYPES.includes(nodeType)) {
-    const providers = nodeType === "image-gen"
-      ? [{ value: "openai", label: "OpenAI (DALL-E)" }, { value: "stability", label: "Stability AI" }]
-      : [{ value: "openai", label: "OpenAI" }, { value: "anthropic", label: "Anthropic" }, { value: "ollama", label: "Ollama (Local)" }];
+    const providers =
+      nodeType === "image-gen"
+        ? [
+            { value: "openai", label: "OpenAI (DALL-E)" },
+            { value: "stability", label: "Stability AI" },
+          ]
+        : [
+            { value: "openai", label: "OpenAI" },
+            { value: "anthropic", label: "Anthropic" },
+            { value: "ollama", label: "Ollama (Local)" },
+          ];
     return (
       <select
         value={String(value ?? "openai")}
@@ -266,7 +305,9 @@ function SmartConfigField({
         className={selectClass}
       >
         {providers.map((p) => (
-          <option key={p.value} value={p.value}>{p.label}</option>
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
         ))}
       </select>
     );
@@ -285,7 +326,10 @@ function SmartConfigField({
       "anthropic-ai-agent": "claude-sonnet-4-20250514",
       "ollama-llm": "llama3",
     };
-    const placeholder = placeholders[`${String(value ?? "openai").split("-")[0] || "openai"}-${nodeType}`] || "Model name";
+    const placeholder =
+      placeholders[
+        `${String(value ?? "openai").split("-")[0] || "openai"}-${nodeType}`
+      ] || "Model name";
     return (
       <input
         type="text"
@@ -338,7 +382,10 @@ function SmartConfigField({
   }
 
   // Temperature — LLM, Classifier, AI Agent
-  if (fieldKey === "temperature" && ["llm", "classifier", "ai-agent"].includes(nodeType)) {
+  if (
+    fieldKey === "temperature" &&
+    ["llm", "classifier", "ai-agent"].includes(nodeType)
+  ) {
     return (
       <input
         type="number"
@@ -772,21 +819,64 @@ function SmartConfigField({
 
 /** Check if a key has a smart field renderer */
 function hasSmartField(key: string, nodeType: string): boolean {
-  const AI_NODES = ["llm", "embeddings", "classifier", "structured-output", "summarizer", "ai-agent", "image-gen"];
-  return ["method", "statusCode", "url", "timeout"].includes(key)
-    || (key === "action" && (nodeType === "json" || nodeType === "mqtt"))
-    || key === "unit"
-    || (nodeType === "database" && ["dbType", "host", "port", "database", "user", "password", "query"].includes(key))
-    || (AI_NODES.includes(nodeType) &&
-        ["provider", "model", "apiKey", "baseUrl", "systemPrompt", "temperature", "maxTokens", "categories", "context"].includes(key))
-    || (nodeType === "prompt-template" && ["template"].includes(key))
-    || (nodeType === "text-splitter" && ["strategy", "chunkSize", "overlap"].includes(key))
-    || (nodeType === "vector-store" && ["action", "collection", "topK", "minScore"].includes(key))
-    || (nodeType === "structured-output" && ["schema", "retries"].includes(key))
-    || (nodeType === "summarizer" && ["strategy", "maxLength", "language"].includes(key))
-    || (nodeType === "ai-agent" && ["tools", "maxIterations"].includes(key))
-    || (nodeType === "image-gen" && ["size", "quality", "style"].includes(key))
-    || (nodeType === "mqtt" && ["action", "broker", "port", "topic", "qos", "clientId", "username", "password", "keepAlive"].includes(key));
+  const AI_NODES = [
+    "llm",
+    "embeddings",
+    "classifier",
+    "structured-output",
+    "summarizer",
+    "ai-agent",
+    "image-gen",
+  ];
+  return (
+    ["method", "statusCode", "url", "timeout"].includes(key) ||
+    (key === "action" && (nodeType === "json" || nodeType === "mqtt")) ||
+    key === "unit" ||
+    (nodeType === "database" &&
+      [
+        "dbType",
+        "host",
+        "port",
+        "database",
+        "user",
+        "password",
+        "query",
+      ].includes(key)) ||
+    (AI_NODES.includes(nodeType) &&
+      [
+        "provider",
+        "model",
+        "apiKey",
+        "baseUrl",
+        "systemPrompt",
+        "temperature",
+        "maxTokens",
+        "categories",
+        "context",
+      ].includes(key)) ||
+    (nodeType === "prompt-template" && ["template"].includes(key)) ||
+    (nodeType === "text-splitter" &&
+      ["strategy", "chunkSize", "overlap"].includes(key)) ||
+    (nodeType === "vector-store" &&
+      ["action", "collection", "topK", "minScore"].includes(key)) ||
+    (nodeType === "structured-output" && ["schema", "retries"].includes(key)) ||
+    (nodeType === "summarizer" &&
+      ["strategy", "maxLength", "language"].includes(key)) ||
+    (nodeType === "ai-agent" && ["tools", "maxIterations"].includes(key)) ||
+    (nodeType === "image-gen" && ["size", "quality", "style"].includes(key)) ||
+    (nodeType === "mqtt" &&
+      [
+        "action",
+        "broker",
+        "port",
+        "topic",
+        "qos",
+        "clientId",
+        "username",
+        "password",
+        "keepAlive",
+      ].includes(key))
+  );
 }
 
 /** Available switch operators with human-friendly labels */
@@ -822,13 +912,15 @@ function SwitchRulesEditor({
   onChange: (rules: SwitchRule[]) => void;
 }) {
   const updateRule = (index: number, field: keyof SwitchRule, val: string) => {
-    const updated = rules.map((r, i) => (i === index ? { ...r, [field]: val } : r));
+    const updated = rules.map((r, i) =>
+      i === index ? { ...r, [field]: val } : r,
+    );
     onChange(updated);
   };
 
   const addRule = () => {
     const nextPort = outputs.find(
-      (o) => o.id !== "default" && !rules.some((r) => r.port === o.id)
+      (o) => o.id !== "default" && !rules.some((r) => r.port === o.id),
     );
     onChange([
       ...rules,
@@ -846,9 +938,14 @@ function SwitchRulesEditor({
   return (
     <div className="space-y-2">
       {rules.map((rule, i) => (
-        <div key={i} className="bg-slate-800/60 rounded-md p-2 space-y-1.5 border border-slate-700/50">
+        <div
+          key={`rule-${rule.type}-${rule.field}-${i}`}
+          className="bg-slate-800/60 rounded-md p-2 space-y-1.5 border border-slate-700/50"
+        >
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-slate-500 shrink-0 w-4">{i + 1}.</span>
+            <span className="text-[10px] text-slate-500 shrink-0 w-4">
+              {i + 1}.
+            </span>
             <select
               value={rule.type}
               onChange={(e) => updateRule(i, "type", e.target.value)}
@@ -942,21 +1039,25 @@ export function ConfigPanel() {
     <div className="w-[340px] bg-slate-900 border-l border-slate-700 flex flex-col h-full">
       {/* Header with color accent */}
       <div className="border-b border-slate-700">
-        <div
-          className="h-1 w-full"
-          style={{ backgroundColor: color }}
-        />
+        <div className="h-1 w-full" style={{ backgroundColor: color }} />
         <div className="flex items-center justify-between p-3">
           <div className="flex items-center gap-2.5">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: `${color}20`, border: `1px solid ${color}40` }}
+              style={{
+                backgroundColor: `${color}20`,
+                border: `1px solid ${color}40`,
+              }}
             >
               <Zap size={16} style={{ color }} />
             </div>
             <div>
-              <div className="text-sm font-medium text-slate-200">{data.label}</div>
-              <div className="text-[10px] text-slate-500 font-mono">{nodeType}</div>
+              <div className="text-sm font-medium text-slate-200">
+                {data.label}
+              </div>
+              <div className="text-[10px] text-slate-500 font-mono">
+                {nodeType}
+              </div>
             </div>
           </div>
           <button
@@ -970,8 +1071,13 @@ export function ConfigPanel() {
 
         {/* Status badge */}
         <div className="px-3 pb-2.5 flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 text-[11px] ${statusBadge.color}`}>
-            <statusBadge.Icon size={12} className={status === "running" ? "animate-spin" : ""} />
+          <div
+            className={`flex items-center gap-1.5 text-[11px] ${statusBadge.color}`}
+          >
+            <statusBadge.Icon
+              size={12}
+              className={status === "running" ? "animate-spin" : ""}
+            />
             <span>{statusBadge.label}</span>
           </div>
         </div>
@@ -981,14 +1087,20 @@ export function ConfigPanel() {
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {/* Node Name */}
         <div>
-          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+          <label
+            htmlFor="config-node-name"
+            className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1"
+          >
             Node Name
           </label>
           <input
+            id="config-node-name"
             type="text"
             value={data.label}
             onChange={(e) =>
-              updateNodeData(selectedNodeId, { label: e.target.value } as Partial<Z8NodeData>)
+              updateNodeData(selectedNodeId, {
+                label: e.target.value,
+              } as Partial<Z8NodeData>)
             }
             className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
               text-xs text-slate-200 focus:outline-none focus:border-z8-500 transition-colors"
@@ -1007,99 +1119,119 @@ export function ConfigPanel() {
             <div className="space-y-2.5">
               {Object.entries(config).map(([key, value]) => {
                 // Switch rules get a dedicated editor
-                if (key === "rules" && nodeType === "switch" && Array.isArray(value)) {
+                if (
+                  key === "rules" &&
+                  nodeType === "switch" &&
+                  Array.isArray(value)
+                ) {
                   return (
                     <div key={key}>
-                      <label className="text-[10px] font-medium text-slate-400 block mb-1.5">
+                      <span className="text-[10px] font-medium text-slate-400 block mb-1.5">
                         Rules
-                      </label>
+                      </span>
                       <SwitchRulesEditor
                         rules={value as SwitchRule[]}
                         outputs={outputs}
-                        onChange={(newRules) => handleConfigChange("rules", newRules)}
+                        onChange={(newRules) =>
+                          handleConfigChange("rules", newRules)
+                        }
                       />
                     </div>
                   );
                 }
 
                 return (
-                <div key={key}>
-                  <label className="text-[10px] font-medium text-slate-400 block mb-1">
-                    {humanizeKey(key)}
-                  </label>
-                  {hasSmartField(key, nodeType) ? (
-                    <SmartConfigField
-                      fieldKey={key}
-                      value={value}
-                      nodeType={nodeType}
-                      onChange={(val) => handleConfigChange(key, val)}
-                    />
-                  ) : typeof value === "string" && (key === "code" || value.length > 50) ? (
-                    <textarea
-                      value={String(value)}
-                      onChange={(e) => handleConfigChange(key, e.target.value)}
-                      rows={key === "code" ? 6 : 3}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
+                  <div key={key}>
+                    <label
+                      htmlFor={`config-${key}`}
+                      className="text-[10px] font-medium text-slate-400 block mb-1"
+                    >
+                      {humanizeKey(key)}
+                    </label>
+                    {hasSmartField(key, nodeType) ? (
+                      <SmartConfigField
+                        fieldKey={key}
+                        value={value}
+                        nodeType={nodeType}
+                        onChange={(val) => handleConfigChange(key, val)}
+                      />
+                    ) : typeof value === "string" &&
+                      (key === "code" || value.length > 50) ? (
+                      <textarea
+                        id={`config-${key}`}
+                        value={String(value)}
+                        onChange={(e) =>
+                          handleConfigChange(key, e.target.value)
+                        }
+                        rows={key === "code" ? 6 : 3}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
                         text-xs text-slate-200 font-mono focus:outline-none focus:border-z8-500
                         transition-colors resize-y"
-                      spellCheck={false}
-                    />
-                  ) : typeof value === "number" ? (
-                    <input
-                      type="number"
-                      value={Number(value)}
-                      onChange={(e) => handleConfigChange(key, Number(e.target.value))}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
+                        spellCheck={false}
+                      />
+                    ) : typeof value === "number" ? (
+                      <input
+                        id={`config-${key}`}
+                        type="number"
+                        value={Number(value)}
+                        onChange={(e) =>
+                          handleConfigChange(key, Number(e.target.value))
+                        }
+                        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
                         text-xs text-slate-200 focus:outline-none focus:border-z8-500 transition-colors"
-                    />
-                  ) : typeof value === "boolean" ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleConfigChange(key, !value)}
-                        className={`
+                      />
+                    ) : typeof value === "boolean" ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleConfigChange(key, !value)}
+                          className={`
                           w-9 h-5 rounded-full transition-colors relative shrink-0
                           ${value ? "bg-z8-600" : "bg-slate-700"}
                         `}
-                      >
-                        <div
-                          className={`
+                        >
+                          <div
+                            className={`
                             w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] transition-transform
                             ${value ? "translate-x-[19px]" : "translate-x-[3px]"}
                           `}
-                        />
-                      </button>
-                      <span className="text-[10px] text-slate-500">
-                        {value ? "Enabled" : "Disabled"}
-                      </span>
-                    </div>
-                  ) : typeof value === "object" && value !== null ? (
-                    <textarea
-                      value={JSON.stringify(value, null, 2)}
-                      onChange={(e) => {
-                        try {
-                          handleConfigChange(key, JSON.parse(e.target.value));
-                        } catch {
-                          // Don't update if invalid JSON — user is still typing
-                        }
-                      }}
-                      rows={4}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
+                          />
+                        </button>
+                        <span className="text-[10px] text-slate-500">
+                          {value ? "Enabled" : "Disabled"}
+                        </span>
+                      </div>
+                    ) : typeof value === "object" && value !== null ? (
+                      <textarea
+                        id={`config-${key}`}
+                        value={JSON.stringify(value, null, 2)}
+                        onChange={(e) => {
+                          try {
+                            handleConfigChange(key, JSON.parse(e.target.value));
+                          } catch {
+                            // Don't update if invalid JSON — user is still typing
+                          }
+                        }}
+                        rows={4}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
                         text-xs text-slate-200 font-mono focus:outline-none focus:border-z8-500
                         transition-colors resize-y"
-                      spellCheck={false}
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      value={String(value)}
-                      onChange={(e) => handleConfigChange(key, e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
+                        spellCheck={false}
+                      />
+                    ) : (
+                      <input
+                        id={`config-${key}`}
+                        type="text"
+                        value={String(value)}
+                        onChange={(e) =>
+                          handleConfigChange(key, e.target.value)
+                        }
+                        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
                         text-xs text-slate-200 font-mono focus:outline-none focus:border-z8-500
                         transition-colors"
-                    />
-                  )}
-                </div>
+                      />
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -1127,10 +1259,14 @@ export function ConfigPanel() {
                     >
                       <div
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: PORT_COLORS[p.type] ?? "#94A3B8" }}
+                        style={{
+                          backgroundColor: PORT_COLORS[p.type] ?? "#94A3B8",
+                        }}
                       />
                       <span className="text-slate-300">{p.name}</span>
-                      <span className="text-slate-600 font-mono text-[10px] ml-auto">{p.type}</span>
+                      <span className="text-slate-600 font-mono text-[10px] ml-auto">
+                        {p.type}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1148,10 +1284,14 @@ export function ConfigPanel() {
                     >
                       <div
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: PORT_COLORS[p.type] ?? "#94A3B8" }}
+                        style={{
+                          backgroundColor: PORT_COLORS[p.type] ?? "#94A3B8",
+                        }}
                       />
                       <span className="text-slate-300">{p.name}</span>
-                      <span className="text-slate-600 font-mono text-[10px] ml-auto">{p.type}</span>
+                      <span className="text-slate-600 font-mono text-[10px] ml-auto">
+                        {p.type}
+                      </span>
                     </div>
                   ))}
                 </div>

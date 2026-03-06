@@ -8,7 +8,9 @@ export const vaultApi = {
   list: () => api.get("vault").json<{ keys: string[] }>(),
 
   store: (key: string, value: string) =>
-    api.post("vault", { json: { key, value } }).json<{ status: string; key: string }>(),
+    api
+      .post("vault", { json: { key, value } })
+      .json<{ status: string; key: string }>(),
 
   get: (key: string) =>
     api.get(`vault/${key}`).json<{ key: string; value: string }>(),

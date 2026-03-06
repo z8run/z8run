@@ -1,5 +1,5 @@
+import { type UserInfo, authService } from "@/api/auth";
 import { create } from "zustand";
-import { authService, UserInfo } from "@/api/auth";
 
 interface AuthState {
   token: string | null;
@@ -8,7 +8,11 @@ interface AuthState {
   error: string | null;
 
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
+  register: (
+    email: string,
+    username: string,
+    password: string,
+  ) => Promise<void>;
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
@@ -26,11 +30,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const res = await authService.login(email, password);
       localStorage.setItem("z8_token", res.token);
       set({ token: res.token, user: res.user, loading: false });
-    } catch (err: any) {
-      const msg = err?.response
-        ? await err.response
+    } catch (err: unknown) {
+      const resErr = err as { response?: Response };
+      const msg = resErr?.response
+        ? await resErr.response
             .json()
-            .then((b: any) => b.error?.message || "Login failed")
+            .then(
+              (b: Record<string, { message?: string }>) =>
+                b.error?.message || "Login failed",
+            )
             .catch(() => "Login failed")
         : "Network error";
       set({ error: msg, loading: false });
@@ -43,11 +51,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const res = await authService.register(email, username, password);
       localStorage.setItem("z8_token", res.token);
       set({ token: res.token, user: res.user, loading: false });
-    } catch (err: any) {
-      const msg = err?.response
-        ? await err.response
+    } catch (err: unknown) {
+      const resErr = err as { response?: Response };
+      const msg = resErr?.response
+        ? await resErr.response
             .json()
-            .then((b: any) => b.error?.message || "Registration failed")
+            .then(
+              (b: Record<string, { message?: string }>) =>
+                b.error?.message || "Registration failed",
+            )
             .catch(() => "Registration failed")
         : "Network error";
       set({ error: msg, loading: false });

@@ -23,8 +23,7 @@ export const useUIStore = create<UIState>((set) => ({
   openConfigPanel: (nodeId) =>
     set({ configPanelOpen: true, selectedNodeId: nodeId }),
 
-  closeConfigPanel: () =>
-    set({ configPanelOpen: false, selectedNodeId: null }),
+  closeConfigPanel: () => set({ configPanelOpen: false, selectedNodeId: null }),
 
   setTheme: (theme) => set({ theme }),
 }));

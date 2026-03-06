@@ -1,10 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { FlowListPage } from "@/features/flows/FlowListPage";
-import { EditorPage } from "@/features/editor/EditorPage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RegisterPage } from "@/features/auth/RegisterPage";
+import { EditorPage } from "@/features/editor/EditorPage";
+import { FlowListPage } from "@/features/flows/FlowListPage";
 import { VaultPage } from "@/features/vault/VaultPage";
 import { useAuthStore } from "@/stores/authStore";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token);

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { UserPlus, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { Loader2, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 export function RegisterPage() {
   const { register, loading, error, token, clearError } = useAuthStore();
@@ -51,10 +51,14 @@ export function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">
+              <label
+                htmlFor="register-email"
+                className="block text-xs text-slate-400 mb-1.5"
+              >
                 Email
               </label>
               <input
+                id="register-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -65,10 +69,14 @@ export function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">
+              <label
+                htmlFor="register-username"
+                className="block text-xs text-slate-400 mb-1.5"
+              >
                 Username
               </label>
               <input
+                id="register-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -79,10 +87,14 @@ export function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1.5">
+              <label
+                htmlFor="register-password"
+                className="block text-xs text-slate-400 mb-1.5"
+              >
                 Password
               </label>
               <input
+                id="register-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
