@@ -1,6 +1,6 @@
-<p align="center">
+<!-- <p align="center">
   <img src="assets/z8run-logo.svg" alt="z8run" width="280" />
-</p>
+</p> -->
 
 <h3 align="center">Next Generation Visual Flow Engine</h3>
 
