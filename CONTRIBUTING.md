@@ -64,9 +64,22 @@ z8run/
 
 ### Requirements
 
-- [Rust](https://rustup.rs/) 1.75+ (see `rust-toolchain.toml` for the pinned version)
+- [Rust](https://rustup.rs/) 1.91+ (see `rust-toolchain.toml` for the pinned version)
 - Node.js 20+ and `pnpm` (for frontend work)
+- Optional: Docker and Docker Compose (for containerized development)
 - Optional: `wasm-pack` or a WASM target if working on plugins
+
+### Environment Setup
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+- `Z8_JWT_SECRET` — required for PostgreSQL (generate with `openssl rand -base64 32`)
+- `POSTGRES_PASSWORD` — if using Docker with PostgreSQL
+
+For local development with SQLite, the defaults work out of the box.
 
 ### Backend
 
@@ -88,6 +101,14 @@ cd frontend
 pnpm install
 pnpm dev
 ```
+
+### With Docker (local build)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
+```
+
+This uses `docker-compose.build.yml` as an override to build images locally instead of pulling from GHCR.
 
 ### Linting & Formatting
 
@@ -180,7 +201,11 @@ z8run supports plugins compiled to WebAssembly. To create one:
    ```bash
    cargo build --target wasm32-wasi --release
    ```
-3. Place the `.wasm` file in the `data/plugins/` directory and use `z8run plugin scan` to register it.
+3. Install the plugin using the CLI:
+   ```bash
+   z8run plugin install ./target/wasm32-wasi/release/my_plugin.wasm
+   ```
+   Or place the `.wasm` file in the `data/plugins/` directory and use `z8run plugin scan` to register it.
 4. Add tests and documentation for your plugin nodes and capabilities.
 
 ---

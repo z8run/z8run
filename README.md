@@ -35,17 +35,32 @@ z8run is an open-source visual flow engine built from the ground up in **Rust** 
 
 ## Quick Start
 
-### Requirements
+### From Source
 
-- [Rust](https://rustup.rs/) 1.75+
-
-### Build & Run
+**Requirements:** [Rust](https://rustup.rs/) 1.91+, Node.js 20+ and `pnpm` (for frontend)
 
 ```bash
 git clone https://github.com/z8run/z8run.git
 cd z8run
+cp .env.example .env          # adjust as needed
 cargo build --release
 cargo run --bin z8run -- serve
+```
+
+### With Docker
+
+```bash
+git clone https://github.com/z8run/z8run.git
+cd z8run
+cp .env.example .env          # set Z8_JWT_SECRET and POSTGRES_PASSWORD
+docker compose up -d
+```
+
+Pre-built images are available on [GHCR](https://github.com/z8run/z8run/pkgs/container/z8run-api):
+
+```bash
+docker pull ghcr.io/z8run/z8run-api:latest
+docker pull ghcr.io/z8run/z8run-nginx:latest
 ```
 
 The server starts on `http://localhost:7700`.
@@ -98,13 +113,16 @@ z8run/
 ## CLI
 
 ```bash
-z8run serve              # Start the server (default port 7700)
-z8run serve -p 8080      # Custom port
-z8run migrate            # Run database migrations
-z8run plugin list        # List installed plugins
-z8run plugin scan        # Scan plugin directory
-z8run validate flow.json # Validate a flow file
-z8run info               # Show system information
+z8run serve                            # Start the server (default port 7700)
+z8run serve -p 8080                    # Custom port
+z8run migrate                          # Run database migrations
+z8run plugin list                      # List installed plugins
+z8run plugin install ./csv-parser.wasm # Install a plugin from .wasm file
+z8run plugin install ./json-transform/ # Install from directory with manifest.toml
+z8run plugin remove csv-parser         # Uninstall a plugin by name
+z8run plugin scan                      # Scan plugin directory
+z8run validate flow.json               # Validate a flow file
+z8run info                             # Show system information
 ```
 
 ### Environment Variables
@@ -114,8 +132,11 @@ z8run info               # Show system information
 | `Z8_PORT` | `7700` | HTTP/WebSocket port |
 | `Z8_BIND` | `0.0.0.0` | Bind address |
 | `Z8_DATA_DIR` | `./data` | Data directory (database, plugins) |
-| `Z8_DB_URL` | SQLite auto | Database URL (sqlite:// or postgres://) |
+| `Z8_DB_URL` | SQLite auto | Database URL (`sqlite://` or `postgres://`) |
 | `Z8_LOG_LEVEL` | `info` | Log level (trace, debug, info, warn, error) |
+| `Z8_JWT_SECRET` | — | JWT signing secret (**required** for PostgreSQL/MySQL, auto-generated for SQLite dev). Generate with `openssl rand -base64 32` |
+| `Z8_VAULT_SECRET` | — | Encryption key for the credential vault (**must** change in production) |
+| `POSTGRES_PASSWORD` | — | Password for the PostgreSQL user (Docker deployment) |
 
 ## API
 
@@ -169,8 +190,18 @@ z8run ships with 23 native nodes across 6 categories:
 - [x] WASM plugin execution (wasmtime sandbox with capabilities)
 - [x] MQTT node (publish/subscribe with TLS)
 - [x] AI suite: LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen
-- [ ] Cloud deployment mode (Docker, Helm)
+- [x] Docker deployment (multi-stage build, GHCR registry)
+- [x] CI/CD pipeline (GitHub Actions: build, test, deploy, release)
+- [x] Domain setup with Cloudflare (landing + app subdomains)
+- [x] Plugin install/remove CLI (`z8run plugin install`, `z8run plugin remove`)
+- [ ] Undo/redo in the flow editor
+- [ ] Flow duplication
+- [ ] Node search/filter in the palette
+- [ ] Rate limiting on the API
+- [ ] Integration tests
+- [ ] MySQL storage adapter
 - [ ] Plugin marketplace
+- [ ] Helm chart for Kubernetes
 
 ## Contributing
 
