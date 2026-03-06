@@ -939,7 +939,7 @@ function SwitchRulesEditor({
     <div className="space-y-2">
       {rules.map((rule, i) => (
         <div
-          key={`rule-${rule.type}-${rule.field}-${i}`}
+          key={`rule-${rule.type}-${rule.port}-${i}`}
           className="bg-slate-800/60 rounded-md p-2 space-y-1.5 border border-slate-700/50"
         >
           <div className="flex items-center gap-1.5">
