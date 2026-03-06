@@ -24,3 +24,4 @@ anyhow = { workspace = true }
 axum = { workspace = true }
 config = { workspace = true }
 dotenvy = { workspace = true }
+rand = { workspace = true }

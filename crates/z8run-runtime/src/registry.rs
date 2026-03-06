@@ -117,4 +117,124 @@ impl PluginRegistry {
     pub async fn count(&self) -> usize {
         self.plugins.read().await.len()
     }
+
+    /// Returns the plugins directory path.
+    pub fn plugins_dir(&self) -> &Path {
+        &self.plugins_dir
+    }
+
+    /// Installs a plugin from a local .wasm file or directory.
+    ///
+    /// If `source` is a directory, it must contain manifest.toml + .wasm file.
+    /// If `source` is a .wasm file, a minimal manifest is auto-generated.
+    pub async fn install_local(&self, source: &Path) -> Result<String, RuntimeError> {
+        if !source.exists() {
+            return Err(RuntimeError::ModuleNotFound(source.display().to_string()));
+        }
+
+        if source.is_dir() {
+            // Source is a plugin directory — copy it into plugins_dir
+            let dir_name = source
+                .file_name()
+                .ok_or_else(|| RuntimeError::Manifest("Invalid directory name".into()))?;
+            let dest = self.plugins_dir.join(dir_name);
+
+            if dest.exists() {
+                return Err(RuntimeError::Manifest(format!(
+                    "Plugin directory '{}' already exists. Remove it first.",
+                    dest.display()
+                )));
+            }
+
+            copy_dir_recursive(source, &dest)?;
+            self.register_from_dir(&dest).await
+        } else if source.extension().map(|e| e == "wasm").unwrap_or(false) {
+            // Source is a single .wasm file — create a plugin directory with auto-manifest
+            let stem = source
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+            let plugin_dir = self.plugins_dir.join(stem);
+            std::fs::create_dir_all(&plugin_dir)
+                .map_err(|e| RuntimeError::ModuleLoad(format!("Failed to create plugin dir: {}", e)))?;
+
+            let wasm_filename = source
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("plugin.wasm");
+
+            // Copy the .wasm file
+            std::fs::copy(source, plugin_dir.join(wasm_filename))
+                .map_err(|e| RuntimeError::ModuleLoad(format!("Failed to copy wasm: {}", e)))?;
+
+            // Generate a manifest
+            let manifest = format!(
+                r#"name = "{}"
+version = "0.1.0"
+description = "Installed from {}"
+wasm_file = "{}"
+"#,
+                stem,
+                source.display(),
+                wasm_filename
+            );
+            std::fs::write(plugin_dir.join("manifest.toml"), manifest)
+                .map_err(|e| RuntimeError::Manifest(format!("Failed to write manifest: {}", e)))?;
+
+            self.register_from_dir(&plugin_dir).await
+        } else {
+            Err(RuntimeError::ModuleLoad(
+                "Source must be a .wasm file or a directory with manifest.toml".into(),
+            ))
+        }
+    }
+
+    /// Removes an installed plugin by name.
+    pub async fn remove(&self, name: &str) -> Result<(), RuntimeError> {
+        // Check if plugin exists in registry
+        let exists = self.plugins.read().await.contains_key(name);
+        if !exists {
+            return Err(RuntimeError::ModuleNotFound(format!(
+                "Plugin '{}' is not installed",
+                name
+            )));
+        }
+
+        // Remove plugin directory
+        let plugin_dir = self.plugins_dir.join(name);
+        if plugin_dir.exists() {
+            std::fs::remove_dir_all(&plugin_dir).map_err(|e| {
+                RuntimeError::ModuleLoad(format!("Failed to remove plugin directory: {}", e))
+            })?;
+        }
+
+        // Unregister from memory
+        self.plugins.write().await.remove(name);
+
+        Ok(())
+    }
+}
+
+/// Recursively copy a directory.
+fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), RuntimeError> {
+    std::fs::create_dir_all(dst)
+        .map_err(|e| RuntimeError::ModuleLoad(format!("Failed to create dir: {}", e)))?;
+
+    for entry in std::fs::read_dir(src)
+        .map_err(|e| RuntimeError::ModuleLoad(format!("Failed to read dir: {}", e)))?
+        .flatten()
+    {
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path).map_err(|e| {
+                RuntimeError::ModuleLoad(format!("Failed to copy file: {}", e))
+            })?;
+        }
+    }
+
+    Ok(())
 }

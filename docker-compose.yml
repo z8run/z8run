@@ -10,6 +10,7 @@ services:
       Z8_DB_URL: "postgres://z8run:${POSTGRES_PASSWORD:-z8run_secret}@host.docker.internal:5432/z8run"
       Z8_DATA_DIR: "/app/data"
       Z8_LOG_LEVEL: "${Z8_LOG_LEVEL:-info}"
+      Z8_JWT_SECRET: "${Z8_JWT_SECRET}"
       Z8_VAULT_SECRET: "${Z8_VAULT_SECRET:-change-me-in-production}"
     extra_hosts:
       - "host.docker.internal:host-gateway"

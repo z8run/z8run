@@ -67,14 +67,14 @@ enum Commands {
 enum PluginAction {
     /// List installed plugins
     List,
-    /// Install a plugin from the registry
+    /// Install a plugin from a local .wasm file or directory
     Install {
-        /// Plugin name
-        name: String,
+        /// Path to .wasm file or plugin directory with manifest.toml
+        source: String,
     },
-    /// Uninstall a plugin
+    /// Uninstall a plugin by name
     Remove {
-        /// Plugin name
+        /// Plugin name (as shown in 'plugin list')
         name: String,
     },
     /// Scan the plugin directory
@@ -149,7 +149,26 @@ async fn cmd_serve(
     // Initialize storage (PostgreSQL or SQLite based on URL)
     let url = db_url.unwrap_or_else(|| format!("sqlite://{}/z8run.db?mode=rwc", data_dir));
 
-    let jwt_secret = "z8run-dev-secret".to_string(); // TODO: generate or load from config
+    // JWT secret: required in production, auto-generated for development
+    let jwt_secret = match std::env::var("Z8_JWT_SECRET") {
+        Ok(secret) if !secret.is_empty() => {
+            tracing::info!("JWT secret loaded from Z8_JWT_SECRET");
+            secret
+        }
+        _ => {
+            if url.starts_with("postgres") || url.starts_with("mysql") {
+                anyhow::bail!(
+                    "Z8_JWT_SECRET is required when using PostgreSQL or MySQL. \
+                     Generate one with: openssl rand -base64 32"
+                );
+            }
+            let dev_secret: String = (0..32)
+                .map(|_| format!("{:02x}", rand::random::<u8>()))
+                .collect();
+            tracing::warn!("No Z8_JWT_SECRET set — generated ephemeral secret (tokens won't survive restarts)");
+            dev_secret
+        }
+    };
     let vault_secret = std::env::var("Z8_VAULT_SECRET").unwrap_or_else(|_| jwt_secret.clone());
 
     let (storage, user_storage, vault): (
@@ -254,15 +273,26 @@ async fn cmd_plugin(action: PluginAction, data_dir: &str) -> anyhow::Result<()> 
                 }
             }
         }
-        PluginAction::Install { name } => {
-            println!("Installing plugin: {}", name);
-            // TODO: download from remote registry
-            println!("Pending functionality: download from remote registry");
+        PluginAction::Install { source } => {
+            let source_path = std::path::Path::new(&source);
+            println!("Installing plugin from: {}", source);
+            match registry.install_local(source_path).await {
+                Ok(name) => println!("✓ Plugin '{}' installed successfully", name),
+                Err(e) => {
+                    eprintln!("✗ Failed to install plugin: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         PluginAction::Remove { name } => {
-            println!("Uninstalling plugin: {}", name);
-            // TODO: remove from plugin directory
-            println!("Pending functionality");
+            println!("Removing plugin: {}", name);
+            match registry.remove(&name).await {
+                Ok(()) => println!("✓ Plugin '{}' removed successfully", name),
+                Err(e) => {
+                    eprintln!("✗ Failed to remove plugin: {}", e);
+                    std::process::exit(1);
+                }
+            }
         }
         PluginAction::Scan => {
             let count = registry.scan().await?;
