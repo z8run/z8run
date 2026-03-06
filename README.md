@@ -13,6 +13,7 @@
   <a href="https://github.com/z8run/z8run/releases"><img src="https://img.shields.io/github/v/release/z8run/z8run?style=flat-square&color=06B6D4" alt="Release" /></a>
   <a href="LICENSE-MIT"><img src="https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue?style=flat-square" alt="License" /></a>
   <a href="https://github.com/z8run/z8run/stargazers"><img src="https://img.shields.io/github/stars/z8run/z8run?style=flat-square" alt="Stars" /></a>
+    <a href="https://hub.docker.com/r/z8run/z8run"><img src="https://img.shields.io/docker/pulls/z8run/z8run?style=flat-square&color=2496ED" alt="Docker Pulls" /></a>a>
 </p>
 
 ---
