@@ -68,11 +68,18 @@ enum PluginAction {
     /// List installed plugins
     List,
     /// Install a plugin from a local .wasm file or directory
+    ///
+    /// Examples:
+    ///   z8run plugin install ./csv-parser.wasm
+    ///   z8run plugin install ./plugins/json-transform/
     Install {
         /// Path to .wasm file or plugin directory with manifest.toml
         source: String,
     },
     /// Uninstall a plugin by name
+    ///
+    /// Examples:
+    ///   z8run plugin remove csv-parser
     Remove {
         /// Plugin name (as shown in 'plugin list')
         name: String,
