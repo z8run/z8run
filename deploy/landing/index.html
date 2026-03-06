@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>z8run — Visual Flow Engine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #fafafa;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 2rem;
+        }
+        .logo {
+            font-size: 4rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+        .tagline {
+            font-size: 1.25rem;
+            color: #a1a1aa;
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+        }
+        .cta {
+            display: inline-block;
+            padding: 0.875rem 2rem;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            text-decoration: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: opacity 0.2s;
+        }
+        .cta:hover { opacity: 0.9; }
+        .links {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+        }
+        .links a {
+            color: #71717a;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+        .links a:hover { color: #fafafa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="logo">z8run</h1>
+        <p class="tagline">
+            Open-source visual flow engine.<br>
+            Build, connect, and automate — powered by Rust.
+        </p>
+        <a href="https://app.z8run.org" class="cta">Open Editor</a>
+        <div class="links">
+            <a href="https://github.com/poolcamacho/z8run">GitHub</a>
+            <a href="https://app.z8run.org">Documentation</a>
+        </div>
+    </div>
+</body>
+</html>

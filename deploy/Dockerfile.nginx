@@ -9,3 +9,4 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=builder /build/dist /var/www/html
+COPY deploy/landing/ /var/www/landing/
