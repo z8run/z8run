@@ -5,15 +5,18 @@
 <h3 align="center">Next Generation Visual Flow Engine</h3>
 
 <p align="center">
-  Build, connect, and automate anything — visually.
+  Build, connect, and automate anything - visually.
 </p>
 
 <p align="center">
-  <a href="https://github.com/z8run/z8run/actions/workflows/ci.yml"><img src="https://github.com/z8run/z8run/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/z8run/z8run/actions/workflows/deploy.yml"><img src="https://github.com/z8run/z8run/actions/workflows/deploy.yml/badge.svg" alt="Deploy" /></a>
   <a href="https://github.com/z8run/z8run/releases"><img src="https://img.shields.io/github/v/release/z8run/z8run?style=flat-square&color=06B6D4" alt="Release" /></a>
   <a href="https://github.com/z8run/z8run/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue?style=flat-square" alt="License" /></a>
   <a href="https://github.com/z8run/z8run/stargazers"><img src="https://img.shields.io/github/stars/z8run/z8run?style=flat-square" alt="Stars" /></a>
   <a href="https://github.com/z8run/z8run/pkgs/container/z8run-api"><img src="https://img.shields.io/badge/ghcr.io-z8run--api-2496ED?style=flat-square&logo=docker" alt="Container Registry" /></a>
+  <a href="https://crates.io/crates/z8run"><img src="https://img.shields.io/crates/v/z8run?style=flat-square&color=e6522c" alt="Crates.io" /></a>
+  <a href="https://github.com/z8run/z8run/issues"><img src="https://img.shields.io/github/issues/z8run/z8run?style=flat-square" alt="Issues" /></a>
+  <a href="https://github.com/z8run/z8run/graphs/contributors"><img src="https://img.shields.io/github/contributors/z8run/z8run?style=flat-square" alt="Contributors" /></a>
 </p>
 
 ---
