@@ -1,0 +1,12 @@
+# Override file for local builds.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.build.yml build
+services:
+  z8run:
+    build: .
+    image: z8run-api:local
+
+  nginx:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.nginx
+    image: z8run-nginx:local

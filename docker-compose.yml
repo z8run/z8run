@@ -1,7 +1,7 @@
 services:
   # ── z8run backend (API + WebSocket) ──────────────────────
   z8run:
-    build: .
+    image: ghcr.io/z8run/z8run-api:latest
     container_name: z8run
     restart: unless-stopped
     environment:
@@ -20,9 +20,7 @@ services:
 
   # ── Nginx (frontend + reverse proxy) ─────────────────────
   nginx:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile.nginx
+    image: ghcr.io/z8run/z8run-nginx:latest
     container_name: z8run-web
     restart: unless-stopped
     depends_on:
