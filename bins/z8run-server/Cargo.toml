@@ -4,6 +4,7 @@ description = "Binario del servidor z8run con frontend embebido"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [[bin]]
 name = "z8run-server"

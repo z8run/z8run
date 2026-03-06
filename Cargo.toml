@@ -23,12 +23,12 @@ keywords = ["flow-engine", "automation", "visual-programming", "workflow", "node
 categories = ["development-tools", "visualization"]
 
 [workspace.dependencies]
-# Internal crates
-z8run-core = { path = "crates/z8run-core" }
-z8run-protocol = { path = "crates/z8run-protocol" }
-z8run-storage = { path = "crates/z8run-storage" }
-z8run-runtime = { path = "crates/z8run-runtime" }
-z8run-api = { path = "crates/z8run-api" }
+# Internal crates (path for local dev, version for crates.io publish)
+z8run-core = { path = "crates/z8run-core", version = "0.1.0" }
+z8run-protocol = { path = "crates/z8run-protocol", version = "0.1.0" }
+z8run-storage = { path = "crates/z8run-storage", version = "0.1.0" }
+z8run-runtime = { path = "crates/z8run-runtime", version = "0.1.0" }
+z8run-api = { path = "crates/z8run-api", version = "0.1.0" }
 
 # Async runtime
 tokio = { version = "1.49", features = ["full"] }
