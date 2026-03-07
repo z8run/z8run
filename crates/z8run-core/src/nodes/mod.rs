@@ -3,8 +3,11 @@
 //! These are the native nodes shipped with z8run.
 //! Each implements `NodeExecutor` and has a corresponding factory.
 
+pub mod aggregator;
 pub mod ai_agent;
+pub mod batch;
 pub mod classifier;
+pub mod csv_node;
 pub mod database;
 pub mod debug;
 pub mod delay;
@@ -117,5 +120,18 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .await;
     engine
         .register_node_type(Arc::new(image_gen::ImageGenNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+
+    // Data Engineering nodes
+    engine
+        .register_node_type(Arc::new(csv_node::CsvNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(
+            Arc::new(aggregator::AggregatorNodeFactory) as Arc<dyn NodeExecutorFactory>,
+        )
+        .await;
+    engine
+        .register_node_type(Arc::new(batch::BatchNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
 }

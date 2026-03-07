@@ -1,62 +1,15 @@
 import {
   NODE_CATEGORIES,
   NODE_DEFINITIONS,
+  NODE_ICON_MAP,
   type NodeDefinition,
 } from "@/lib/nodeDefinitions";
 import { CATEGORY_COLORS, type NodeCategory } from "@/types/flow";
 import { Search } from "lucide-react";
-import {
-  AlignLeft,
-  Bot,
-  Braces,
-  Brain,
-  Bug,
-  Clock,
-  Code,
-  Database,
-  FileText,
-  Filter,
-  Fingerprint,
-  GitBranch,
-  Globe,
-  Image,
-  Radio,
-  Scissors,
-  Send,
-  Tags,
-  Timer,
-  Webhook,
-} from "lucide-react";
 import { useCallback, useState } from "react";
 
-const ICON_MAP: Record<
-  string,
-  React.ComponentType<{ size?: number; className?: string }>
-> = {
-  Globe,
-  Clock,
-  Webhook,
-  Code,
-  Braces,
-  Filter,
-  Bug,
-  Send,
-  GitBranch,
-  Timer,
-  Database,
-  Radio,
-  Brain,
-  Fingerprint,
-  Tags,
-  FileText,
-  Scissors,
-  AlignLeft,
-  Bot,
-  Image,
-};
-
 function PaletteNode({ def }: { def: NodeDefinition }) {
-  const Icon = ICON_MAP[def.icon];
+  const Icon = NODE_ICON_MAP[def.icon];
   const color = CATEGORY_COLORS[def.category];
 
   const onDragStart = useCallback(

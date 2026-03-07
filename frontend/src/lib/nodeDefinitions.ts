@@ -1,4 +1,59 @@
 import type { NodeCategory, PortDefinition, Z8NodeData } from "@/types/flow";
+import {
+  AlignLeft,
+  Bot,
+  Braces,
+  Brain,
+  Bug,
+  Calculator,
+  Clock,
+  Code,
+  Database,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  Fingerprint,
+  GitBranch,
+  Globe,
+  Image,
+  Layers,
+  Radio,
+  Scissors,
+  Send,
+  Tags,
+  Timer,
+  Webhook,
+} from "lucide-react";
+
+/** Centralized icon registry — add new icons here only. */
+export const NODE_ICON_MAP: Record<
+  string,
+  React.ComponentType<{ size?: number; className?: string }>
+> = {
+  Globe,
+  Clock,
+  Webhook,
+  Code,
+  Braces,
+  Filter,
+  Bug,
+  Send,
+  GitBranch,
+  Timer,
+  Database,
+  Radio,
+  Brain,
+  Fingerprint,
+  Tags,
+  FileText,
+  Scissors,
+  AlignLeft,
+  Bot,
+  Image,
+  FileSpreadsheet,
+  Calculator,
+  Layers,
+};
 
 export interface NodeDefinition {
   type: string;
@@ -53,7 +108,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     description: "Run custom JavaScript",
     inputs: [{ id: "input", name: "Input", type: "any" }],
     outputs: [{ id: "output", name: "Output", type: "any" }],
-    defaultConfig: { code: "return msg;" },
+    defaultConfig: { code: "return msg;", language: "javascript" },
   },
   {
     type: "json",
@@ -202,13 +257,66 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     },
   },
 
+  // Data Engineering nodes
+  {
+    type: "csv",
+    label: "CSV",
+    category: "data",
+    icon: "FileSpreadsheet",
+    description: "Parse CSV to JSON or stringify JSON to CSV",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "output", name: "Output", type: "any" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      action: "parse",
+      delimiter: ",",
+      hasHeaders: true,
+      columns: [],
+    },
+  },
+  {
+    type: "aggregator",
+    label: "Aggregator",
+    category: "data",
+    icon: "Calculator",
+    description: "Aggregate data: count, sum, avg, min, max, group by",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "output", name: "Output", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      operation: "count",
+      field: "",
+      groupBy: "",
+    },
+  },
+  {
+    type: "batch",
+    label: "Batch",
+    category: "process",
+    icon: "Layers",
+    description: "Split arrays into chunks for batch processing",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "output", name: "Output", type: "array" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      size: 100,
+      field: "",
+    },
+  },
+
   // AI nodes
   {
     type: "llm",
     label: "LLM",
     category: "ai",
     icon: "Brain",
-    description: "AI language model (OpenAI, Anthropic, Ollama)",
+    description: "AI language model with vision support (OpenAI, Anthropic, Ollama)",
     inputs: [{ id: "input", name: "Input", type: "any" }],
     outputs: [
       { id: "response", name: "Response", type: "object" },
@@ -222,6 +330,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       systemPrompt: "",
       temperature: 0.7,
       maxTokens: 1024,
+      vision: false,
       timeout: 30000,
     },
   },

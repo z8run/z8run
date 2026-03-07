@@ -23,7 +23,14 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.1",
     "tailwind-merge": "^2.6.0",
-    "zustand": "^5.0.3"
+    "zustand": "^5.0.3",
+    "@uiw/react-codemirror": "^4.23.0",
+    "@codemirror/lang-javascript": "^6.2.0",
+    "@codemirror/lang-python": "^6.1.0",
+    "@codemirror/lang-sql": "^6.7.0",
+    "@codemirror/lang-json": "^6.0.0",
+    "@codemirror/lang-rust": "^6.0.0",
+    "@codemirror/view": "^6.26.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

@@ -13,6 +13,11 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import {
+  CodeEditor,
+  type CodeLanguage,
+  detectLanguage,
+} from "@/components/ui/CodeEditor";
 
 const STATUS_BADGES: Record<
   NodeStatus,
@@ -72,12 +77,40 @@ function SmartConfigField({
   value,
   nodeType,
   onChange,
+  allConfig,
+  onConfigChange,
+  nodeLabel,
 }: {
   fieldKey: string;
   value: unknown;
   nodeType: string;
   onChange: (val: unknown) => void;
+  allConfig?: Record<string, unknown>;
+  onConfigChange?: (key: string, val: unknown) => void;
+  nodeLabel?: string;
 }) {
+  // --- CODE EDITOR with language selector ---
+  if (fieldKey === "code") {
+    const codeValue = String(value ?? "");
+    const currentLang =
+      (allConfig?.language as CodeLanguage) || detectLanguage(codeValue);
+
+    return (
+      <CodeEditor
+        code={codeValue}
+        language={currentLang}
+        onCodeChange={(newCode) => onChange(newCode)}
+        onLanguageChange={(lang) => {
+          if (onConfigChange) {
+            onConfigChange("language", lang);
+          }
+        }}
+        placeholder="// Write your code here..."
+        nodeLabel={nodeLabel}
+      />
+    );
+  }
+
   // Method dropdown for HTTP nodes
   if (fieldKey === "method") {
     return (
@@ -159,6 +192,104 @@ function SmartConfigField({
         <option value="stringify">Stringify (object → string)</option>
         <option value="extract">Extract (dot-notation path)</option>
       </select>
+    );
+  }
+
+  // Action dropdown for CSV node
+  if (fieldKey === "action" && nodeType === "csv") {
+    return (
+      <select
+        value={String(value ?? "parse")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="parse">Parse (CSV → JSON)</option>
+        <option value="stringify">Stringify (JSON → CSV)</option>
+      </select>
+    );
+  }
+
+  // Delimiter dropdown for CSV node
+  if (fieldKey === "delimiter" && nodeType === "csv") {
+    return (
+      <select
+        value={String(value ?? ",")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value=",">, (comma)</option>
+        <option value=";">; (semicolon)</option>
+        <option value="tab">Tab</option>
+        <option value="|">| (pipe)</option>
+      </select>
+    );
+  }
+
+  // Operation dropdown for Aggregator node
+  if (fieldKey === "operation" && nodeType === "aggregator") {
+    return (
+      <select
+        value={String(value ?? "count")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="count">Count</option>
+        <option value="sum">Sum</option>
+        <option value="avg">Average</option>
+        <option value="min">Min</option>
+        <option value="max">Max</option>
+        <option value="group_by">Group By</option>
+      </select>
+    );
+  }
+
+  // Field input for Aggregator node
+  if (
+    (fieldKey === "field" || fieldKey === "groupBy") &&
+    nodeType === "aggregator"
+  ) {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={
+          fieldKey === "field"
+            ? "e.g. amount, price, score"
+            : "e.g. category, status, region"
+        }
+        className={inputClass}
+      />
+    );
+  }
+
+  // Batch size input
+  if (fieldKey === "size" && nodeType === "batch") {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          value={Number(value ?? 100)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          min={1}
+          step={10}
+          className={inputClass}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">items/batch</span>
+      </div>
+    );
+  }
+
+  // Batch field input
+  if (fieldKey === "field" && nodeType === "batch") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="auto-detect (rows, data, results)"
+        className={inputClass}
+      />
     );
   }
 
@@ -245,16 +376,17 @@ function SmartConfigField({
     );
   }
 
-  // Query textarea for database
+  // Query editor for database — uses CodeEditor with SQL locked in
   if (fieldKey === "query" && nodeType === "database") {
     return (
-      <textarea
-        value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
-        rows={4}
+      <CodeEditor
+        code={String(value ?? "")}
+        language="sql"
+        onCodeChange={(newCode) => onChange(newCode)}
+        onLanguageChange={() => {}}
         placeholder="SELECT * FROM users WHERE id = $1"
-        className={`${inputClass} resize-y`}
-        spellCheck={false}
+        minHeight="80px"
+        maxHeight="200px"
       />
     );
   }
@@ -562,13 +694,14 @@ function SmartConfigField({
   // --- STRUCTURED OUTPUT ---
   if (fieldKey === "schema" && nodeType === "structured-output") {
     return (
-      <textarea
-        value={String(value ?? "{}")}
-        onChange={(e) => onChange(e.target.value)}
+      <CodeEditor
+        code={String(value ?? "{}")}
+        language="json"
+        onCodeChange={(newCode) => onChange(newCode)}
+        onLanguageChange={() => {}}
         placeholder='{"type":"object","properties":{"name":{"type":"string"}}}'
-        rows={5}
-        className={`${inputClass} resize-y`}
-        spellCheck={false}
+        minHeight="100px"
+        maxHeight="250px"
       />
     );
   }
@@ -631,13 +764,14 @@ function SmartConfigField({
   // --- AI AGENT ---
   if (fieldKey === "tools" && nodeType === "ai-agent") {
     return (
-      <textarea
-        value={String(value ?? "[]")}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder='[{"name":"search","description":"Search the web","parameters":{"type":"object","properties":{"query":{"type":"string"}}}}]'
-        rows={6}
-        className={`${inputClass} resize-y`}
-        spellCheck={false}
+      <CodeEditor
+        code={String(value ?? "[]")}
+        language="json"
+        onCodeChange={(newCode) => onChange(newCode)}
+        onLanguageChange={() => {}}
+        placeholder='[{"name":"search","description":"Search the web","parameters":{...}}]'
+        minHeight="100px"
+        maxHeight="250px"
       />
     );
   }
@@ -813,6 +947,23 @@ function SmartConfigField({
     );
   }
 
+  // Vision toggle for LLM node
+  if (fieldKey === "vision" && nodeType === "llm") {
+    return (
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onChange(e.target.checked)}
+          className="rounded border-slate-600 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+        />
+        <span className="text-[11px] text-slate-300">
+          Enable image analysis (GPT-4o, Claude, LLaVA)
+        </span>
+      </label>
+    );
+  }
+
   // No smart field
   return null;
 }
@@ -829,8 +980,13 @@ function hasSmartField(key: string, nodeType: string): boolean {
     "image-gen",
   ];
   return (
-    ["method", "statusCode", "url", "timeout"].includes(key) ||
-    (key === "action" && (nodeType === "json" || nodeType === "mqtt")) ||
+    ["method", "statusCode", "url", "timeout", "code"].includes(key) ||
+    (key === "action" &&
+      ["json", "mqtt", "csv"].includes(nodeType)) ||
+    (nodeType === "csv" && ["delimiter", "hasHeaders"].includes(key)) ||
+    (nodeType === "aggregator" &&
+      ["operation", "field", "groupBy"].includes(key)) ||
+    (nodeType === "batch" && ["size", "field"].includes(key)) ||
     key === "unit" ||
     (nodeType === "database" &&
       [
@@ -853,6 +1009,7 @@ function hasSmartField(key: string, nodeType: string): boolean {
         "maxTokens",
         "categories",
         "context",
+        "vision",
       ].includes(key)) ||
     (nodeType === "prompt-template" && ["template"].includes(key)) ||
     (nodeType === "text-splitter" &&
@@ -1118,6 +1275,14 @@ export function ConfigPanel() {
             </div>
             <div className="space-y-2.5">
               {Object.entries(config).map(([key, value]) => {
+                // Hide language field when it's paired with a code field (handled by CodeEditor)
+                if (
+                  key === "language" &&
+                  config.code !== undefined
+                ) {
+                  return null;
+                }
+
                 // Switch rules get a dedicated editor
                 if (
                   key === "rules" &&
@@ -1154,6 +1319,9 @@ export function ConfigPanel() {
                         value={value}
                         nodeType={nodeType}
                         onChange={(val) => handleConfigChange(key, val)}
+                        allConfig={config}
+                        onConfigChange={handleConfigChange}
+                        nodeLabel={data.label}
                       />
                     ) : typeof value === "string" &&
                       (key === "code" || value.length > 50) ? (

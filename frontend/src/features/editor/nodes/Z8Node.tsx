@@ -1,54 +1,10 @@
+import { NODE_ICON_MAP } from "@/lib/nodeDefinitions";
 import { useUIStore } from "@/stores/uiStore";
 import type { Z8NodeData } from "@/types/flow";
 import { CATEGORY_COLORS, PORT_COLORS } from "@/types/flow";
 import { Handle, type NodeProps, Position, useReactFlow } from "@xyflow/react";
-import {
-  AlignLeft,
-  Bot,
-  Braces,
-  Brain,
-  Bug,
-  Clock,
-  Code,
-  Database,
-  FileText,
-  Filter,
-  Fingerprint,
-  GitBranch,
-  Globe,
-  Image,
-  Radio,
-  Scissors,
-  Send,
-  Tags,
-  Timer,
-  Webhook,
-  X,
-} from "lucide-react";
+import { X } from "lucide-react";
 import { memo, useCallback } from "react";
-
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number }>> = {
-  Globe,
-  Clock,
-  Webhook,
-  Code,
-  Braces,
-  Filter,
-  Bug,
-  Send,
-  GitBranch,
-  Timer,
-  Database,
-  Radio,
-  Brain,
-  Fingerprint,
-  Tags,
-  FileText,
-  Scissors,
-  AlignLeft,
-  Bot,
-  Image,
-};
 
 const STATUS_STYLES: Record<string, string> = {
   idle: "border-slate-600",
@@ -83,7 +39,7 @@ function Z8NodeComponent({ id, data, selected }: NodeProps) {
     const category = nodeData?.category ?? "process";
     const label = nodeData?.label ?? nodeData?.type ?? "Node";
 
-    const Icon = ICON_MAP[icon];
+    const Icon = NODE_ICON_MAP[icon];
     const categoryColor =
       (CATEGORY_COLORS as Record<string, string>)[category] ?? "#6366f1";
     const status = nodeData?.status ?? "idle";

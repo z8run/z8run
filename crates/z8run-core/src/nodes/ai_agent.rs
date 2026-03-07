@@ -1,11 +1,17 @@
-//! AI Agent node: LLM with tool-use capability.
+//! AI Agent node: LLM with multi-turn tool-use capability.
 //!
-//! Supports multi-turn agent loops with function calling.
+//! Supports iterative agent loops with function calling.
 //! Supports OpenAI, Anthropic, and Ollama providers.
+//!
+//! The agent maintains conversation history across tool calls:
+//! 1. First call: sends user message → LLM may return text or tool_call
+//! 2. If tool_call: emits on "tool_call" port with conversation_history
+//! 3. When receiving a tool_result (with conversation_history), continues the loop
+//! 4. Repeats until text response or maxIterations reached
 //!
 //! Outputs:
 //!   - "response" port: Final text response from agent
-//!   - "tool_call" port: When agent wants to call a tool (tool_name, arguments, iteration)
+//!   - "tool_call" port: When agent wants to call a tool (includes conversation_history)
 //!   - "error" port: API or configuration errors
 
 use crate::engine::{EngineEvent, NodeExecutor, NodeExecutorFactory};
@@ -40,80 +46,178 @@ pub struct AiAgentNode {
     node_id: Option<Uuid>,
 }
 
+/// Represents the result of a single LLM call.
+enum AgentStep {
+    /// Agent returned a text response (no tool call).
+    TextResponse(String),
+    /// Agent wants to call a tool.
+    ToolCall {
+        tool_name: String,
+        arguments: serde_json::Value,
+        tool_call_id: String,
+    },
+}
+
 #[async_trait::async_trait]
 impl NodeExecutor for AiAgentNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        // Extract user message
-        let user_message = extract_text(&msg.payload);
+        let client = reqwest::Client::new();
+        let timeout = std::time::Duration::from_millis(self.timeout_ms);
 
-        if user_message.is_empty() {
-            let err = serde_json::json!({
-                "error": "No message text found in payload"
+        // Check if this is a continuation (tool_result coming back)
+        let (mut history, iteration) = if let Some(history_val) =
+            msg.payload.get("conversation_history")
+        {
+            let history: Vec<serde_json::Value> = history_val
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            let iter = msg
+                .payload
+                .get("iteration")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1) as u32;
+
+            // Append tool result to history
+            let tool_result = msg
+                .payload
+                .get("tool_result")
+                .cloned()
+                .unwrap_or(serde_json::json!(""));
+            let tool_call_id = msg
+                .payload
+                .get("tool_call_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("call_0")
+                .to_string();
+
+            let mut h = history;
+            match self.provider.as_str() {
+                "anthropic" => {
+                    h.push(serde_json::json!({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": tool_call_id,
+                            "content": tool_result.as_str().unwrap_or(&tool_result.to_string())
+                        }]
+                    }));
+                }
+                _ => {
+                    // OpenAI format
+                    h.push(serde_json::json!({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": tool_result.as_str().unwrap_or(&tool_result.to_string())
+                    }));
+                }
+            }
+
+            (h, iter + 1)
+        } else {
+            // Fresh conversation
+            let user_message = extract_text(&msg.payload);
+            if user_message.is_empty() {
+                let err = serde_json::json!({"error": "No message text found in payload"});
+                return Ok(vec![msg.derive(msg.source_node, "error", err)]);
+            }
+
+            let mut h = Vec::new();
+            if !self.system_prompt.is_empty() {
+                h.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
+            }
+            h.push(serde_json::json!({"role": "user", "content": user_message}));
+            (h, 1u32)
+        };
+
+        // Check iteration limit
+        if iteration > self.max_iterations {
+            warn!(
+                node = %self.name,
+                iteration,
+                max = self.max_iterations,
+                "Agent reached max iterations"
+            );
+            let payload = serde_json::json!({
+                "error": format!("Agent reached max iterations ({})", self.max_iterations),
+                "conversation_history": history,
+                "iteration": iteration,
             });
-            return Ok(vec![msg.derive(msg.source_node, "error", err)]);
+            return Ok(vec![msg.derive(msg.source_node, "error", payload)]);
         }
 
         info!(
             node = %self.name,
             provider = %self.provider,
             model = %self.model,
-            iteration = 1,
-            "AI agent processing message"
+            iteration,
+            "AI agent iteration"
         );
 
-        let client = reqwest::Client::new();
-        let timeout = std::time::Duration::from_millis(self.timeout_ms);
+        // Emit streaming event for iteration start
+        if let Some(tx) = &self.event_tx {
+            let _ = tx.send(EngineEvent::StreamChunk {
+                flow_id: msg.trace_id,
+                node_id: msg.source_node,
+                chunk: format!("[Agent iteration {}]", iteration),
+                done: false,
+            });
+        }
 
-        // For v1, we do a single LLM call
-        // In a real agent loop, you'd iterate on tool calls and feed results back
+        // Call LLM
         let result = match self.provider.as_str() {
             "anthropic" => {
-                self.call_anthropic_agent(&client, &user_message, timeout)
-                    .await
+                self.call_anthropic_agent(&client, &history, timeout).await
             }
             "ollama" => {
-                self.call_ollama_agent(&client, &user_message, timeout)
-                    .await
+                self.call_ollama_agent(&client, &history, timeout).await
             }
             _ => {
-                self.call_openai_agent(&client, &user_message, timeout)
-                    .await
+                self.call_openai_agent(&client, &history, timeout).await
             }
         };
 
         match result {
-            Ok(agent_response) => {
-                // Check if response contains a tool call
-                if let Some(tool_call) = extract_tool_call(&agent_response) {
-                    info!(
-                        node = %self.name,
-                        tool_name = %tool_call["tool_name"],
-                        "Agent requested tool call"
-                    );
-                    let mut payload = tool_call;
-                    payload["iteration"] = serde_json::Value::Number(1.into());
-                    Ok(vec![msg.derive(msg.source_node, "tool_call", payload)])
-                } else {
-                    // Extract text response
-                    let response_text = agent_response
-                        .get("text")
-                        .or_else(|| agent_response.get("content"))
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| agent_response.to_string());
+            Ok((step, assistant_msg)) => {
+                // Append assistant message to history
+                history.push(assistant_msg);
 
-                    info!(
-                        node = %self.name,
-                        chars = response_text.len(),
-                        "Agent response generated"
-                    );
-
-                    let payload = serde_json::json!({
-                        "text": response_text,
-                        "model": self.model,
-                        "provider": self.provider,
-                    });
-                    Ok(vec![msg.derive(msg.source_node, "response", payload)])
+                match step {
+                    AgentStep::ToolCall {
+                        tool_name,
+                        arguments,
+                        tool_call_id,
+                    } => {
+                        info!(
+                            node = %self.name,
+                            tool = %tool_name,
+                            iteration,
+                            "Agent requested tool call"
+                        );
+                        let payload = serde_json::json!({
+                            "tool_name": tool_name,
+                            "arguments": arguments,
+                            "tool_call_id": tool_call_id,
+                            "iteration": iteration,
+                            "conversation_history": history,
+                        });
+                        Ok(vec![msg.derive(msg.source_node, "tool_call", payload)])
+                    }
+                    AgentStep::TextResponse(text) => {
+                        info!(
+                            node = %self.name,
+                            chars = text.len(),
+                            iterations = iteration,
+                            "Agent completed"
+                        );
+                        let payload = serde_json::json!({
+                            "text": text,
+                            "model": self.model,
+                            "provider": self.provider,
+                            "iterations": iteration,
+                        });
+                        Ok(vec![msg.derive(msg.source_node, "response", payload)])
+                    }
                 }
             }
             Err(e) => {
@@ -121,6 +225,7 @@ impl NodeExecutor for AiAgentNode {
                 let payload = serde_json::json!({
                     "error": e,
                     "provider": self.provider,
+                    "iteration": iteration,
                 });
                 Ok(vec![msg.derive(msg.source_node, "error", payload)])
             }
@@ -155,20 +260,13 @@ impl NodeExecutor for AiAgentNode {
         if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
             self.timeout_ms = v;
         }
+        // Tools can come as array or JSON string
         if let Some(tools_arr) = config.get("tools").and_then(|v| v.as_array()) {
-            self.tools = tools_arr
-                .iter()
-                .filter_map(|t| {
-                    let name = t.get("name").and_then(|n| n.as_str())?;
-                    let description = t.get("description").and_then(|d| d.as_str())?;
-                    let parameters = t.get("parameters").cloned()?;
-                    Some(ToolDefinition {
-                        name: name.to_string(),
-                        description: description.to_string(),
-                        parameters,
-                    })
-                })
-                .collect();
+            self.tools = parse_tools(tools_arr);
+        } else if let Some(tools_str) = config.get("tools").and_then(|v| v.as_str()) {
+            if let Ok(parsed) = serde_json::from_str::<Vec<serde_json::Value>>(tools_str) {
+                self.tools = parse_tools(&parsed);
+            }
         }
         Ok(())
     }
@@ -191,25 +289,35 @@ impl NodeExecutor for AiAgentNode {
     }
 }
 
+fn parse_tools(arr: &[serde_json::Value]) -> Vec<ToolDefinition> {
+    arr.iter()
+        .filter_map(|t| {
+            let name = t.get("name").and_then(|n| n.as_str())?;
+            let description = t.get("description").and_then(|d| d.as_str())?;
+            let parameters = t.get("parameters").cloned()?;
+            Some(ToolDefinition {
+                name: name.to_string(),
+                description: description.to_string(),
+                parameters,
+            })
+        })
+        .collect()
+}
+
 impl AiAgentNode {
+    /// Call OpenAI API and return the agent step + raw assistant message for history.
     async fn call_openai_agent(
         &self,
         client: &reqwest::Client,
-        user_message: &str,
+        messages: &[serde_json::Value],
         timeout: std::time::Duration,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<(AgentStep, serde_json::Value), String> {
         let base = if self.base_url.is_empty() {
             "https://api.openai.com/v1"
         } else {
             &self.base_url
         };
         let url = format!("{}/chat/completions", base);
-
-        let mut messages = Vec::new();
-        if !self.system_prompt.is_empty() {
-            messages.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
-        }
-        messages.push(serde_json::json!({"role": "user", "content": user_message}));
 
         let mut body = serde_json::json!({
             "model": self.model,
@@ -218,7 +326,6 @@ impl AiAgentNode {
             "max_tokens": 2048,
         });
 
-        // Add tools if available
         if !self.tools.is_empty() {
             let tools_json: Vec<serde_json::Value> = self
                 .tools
@@ -260,34 +367,50 @@ impl AiAgentNode {
         let json: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
 
-        // Check for tool use
-        if let Some(tool_calls) = json["choices"][0]["message"]["tool_calls"].as_array() {
-            if !tool_calls.is_empty() {
-                let tool_call = &tool_calls[0];
-                return Ok(serde_json::json!({
-                    "tool_name": tool_call.get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()).unwrap_or("unknown"),
-                    "arguments": tool_call.get("function").and_then(|f| f.get("arguments")).cloned().unwrap_or(serde_json::json!({})),
-                }));
+        let assistant_msg = json["choices"][0]["message"].clone();
+
+        // Check for tool calls
+        if let Some(tool_calls) = assistant_msg["tool_calls"].as_array() {
+            if let Some(tc) = tool_calls.first() {
+                let tool_name = tc["function"]["name"]
+                    .as_str()
+                    .unwrap_or("unknown")
+                    .to_string();
+                let arguments_str = tc["function"]["arguments"]
+                    .as_str()
+                    .unwrap_or("{}");
+                let arguments = serde_json::from_str(arguments_str)
+                    .unwrap_or(serde_json::json!({}));
+                let tool_call_id = tc["id"]
+                    .as_str()
+                    .unwrap_or("call_0")
+                    .to_string();
+
+                return Ok((
+                    AgentStep::ToolCall {
+                        tool_name,
+                        arguments,
+                        tool_call_id,
+                    },
+                    assistant_msg,
+                ));
             }
         }
 
-        // Otherwise return text content
-        let content = json["choices"][0]["message"]["content"]
+        let content = assistant_msg["content"]
             .as_str()
             .unwrap_or("")
             .to_string();
-
-        Ok(serde_json::json!({
-            "text": content,
-        }))
+        Ok((AgentStep::TextResponse(content), assistant_msg))
     }
 
+    /// Call Anthropic API.
     async fn call_anthropic_agent(
         &self,
         client: &reqwest::Client,
-        user_message: &str,
+        messages: &[serde_json::Value],
         timeout: std::time::Duration,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<(AgentStep, serde_json::Value), String> {
         let base = if self.base_url.is_empty() {
             "https://api.anthropic.com/v1"
         } else {
@@ -295,17 +418,23 @@ impl AiAgentNode {
         };
         let url = format!("{}/messages", base);
 
+        // Separate system message from conversation messages
+        let (system_msg, conv_messages): (Vec<_>, Vec<_>) = messages
+            .iter()
+            .partition(|m| m.get("role").and_then(|r| r.as_str()) == Some("system"));
+
         let mut body = serde_json::json!({
             "model": self.model,
             "max_tokens": 2048,
-            "messages": [{"role": "user", "content": user_message}],
+            "messages": conv_messages,
         });
 
-        if !self.system_prompt.is_empty() {
-            body["system"] = serde_json::Value::String(self.system_prompt.clone());
+        if let Some(sys) = system_msg.first() {
+            if let Some(content) = sys.get("content").and_then(|c| c.as_str()) {
+                body["system"] = serde_json::Value::String(content.to_string());
+            }
         }
 
-        // Add tools if available
         if !self.tools.is_empty() {
             let tools_json: Vec<serde_json::Value> = self
                 .tools
@@ -348,35 +477,52 @@ impl AiAgentNode {
         let json: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
 
+        let assistant_msg = serde_json::json!({
+            "role": "assistant",
+            "content": json["content"]
+        });
+
         // Check for tool use in content blocks
         if let Some(content) = json["content"].as_array() {
             for block in content {
                 if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-                    return Ok(serde_json::json!({
-                        "tool_name": block.get("name").and_then(|n| n.as_str()).unwrap_or("unknown"),
-                        "arguments": block.get("input").cloned().unwrap_or(serde_json::json!({})),
-                    }));
+                    let tool_name = block["name"]
+                        .as_str()
+                        .unwrap_or("unknown")
+                        .to_string();
+                    let arguments = block["input"].clone();
+                    let tool_call_id = block["id"]
+                        .as_str()
+                        .unwrap_or("call_0")
+                        .to_string();
+
+                    return Ok((
+                        AgentStep::ToolCall {
+                            tool_name,
+                            arguments,
+                            tool_call_id,
+                        },
+                        assistant_msg,
+                    ));
                 }
             }
         }
 
-        // Otherwise return text content
+        // Text response
         let content = json["content"][0]["text"]
             .as_str()
             .unwrap_or("")
             .to_string();
-
-        Ok(serde_json::json!({
-            "text": content,
-        }))
+        Ok((AgentStep::TextResponse(content), assistant_msg))
     }
 
+    /// Call Ollama API (no tool support yet, but returns same format).
     async fn call_ollama_agent(
         &self,
         client: &reqwest::Client,
-        user_message: &str,
+        messages: &[serde_json::Value],
         timeout: std::time::Duration,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<(AgentStep, serde_json::Value), String> {
         let base = if self.base_url.is_empty() {
             "http://localhost:11434"
         } else {
@@ -384,13 +530,7 @@ impl AiAgentNode {
         };
         let url = format!("{}/api/chat", base);
 
-        let mut messages = Vec::new();
-        if !self.system_prompt.is_empty() {
-            messages.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
-        }
-        messages.push(serde_json::json!({"role": "user", "content": user_message}));
-
-        let body = serde_json::json!({
+        let mut body = serde_json::json!({
             "model": self.model,
             "messages": messages,
             "stream": false,
@@ -399,6 +539,25 @@ impl AiAgentNode {
                 "num_predict": 2048,
             }
         });
+
+        // Ollama supports tools for models like llama3.1+
+        if !self.tools.is_empty() {
+            let tools_json: Vec<serde_json::Value> = self
+                .tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.parameters,
+                        }
+                    })
+                })
+                .collect();
+            body["tools"] = serde_json::Value::Array(tools_json);
+        }
 
         let resp = client
             .post(&url)
@@ -422,24 +581,34 @@ impl AiAgentNode {
         let json: serde_json::Value =
             serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
 
+        let assistant_msg = json["message"].clone();
+
+        // Check for tool calls (Ollama format)
+        if let Some(tool_calls) = json["message"]["tool_calls"].as_array() {
+            if let Some(tc) = tool_calls.first() {
+                let tool_name = tc["function"]["name"]
+                    .as_str()
+                    .unwrap_or("unknown")
+                    .to_string();
+                let arguments = tc["function"]["arguments"].clone();
+
+                return Ok((
+                    AgentStep::ToolCall {
+                        tool_name,
+                        arguments,
+                        tool_call_id: "call_0".to_string(),
+                    },
+                    assistant_msg,
+                ));
+            }
+        }
+
         let content = json["message"]["content"]
             .as_str()
             .unwrap_or("")
             .to_string();
-
-        Ok(serde_json::json!({
-            "text": content,
-        }))
+        Ok((AgentStep::TextResponse(content), assistant_msg))
     }
-}
-
-/// Try to extract tool call information from agent response
-fn extract_tool_call(response: &serde_json::Value) -> Option<serde_json::Value> {
-    // If response has tool_name and arguments fields, it's a tool call
-    if response.get("tool_name").is_some() && response.get("arguments").is_some() {
-        return Some(response.clone());
-    }
-    None
 }
 
 fn extract_text(payload: &serde_json::Value) -> String {

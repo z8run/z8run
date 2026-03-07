@@ -1,6 +1,7 @@
 //! LLM node: sends prompts to AI language models.
 //!
 //! Supports OpenAI, Anthropic, and Ollama (local) providers.
+//! Supports vision mode for image analysis (GPT-4o, Claude, LLaVA).
 //!
 //! Outputs:
 //!   - "response" port: AI model response
@@ -25,6 +26,7 @@ pub struct LlmNode {
     temperature: f64,
     max_tokens: u64,
     timeout_ms: u64,
+    vision: bool, // enable vision mode for image analysis
     event_tx: Option<broadcast::Sender<EngineEvent>>,
     flow_id: Option<Uuid>,
     node_id: Option<Uuid>,
@@ -34,7 +36,6 @@ pub struct LlmNode {
 impl NodeExecutor for LlmNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         // Extract prompt from the incoming message
-        // Try: msg.payload as string, msg.payload.prompt, msg.payload.body, msg.payload.text
         let prompt = extract_prompt(&msg.payload);
 
         if prompt.is_empty() {
@@ -44,38 +45,47 @@ impl NodeExecutor for LlmNode {
             return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
         }
 
-        info!(node = %self.name, provider = %self.provider, model = %self.model, "LLM request");
+        // Extract image for vision mode (base64 or URL)
+        let image = if self.vision {
+            extract_image(&msg.payload)
+        } else {
+            None
+        };
+
+        info!(
+            node = %self.name,
+            provider = %self.provider,
+            model = %self.model,
+            vision = self.vision && image.is_some(),
+            "LLM request"
+        );
 
         let client = reqwest::Client::new();
         let timeout = std::time::Duration::from_millis(self.timeout_ms);
 
-        // Extract flow_id and node_id from message metadata or trace_id
-        // Use trace_id as flow_id and source_node as node_id for streaming events
         let flow_id = msg.trace_id;
         let node_id = msg.source_node;
 
         let result = if self.event_tx.is_some() {
-            // Use streaming variants when event_tx is available
             match self.provider.as_str() {
                 "anthropic" => {
-                    self.stream_anthropic(&client, &prompt, timeout, flow_id, node_id)
+                    self.stream_anthropic(&client, &prompt, image.as_deref(), timeout, flow_id, node_id)
                         .await
                 }
                 "ollama" => {
-                    self.stream_ollama(&client, &prompt, timeout, flow_id, node_id)
+                    self.stream_ollama(&client, &prompt, image.as_deref(), timeout, flow_id, node_id)
                         .await
                 }
                 _ => {
-                    self.stream_openai(&client, &prompt, timeout, flow_id, node_id)
+                    self.stream_openai(&client, &prompt, image.as_deref(), timeout, flow_id, node_id)
                         .await
                 }
             }
         } else {
-            // Use non-streaming variants (original behavior)
             match self.provider.as_str() {
-                "anthropic" => self.call_anthropic(&client, &prompt, timeout).await,
-                "ollama" => self.call_ollama(&client, &prompt, timeout).await,
-                _ => self.call_openai(&client, &prompt, timeout).await,
+                "anthropic" => self.call_anthropic(&client, &prompt, image.as_deref(), timeout).await,
+                "ollama" => self.call_ollama(&client, &prompt, image.as_deref(), timeout).await,
+                _ => self.call_openai(&client, &prompt, image.as_deref(), timeout).await,
             }
         };
 
@@ -130,6 +140,9 @@ impl NodeExecutor for LlmNode {
         if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
             self.timeout_ms = v;
         }
+        if let Some(v) = config.get("vision").and_then(|v| v.as_bool()) {
+            self.vision = v;
+        }
         Ok(())
     }
 
@@ -156,6 +169,7 @@ impl LlmNode {
         &self,
         client: &reqwest::Client,
         prompt: &str,
+        image: Option<&str>,
         timeout: std::time::Duration,
     ) -> Result<String, String> {
         let base = if self.base_url.is_empty() {
@@ -169,7 +183,7 @@ impl LlmNode {
         if !self.system_prompt.is_empty() {
             messages.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
         }
-        messages.push(serde_json::json!({"role": "user", "content": prompt}));
+        messages.push(build_user_message_openai(prompt, image));
 
         let body = serde_json::json!({
             "model": self.model,
@@ -211,6 +225,7 @@ impl LlmNode {
         &self,
         client: &reqwest::Client,
         prompt: &str,
+        image: Option<&str>,
         timeout: std::time::Duration,
     ) -> Result<String, String> {
         let base = if self.base_url.is_empty() {
@@ -220,10 +235,11 @@ impl LlmNode {
         };
         let url = format!("{}/messages", base);
 
+        let user_content = build_user_content_anthropic(prompt, image);
         let mut body = serde_json::json!({
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [{"role": "user", "content": user_content}],
         });
 
         if !self.system_prompt.is_empty() {
@@ -265,6 +281,7 @@ impl LlmNode {
         &self,
         client: &reqwest::Client,
         prompt: &str,
+        image: Option<&str>,
         timeout: std::time::Duration,
     ) -> Result<String, String> {
         let base = if self.base_url.is_empty() {
@@ -278,7 +295,7 @@ impl LlmNode {
         if !self.system_prompt.is_empty() {
             messages.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
         }
-        messages.push(serde_json::json!({"role": "user", "content": prompt}));
+        messages.push(build_user_message_ollama(prompt, image));
 
         let body = serde_json::json!({
             "model": self.model,
@@ -322,6 +339,7 @@ impl LlmNode {
         &self,
         client: &reqwest::Client,
         prompt: &str,
+        image: Option<&str>,
         timeout: std::time::Duration,
         flow_id: Uuid,
         node_id: Uuid,
@@ -337,7 +355,7 @@ impl LlmNode {
         if !self.system_prompt.is_empty() {
             messages.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
         }
-        messages.push(serde_json::json!({"role": "user", "content": prompt}));
+        messages.push(build_user_message_openai(prompt, image));
 
         let body = serde_json::json!({
             "model": self.model,
@@ -412,6 +430,7 @@ impl LlmNode {
         &self,
         client: &reqwest::Client,
         prompt: &str,
+        image: Option<&str>,
         timeout: std::time::Duration,
         flow_id: Uuid,
         node_id: Uuid,
@@ -423,10 +442,11 @@ impl LlmNode {
         };
         let url = format!("{}/messages", base);
 
+        let user_content = build_user_content_anthropic(prompt, image);
         let mut body = serde_json::json!({
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": [{"role": "user", "content": user_content}],
             "stream": true,
         });
 
@@ -505,6 +525,7 @@ impl LlmNode {
         &self,
         client: &reqwest::Client,
         prompt: &str,
+        image: Option<&str>,
         timeout: std::time::Duration,
         flow_id: Uuid,
         node_id: Uuid,
@@ -520,7 +541,7 @@ impl LlmNode {
         if !self.system_prompt.is_empty() {
             messages.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
         }
-        messages.push(serde_json::json!({"role": "user", "content": prompt}));
+        messages.push(build_user_message_ollama(prompt, image));
 
         let body = serde_json::json!({
             "model": self.model,
@@ -594,6 +615,98 @@ impl LlmNode {
     }
 }
 
+/// Extract image data from payload (base64 string or URL).
+fn extract_image(payload: &serde_json::Value) -> Option<String> {
+    for key in &["image", "image_url", "imageUrl", "img", "photo"] {
+        if let Some(s) = payload.get(key).and_then(|v| v.as_str()) {
+            return Some(s.to_string());
+        }
+    }
+    // Nested: req.body.image
+    if let Some(body) = payload.get("req").and_then(|r| r.get("body")) {
+        for key in &["image", "image_url", "imageUrl"] {
+            if let Some(s) = body.get(key).and_then(|v| v.as_str()) {
+                return Some(s.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Build OpenAI user message with optional vision content.
+fn build_user_message_openai(prompt: &str, image: Option<&str>) -> serde_json::Value {
+    match image {
+        Some(img) => {
+            let image_url = if img.starts_with("http://") || img.starts_with("https://") {
+                serde_json::json!({"url": img})
+            } else {
+                // Assume base64 — detect media type or default to jpeg
+                let media_type = if img.starts_with("/9j/") {
+                    "image/jpeg"
+                } else if img.starts_with("iVBOR") {
+                    "image/png"
+                } else {
+                    "image/jpeg"
+                };
+                serde_json::json!({"url": format!("data:{};base64,{}", media_type, img)})
+            };
+            serde_json::json!({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": image_url}
+                ]
+            })
+        }
+        None => serde_json::json!({"role": "user", "content": prompt}),
+    }
+}
+
+/// Build Anthropic user content with optional vision.
+fn build_user_content_anthropic(prompt: &str, image: Option<&str>) -> serde_json::Value {
+    match image {
+        Some(img) => {
+            if img.starts_with("http://") || img.starts_with("https://") {
+                // Anthropic supports URL source type
+                serde_json::json!([
+                    {"type": "image", "source": {"type": "url", "url": img}},
+                    {"type": "text", "text": prompt}
+                ])
+            } else {
+                let media_type = if img.starts_with("/9j/") {
+                    "image/jpeg"
+                } else if img.starts_with("iVBOR") {
+                    "image/png"
+                } else {
+                    "image/jpeg"
+                };
+                serde_json::json!([
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img}},
+                    {"type": "text", "text": prompt}
+                ])
+            }
+        }
+        None => serde_json::Value::String(prompt.to_string()),
+    }
+}
+
+/// Build Ollama user message with optional vision (for LLaVA, etc.).
+fn build_user_message_ollama(prompt: &str, image: Option<&str>) -> serde_json::Value {
+    match image {
+        Some(img) => {
+            // Ollama expects images as base64 array in the message
+            let img_data = if img.starts_with("http://") || img.starts_with("https://") {
+                // Ollama doesn't support URLs directly — pass as-is, model may handle it
+                img.to_string()
+            } else {
+                img.to_string()
+            };
+            serde_json::json!({"role": "user", "content": prompt, "images": [img_data]})
+        }
+        None => serde_json::json!({"role": "user", "content": prompt}),
+    }
+}
+
 fn extract_prompt(payload: &serde_json::Value) -> String {
     // If payload is a string directly
     if let Some(s) = payload.as_str() {
@@ -635,6 +748,7 @@ impl NodeExecutorFactory for LlmNodeFactory {
             temperature: 0.7,
             max_tokens: 1024,
             timeout_ms: 30000,
+            vision: false,
             event_tx: None,
             flow_id: None,
             node_id: None,
