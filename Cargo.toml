@@ -102,7 +102,7 @@ dotenvy = "0.15"
 tokio-test = "0.4"
 
 # MQTT
-rumqttc = { version = "0.24", features = ["use-rustls"] }
+rumqttc = { version = "0.25", features = ["use-rustls"] }
 
 [profile.release]
 opt-level = 3
