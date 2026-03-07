@@ -75,7 +75,7 @@ aes-gcm = "0.10"
 rand = "0.8"
 
 # Identifiers
-uuid = { version = "1.21", features = ["v4", "v5", "v7", "serde"] }
+uuid = { version = "1.22", features = ["v4", "v5", "v7", "serde"] }
 
 # Time
 chrono = { version = "0.4", features = ["serde"] }
