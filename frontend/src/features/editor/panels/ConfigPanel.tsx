@@ -79,6 +79,7 @@ function SmartConfigField({
   onChange,
   allConfig,
   onConfigChange,
+  onBatchConfigChange,
   nodeLabel,
 }: {
   fieldKey: string;
@@ -87,6 +88,7 @@ function SmartConfigField({
   onChange: (val: unknown) => void;
   allConfig?: Record<string, unknown>;
   onConfigChange?: (key: string, val: unknown) => void;
+  onBatchConfigChange?: (updates: Record<string, unknown>) => void;
   nodeLabel?: string;
 }) {
   // --- CODE EDITOR with language selector ---
@@ -433,7 +435,35 @@ function SmartConfigField({
     return (
       <select
         value={String(value ?? "openai")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const newProvider = e.target.value;
+          const defaultModels: Record<string, Record<string, string>> = {
+            openai: {
+              llm: "gpt-4o", embeddings: "text-embedding-3-small",
+              classifier: "gpt-4o-mini", "structured-output": "gpt-4o",
+              summarizer: "gpt-4o-mini", "ai-agent": "gpt-4o",
+              "image-gen": "dall-e-3",
+            },
+            anthropic: {
+              llm: "claude-sonnet-4-20250514", classifier: "claude-haiku-3-5-20241022",
+              "structured-output": "claude-sonnet-4-20250514",
+              summarizer: "claude-haiku-3-5-20241022",
+              "ai-agent": "claude-sonnet-4-20250514",
+            },
+            ollama: {
+              llm: "llama3", classifier: "llama3",
+              "structured-output": "llama3.1", summarizer: "llama3",
+              "ai-agent": "llama3.1", embeddings: "nomic-embed-text",
+            },
+            stability: { "image-gen": "stable-diffusion-xl-1024-v1-0" },
+          };
+          const defaultModel = defaultModels[newProvider]?.[nodeType] ?? "";
+          if (onBatchConfigChange) {
+            onBatchConfigChange({ provider: newProvider, model: defaultModel });
+          } else {
+            onChange(newProvider);
+          }
+        }}
         className={selectClass}
       >
         {providers.map((p) => (
@@ -445,31 +475,142 @@ function SmartConfigField({
     );
   }
 
-  // AI Model input
+  // AI Model dropdown — models grouped by provider
   if (fieldKey === "model" && AI_NODE_TYPES.includes(nodeType)) {
-    const placeholders: Record<string, string> = {
-      "openai-llm": "gpt-4o-mini",
-      "openai-embeddings": "text-embedding-3-small",
-      "openai-structured-output": "gpt-4o-mini",
-      "openai-summarizer": "gpt-4o-mini",
-      "openai-ai-agent": "gpt-4o",
-      "openai-image-gen": "dall-e-3",
-      "anthropic-llm": "claude-sonnet-4-20250514",
-      "anthropic-ai-agent": "claude-sonnet-4-20250514",
-      "ollama-llm": "llama3",
+    const provider = String(allConfig?.provider ?? "openai");
+
+    const MODELS_BY_PROVIDER: Record<
+      string,
+      Record<string, { value: string; label: string }[]>
+    > = {
+      openai: {
+        llm: [
+          { value: "gpt-4o", label: "GPT-4o" },
+          { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+          { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+          { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+          { value: "o1", label: "o1" },
+          { value: "o1-mini", label: "o1 Mini" },
+          { value: "o3-mini", label: "o3 Mini" },
+        ],
+        embeddings: [
+          { value: "text-embedding-3-small", label: "Embedding 3 Small" },
+          { value: "text-embedding-3-large", label: "Embedding 3 Large" },
+          { value: "text-embedding-ada-002", label: "Embedding Ada 002" },
+        ],
+        classifier: [
+          { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+          { value: "gpt-4o", label: "GPT-4o" },
+        ],
+        "structured-output": [
+          { value: "gpt-4o", label: "GPT-4o" },
+          { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+        ],
+        summarizer: [
+          { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+          { value: "gpt-4o", label: "GPT-4o" },
+          { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo" },
+        ],
+        "ai-agent": [
+          { value: "gpt-4o", label: "GPT-4o" },
+          { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+          { value: "gpt-4-turbo", label: "GPT-4 Turbo" },
+        ],
+        "image-gen": [
+          { value: "dall-e-3", label: "DALL-E 3" },
+          { value: "dall-e-2", label: "DALL-E 2" },
+        ],
+      },
+      anthropic: {
+        llm: [
+          { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+          { value: "claude-opus-4-20250514", label: "Claude Opus 4" },
+          { value: "claude-haiku-3-5-20241022", label: "Claude Haiku 3.5" },
+          { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+        ],
+        classifier: [
+          { value: "claude-haiku-3-5-20241022", label: "Claude Haiku 3.5" },
+          { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+        ],
+        "structured-output": [
+          { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+          { value: "claude-haiku-3-5-20241022", label: "Claude Haiku 3.5" },
+        ],
+        summarizer: [
+          { value: "claude-haiku-3-5-20241022", label: "Claude Haiku 3.5" },
+          { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+        ],
+        "ai-agent": [
+          { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+          { value: "claude-opus-4-20250514", label: "Claude Opus 4" },
+          { value: "claude-haiku-3-5-20241022", label: "Claude Haiku 3.5" },
+        ],
+        embeddings: [],
+        "image-gen": [],
+      },
+      ollama: {
+        llm: [
+          { value: "llama3", label: "LLaMA 3" },
+          { value: "llama3.1", label: "LLaMA 3.1" },
+          { value: "llama3.2", label: "LLaMA 3.2" },
+          { value: "mistral", label: "Mistral" },
+          { value: "mixtral", label: "Mixtral" },
+          { value: "codellama", label: "Code LLaMA" },
+          { value: "deepseek-coder", label: "DeepSeek Coder" },
+          { value: "phi3", label: "Phi-3" },
+          { value: "llava", label: "LLaVA (Vision)" },
+        ],
+        classifier: [
+          { value: "llama3", label: "LLaMA 3" },
+          { value: "mistral", label: "Mistral" },
+        ],
+        "structured-output": [
+          { value: "llama3.1", label: "LLaMA 3.1" },
+          { value: "mistral", label: "Mistral" },
+        ],
+        summarizer: [
+          { value: "llama3", label: "LLaMA 3" },
+          { value: "mistral", label: "Mistral" },
+        ],
+        "ai-agent": [
+          { value: "llama3.1", label: "LLaMA 3.1 (Tool Use)" },
+          { value: "llama3.2", label: "LLaMA 3.2 (Tool Use)" },
+          { value: "mistral", label: "Mistral" },
+        ],
+        embeddings: [
+          { value: "nomic-embed-text", label: "Nomic Embed Text" },
+          { value: "mxbai-embed-large", label: "MxBai Embed Large" },
+          { value: "all-minilm", label: "All-MiniLM" },
+        ],
+        "image-gen": [],
+      },
+      stability: {
+        "image-gen": [
+          { value: "stable-diffusion-xl-1024-v1-0", label: "SDXL 1.0" },
+          { value: "stable-diffusion-v1-6", label: "SD 1.6" },
+        ],
+      },
     };
-    const placeholder =
-      placeholders[
-        `${String(value ?? "openai").split("-")[0] || "openai"}-${nodeType}`
-      ] || "Model name";
+
+    const models =
+      MODELS_BY_PROVIDER[provider]?.[nodeType] ??
+      MODELS_BY_PROVIDER[provider]?.llm ??
+      [];
+
+    const currentValue = String(value ?? "");
+
     return (
-      <input
-        type="text"
-        value={String(value ?? "")}
+      <select
+        value={currentValue || models[0]?.value || ""}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={inputClass}
-      />
+        className={selectClass}
+      >
+        {models.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
     );
   }
 
@@ -1192,6 +1333,12 @@ export function ConfigPanel() {
     } as Partial<Z8NodeData>);
   };
 
+  const handleBatchConfigChange = (updates: Record<string, unknown>) => {
+    updateNodeData(selectedNodeId, {
+      config: { ...config, ...updates },
+    } as Partial<Z8NodeData>);
+  };
+
   return (
     <div className="w-[340px] bg-slate-900 border-l border-slate-700 flex flex-col h-full">
       {/* Header with color accent */}
@@ -1321,6 +1468,7 @@ export function ConfigPanel() {
                         onChange={(val) => handleConfigChange(key, val)}
                         allConfig={config}
                         onConfigChange={handleConfigChange}
+                        onBatchConfigChange={handleBatchConfigChange}
                         nodeLabel={data.label}
                       />
                     ) : typeof value === "string" &&
