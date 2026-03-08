@@ -1105,6 +1105,403 @@ function SmartConfigField({
     );
   }
 
+  // --- TWILIO ---
+  if (fieldKey === "action" && nodeType === "twilio") {
+    return (
+      <select
+        value={String(value ?? "sms")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="sms">Send SMS</option>
+        <option value="call">Make Call</option>
+        <option value="lookup">Lookup Number</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "accountSid" && nodeType === "twilio") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "authToken" && nodeType === "twilio") {
+    return (
+      <input
+        type="password"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Twilio Auth Token"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "fromNumber" && nodeType === "twilio") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="+1234567890"
+        className={inputClass}
+      />
+    );
+  }
+
+  // --- WHATSAPP ---
+  if (fieldKey === "action" && nodeType === "whatsapp") {
+    return (
+      <select
+        value={String(value ?? "send_text")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="send_text">Send Text</option>
+        <option value="send_template">Send Template</option>
+        <option value="send_media">Send Media</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "phoneNumberId" && nodeType === "whatsapp") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Phone Number ID"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "accessToken" && nodeType === "whatsapp") {
+    return (
+      <input
+        type="password"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Meta Access Token"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "apiVersion" && nodeType === "whatsapp") {
+    return (
+      <select
+        value={String(value ?? "v18.0")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="v18.0">v18.0</option>
+        <option value="v19.0">v19.0</option>
+        <option value="v20.0">v20.0</option>
+      </select>
+    );
+  }
+
+  // --- STT ---
+  const STT_TTS_NODES = ["stt", "tts"];
+
+  if (fieldKey === "provider" && STT_TTS_NODES.includes(nodeType)) {
+    const providers =
+      nodeType === "stt"
+        ? [
+            { value: "openai", label: "OpenAI (Whisper)" },
+            { value: "deepgram", label: "Deepgram" },
+            { value: "google", label: "Google Cloud" },
+          ]
+        : [
+            { value: "openai", label: "OpenAI TTS" },
+            { value: "elevenlabs", label: "ElevenLabs" },
+            { value: "google", label: "Google Cloud" },
+          ];
+    return (
+      <select
+        value={String(value ?? "openai")}
+        onChange={(e) => {
+          const newProvider = e.target.value;
+          const defaults: Record<string, Record<string, string>> = {
+            stt: { openai: "whisper-1", deepgram: "nova-2", google: "default" },
+            tts: { openai: "tts-1", elevenlabs: "eleven_monolingual_v1", google: "en-US-Standard-A" },
+          };
+          if (onBatchConfigChange) {
+            onBatchConfigChange({ provider: newProvider, model: defaults[nodeType]?.[newProvider] ?? "" });
+          } else {
+            onChange(newProvider);
+          }
+        }}
+        className={selectClass}
+      >
+        {providers.map((p) => (
+          <option key={p.value} value={p.value}>
+            {p.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (fieldKey === "apiKey" && STT_TTS_NODES.includes(nodeType)) {
+    return (
+      <input
+        type="password"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="API Key"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "model" && STT_TTS_NODES.includes(nodeType)) {
+    const provider = String(allConfig?.provider ?? "openai");
+    const models: Record<string, Record<string, { value: string; label: string }[]>> = {
+      stt: {
+        openai: [{ value: "whisper-1", label: "Whisper 1" }],
+        deepgram: [
+          { value: "nova-2", label: "Nova 2" },
+          { value: "nova", label: "Nova" },
+          { value: "base", label: "Base" },
+        ],
+        google: [
+          { value: "default", label: "Default" },
+          { value: "latest_long", label: "Latest Long" },
+          { value: "latest_short", label: "Latest Short" },
+        ],
+      },
+      tts: {
+        openai: [
+          { value: "tts-1", label: "TTS-1" },
+          { value: "tts-1-hd", label: "TTS-1 HD" },
+        ],
+        elevenlabs: [
+          { value: "eleven_monolingual_v1", label: "Monolingual v1" },
+          { value: "eleven_multilingual_v2", label: "Multilingual v2" },
+          { value: "eleven_turbo_v2", label: "Turbo v2" },
+        ],
+        google: [
+          { value: "en-US-Standard-A", label: "Standard A" },
+          { value: "en-US-Standard-B", label: "Standard B" },
+          { value: "en-US-Wavenet-A", label: "WaveNet A" },
+          { value: "en-US-Neural2-A", label: "Neural2 A" },
+        ],
+      },
+    };
+    const list = models[nodeType]?.[provider] ?? [];
+    return (
+      <select
+        value={String(value ?? list[0]?.value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        {list.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // TTS voice selector
+  if (fieldKey === "voice" && nodeType === "tts") {
+    const provider = String(allConfig?.provider ?? "openai");
+    const voices: Record<string, { value: string; label: string }[]> = {
+      openai: [
+        { value: "alloy", label: "Alloy" },
+        { value: "echo", label: "Echo" },
+        { value: "fable", label: "Fable" },
+        { value: "onyx", label: "Onyx" },
+        { value: "nova", label: "Nova" },
+        { value: "shimmer", label: "Shimmer" },
+      ],
+      elevenlabs: [
+        { value: "21m00Tcm4TlvDq8ikWAM", label: "Rachel" },
+        { value: "AZnzlk1XvdvUeBnXmlld", label: "Domi" },
+        { value: "EXAVITQu4vr4xnSDxMaL", label: "Bella" },
+        { value: "ErXwobaYiN019PkySvjV", label: "Antoni" },
+        { value: "MF3mGyEYCl7XYWbV9V6O", label: "Elli" },
+        { value: "TxGEqnHWrfWFTfGW9XjX", label: "Josh" },
+      ],
+      google: [
+        { value: "en-US-Standard-A", label: "Female A" },
+        { value: "en-US-Standard-B", label: "Male B" },
+        { value: "en-US-Standard-C", label: "Female C" },
+        { value: "en-US-Standard-D", label: "Male D" },
+      ],
+    };
+    const list = voices[provider] ?? voices.openai;
+    return (
+      <select
+        value={String(value ?? list[0]?.value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        {list.map((v) => (
+          <option key={v.value} value={v.value}>
+            {v.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // --- CONVERSATION MEMORY ---
+  if (fieldKey === "action" && nodeType === "conversation-memory") {
+    return (
+      <select
+        value={String(value ?? "save")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="save">Save Message</option>
+        <option value="load">Load History</option>
+        <option value="clear">Clear Conversation</option>
+        <option value="list">List Conversations</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "maxMessages" && nodeType === "conversation-memory") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={Number(value ?? 50)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={`${inputClass} flex-1`}
+          min={1}
+          max={500}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">msgs</span>
+      </div>
+    );
+  }
+
+  if (fieldKey === "ttlSeconds" && nodeType === "conversation-memory") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={Number(value ?? 3600)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={`${inputClass} flex-1`}
+          min={60}
+          step={60}
+        />
+        <span className="text-[10px] text-slate-500 shrink-0">sec</span>
+      </div>
+    );
+  }
+
+  // --- CRM ---
+  if (fieldKey === "provider" && nodeType === "crm") {
+    return (
+      <select
+        value={String(value ?? "hubspot")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="hubspot">HubSpot</option>
+        <option value="salesforce">Salesforce</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "action" && nodeType === "crm") {
+    return (
+      <select
+        value={String(value ?? "create_contact")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="create_contact">Create Contact</option>
+        <option value="update_contact">Update Contact</option>
+        <option value="get_contact">Get Contact</option>
+        <option value="search_contacts">Search Contacts</option>
+        <option value="create_deal">Create Deal</option>
+        <option value="list_deals">List Deals</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "apiKey" && nodeType === "crm") {
+    return (
+      <input
+        type="password"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="API Key / Access Token"
+        className={inputClass}
+      />
+    );
+  }
+
+  if (fieldKey === "baseUrl" && nodeType === "crm") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Salesforce instance URL (optional)"
+        className={inputClass}
+      />
+    );
+  }
+
+  // --- HUMAN HANDOFF ---
+  if (fieldKey === "action" && nodeType === "human-handoff") {
+    return (
+      <select
+        value={String(value ?? "escalate")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="escalate">Escalate</option>
+        <option value="check_status">Check Status</option>
+        <option value="assign">Assign Agent</option>
+        <option value="resolve">Resolve</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "priority" && nodeType === "human-handoff") {
+    return (
+      <select
+        value={String(value ?? "medium")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+        <option value="urgent">Urgent</option>
+      </select>
+    );
+  }
+
+  if (fieldKey === "webhookUrl" && nodeType === "human-handoff") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https://your-system.com/webhook (optional)"
+        className={inputClass}
+      />
+    );
+  }
+
   // No smart field
   return null;
 }
@@ -1123,7 +1520,7 @@ function hasSmartField(key: string, nodeType: string): boolean {
   return (
     ["method", "statusCode", "url", "timeout", "code"].includes(key) ||
     (key === "action" &&
-      ["json", "mqtt", "csv"].includes(nodeType)) ||
+      ["json", "mqtt", "csv", "twilio", "whatsapp", "conversation-memory", "crm", "human-handoff"].includes(nodeType)) ||
     (nodeType === "csv" && ["delimiter", "hasHeaders"].includes(key)) ||
     (nodeType === "aggregator" &&
       ["operation", "field", "groupBy"].includes(key)) ||
@@ -1173,7 +1570,19 @@ function hasSmartField(key: string, nodeType: string): boolean {
         "username",
         "password",
         "keepAlive",
-      ].includes(key))
+      ].includes(key)) ||
+    (nodeType === "twilio" &&
+      ["action", "accountSid", "authToken", "fromNumber"].includes(key)) ||
+    (nodeType === "whatsapp" &&
+      ["action", "phoneNumberId", "accessToken", "apiVersion"].includes(key)) ||
+    (["stt", "tts"].includes(nodeType) &&
+      ["provider", "model", "apiKey", "voice"].includes(key)) ||
+    (nodeType === "conversation-memory" &&
+      ["action", "maxMessages", "ttlSeconds"].includes(key)) ||
+    (nodeType === "crm" &&
+      ["provider", "action", "apiKey", "baseUrl"].includes(key)) ||
+    (nodeType === "human-handoff" &&
+      ["action", "priority", "webhookUrl"].includes(key))
   );
 }
 

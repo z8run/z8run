@@ -24,7 +24,14 @@ pub mod mqtt;
 pub mod prompt_template;
 pub mod structured_output;
 pub mod summarizer;
+pub mod conversation_memory;
+pub mod crm;
+pub mod human_handoff;
+pub mod stt;
 pub mod switch;
+pub mod tts;
+pub mod twilio;
+pub mod whatsapp;
 pub mod text_splitter;
 pub mod timer;
 pub mod vector_store;
@@ -120,6 +127,29 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .await;
     engine
         .register_node_type(Arc::new(image_gen::ImageGenNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(stt::SttNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(tts::TtsNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+
+    // Communication nodes
+    engine
+        .register_node_type(Arc::new(twilio::TwilioNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(whatsapp::WhatsAppNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(conversation_memory::ConversationMemoryNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(crm::CrmNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(human_handoff::HumanHandoffNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
 
     // Data Engineering nodes

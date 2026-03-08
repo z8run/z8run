@@ -15,13 +15,21 @@ import {
   Fingerprint,
   GitBranch,
   Globe,
+  Headphones,
   Image,
   Layers,
+  MessageSquare,
+  Mic,
+  Phone,
   Radio,
   Scissors,
   Send,
+  ShieldCheck,
+  Speech,
   Tags,
   Timer,
+  UserCheck,
+  Volume2,
   Webhook,
 } from "lucide-react";
 
@@ -53,6 +61,13 @@ export const NODE_ICON_MAP: Record<
   FileSpreadsheet,
   Calculator,
   Layers,
+  Phone,
+  MessageSquare,
+  Mic,
+  Volume2,
+  Headphones,
+  UserCheck,
+  ShieldCheck,
 };
 
 export interface NodeDefinition {
@@ -519,6 +534,144 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       timeout: 60000,
     },
   },
+
+  // Communication nodes
+  {
+    type: "twilio",
+    label: "Twilio",
+    category: "communication",
+    icon: "Phone",
+    description: "Send SMS, make calls, lookup numbers via Twilio",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "sent", name: "Sent", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      action: "sms",
+      accountSid: "",
+      authToken: "",
+      fromNumber: "",
+      timeout: 10000,
+    },
+  },
+  {
+    type: "whatsapp",
+    label: "WhatsApp",
+    category: "communication",
+    icon: "MessageSquare",
+    description: "Send messages via WhatsApp Business API",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "sent", name: "Sent", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      action: "send_text",
+      phoneNumberId: "",
+      accessToken: "",
+      apiVersion: "v18.0",
+      timeout: 10000,
+    },
+  },
+  {
+    type: "stt",
+    label: "Speech to Text",
+    category: "communication",
+    icon: "Mic",
+    description: "Convert audio to text (Whisper, Deepgram, Google)",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "transcript", name: "Transcript", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      provider: "openai",
+      model: "whisper-1",
+      apiKey: "",
+      language: "",
+      timeout: 30000,
+    },
+  },
+  {
+    type: "tts",
+    label: "Text to Speech",
+    category: "communication",
+    icon: "Volume2",
+    description: "Convert text to audio (OpenAI, ElevenLabs, Google)",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "audio", name: "Audio", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      provider: "openai",
+      model: "tts-1",
+      apiKey: "",
+      voice: "alloy",
+      timeout: 30000,
+    },
+  },
+  {
+    type: "conversation-memory",
+    label: "Conversation Memory",
+    category: "communication",
+    icon: "Headphones",
+    description: "Store and retrieve conversation history",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "saved", name: "Saved", type: "object" },
+      { id: "history", name: "History", type: "object" },
+      { id: "listed", name: "Listed", type: "array" },
+      { id: "cleared", name: "Cleared", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      action: "save",
+      maxMessages: 50,
+      ttlSeconds: 3600,
+    },
+  },
+  {
+    type: "crm",
+    label: "CRM",
+    category: "communication",
+    icon: "UserCheck",
+    description: "Manage contacts and deals (HubSpot, Salesforce)",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "result", name: "Result", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      provider: "hubspot",
+      action: "create_contact",
+      apiKey: "",
+      baseUrl: "",
+      timeout: 15000,
+    },
+  },
+  {
+    type: "human-handoff",
+    label: "Human Handoff",
+    category: "communication",
+    icon: "ShieldCheck",
+    description: "Escalate conversations to human agents",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "escalated", name: "Escalated", type: "object" },
+      { id: "status", name: "Status", type: "object" },
+      { id: "assigned", name: "Assigned", type: "object" },
+      { id: "resolved", name: "Resolved", type: "object" },
+      { id: "error", name: "Error", type: "any" },
+    ],
+    defaultConfig: {
+      action: "escalate",
+      priority: "medium",
+      webhookUrl: "",
+      timeout: 10000,
+    },
+  },
 ];
 
 export const NODE_CATEGORIES: { id: NodeCategory; label: string }[] = [
@@ -528,6 +681,7 @@ export const NODE_CATEGORIES: { id: NodeCategory; label: string }[] = [
   { id: "logic", label: "Logic" },
   { id: "data", label: "Data" },
   { id: "ai", label: "AI" },
+  { id: "communication", label: "Communication" },
 ];
 
 /** Create Z8NodeData from a NodeDefinition */
