@@ -201,7 +201,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { id: "pass", name: "Pass", type: "any" },
       { id: "reject", name: "Reject", type: "any" },
     ],
-    defaultConfig: { property: "req.body.age", condition: "gte", value: 18 },
+    defaultConfig: { property: "req.body.age", condition: "gte", value: 18, passExpression: "", rejectExpression: "" },
   },
 
   // Output nodes
@@ -262,6 +262,8 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       field: "payload.status",
       operator: "==",
       value: "success",
+      trueExpression: "",
+      falseExpression: "",
     },
   },
   {
@@ -277,6 +279,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     ],
     defaultConfig: {
       field: "payload.items",
+      itemExpression: "",
     },
   },
   {

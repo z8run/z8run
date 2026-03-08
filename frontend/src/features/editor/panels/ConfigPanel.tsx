@@ -1578,6 +1578,76 @@ function SmartConfigField({
     );
   }
 
+  // --- IF/ELSE transform expressions ---
+  if (fieldKey === "trueExpression" && nodeType === "if-else") {
+    return (
+      <div className="space-y-1">
+        <textarea
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={`Example:\n{ "amount": ".amount * 10" }`}
+          rows={3}
+          spellCheck={false}
+          className={`${inputClass} font-mono resize-y`}
+        />
+        <div className="text-[9px] text-slate-500">
+          JSON mapping for True branch. Use ".field" to reference input values, supports * + - /
+        </div>
+      </div>
+    );
+  }
+  if (fieldKey === "falseExpression" && nodeType === "if-else") {
+    return (
+      <div className="space-y-1">
+        <textarea
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={`Example:\n{ "amount": ".amount * 5" }`}
+          rows={3}
+          spellCheck={false}
+          className={`${inputClass} font-mono resize-y`}
+        />
+        <div className="text-[9px] text-slate-500">
+          JSON mapping for False branch. Use ".field" to reference input values, supports * + - /
+        </div>
+      </div>
+    );
+  }
+
+  // --- FILTER transform expressions ---
+  if (fieldKey === "passExpression" && nodeType === "filter") {
+    return (
+      <div className="space-y-1">
+        <input
+          type="text"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder='{"score": ".age * 2"}'
+          className={`${inputClass} font-mono`}
+        />
+        <div className="text-[9px] text-slate-500">
+          Transform for Pass output. Use ".field" refs + math operators
+        </div>
+      </div>
+    );
+  }
+  if (fieldKey === "rejectExpression" && nodeType === "filter") {
+    return (
+      <div className="space-y-1">
+        <input
+          type="text"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder='{"reason": "rejected"}'
+          className={`${inputClass} font-mono`}
+        />
+        <div className="text-[9px] text-slate-500">
+          Transform for Reject output. Use ".field" refs + math operators
+        </div>
+      </div>
+    );
+  }
+
   // --- LOOP node ---
   if (fieldKey === "field" && nodeType === "loop") {
     return (
@@ -1588,6 +1658,22 @@ function SmartConfigField({
         placeholder="payload.items"
         className={`${inputClass} font-mono`}
       />
+    );
+  }
+  if (fieldKey === "itemExpression" && nodeType === "loop") {
+    return (
+      <div className="space-y-1">
+        <input
+          type="text"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder='{"name": ".name", "total": ".price * .qty"}'
+          className={`${inputClass} font-mono`}
+        />
+        <div className="text-[9px] text-slate-500">
+          Transform each item. ".field" references item properties
+        </div>
+      </div>
     );
   }
 
@@ -1767,8 +1853,10 @@ function hasSmartField(key: string, nodeType: string): boolean {
     (nodeType === "human-handoff" &&
       ["action", "priority", "webhookUrl"].includes(key)) ||
     (nodeType === "if-else" &&
-      ["field", "operator", "value"].includes(key)) ||
-    (nodeType === "loop" && ["field"].includes(key)) ||
+      ["field", "operator", "value", "trueExpression", "falseExpression"].includes(key)) ||
+    (nodeType === "filter" &&
+      ["passExpression", "rejectExpression"].includes(key)) ||
+    (nodeType === "loop" && ["field", "itemExpression"].includes(key)) ||
     (nodeType === "cron-trigger" &&
       ["cron", "timezone"].includes(key)) ||
     (nodeType === "webhook-trigger" &&
@@ -1796,6 +1884,7 @@ interface SwitchRule {
   type: string;
   value?: string;
   port: string;
+  transform?: string;
 }
 
 /** Inline rules editor for Switch nodes */
@@ -1889,6 +1978,17 @@ function SwitchRulesEditor({
                   </option>
                 ))}
             </select>
+          </div>
+          <div className="ml-4 mt-1">
+            <input
+              type="text"
+              value={rule.transform ?? ""}
+              onChange={(e) => updateRule(i, "transform", e.target.value)}
+              placeholder='Transform: {"amount":".amount * 2"}'
+              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1
+                text-[10px] text-slate-200 font-mono focus:outline-none focus:border-z8-500
+                placeholder:text-slate-600"
+            />
           </div>
         </div>
       ))}

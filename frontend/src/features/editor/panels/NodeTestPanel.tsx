@@ -22,10 +22,27 @@ const MOCK_EVALUATORS: Record<
     const fieldValue = extractField(input, field);
 
     const result = evaluateCondition(fieldValue, operator, compareValue);
+    const exprRaw = result
+      ? String(config.trueExpression ?? "")
+      : String(config.falseExpression ?? "");
+
+    let transformed: unknown = input;
+    if (exprRaw.trim()) {
+      try {
+        const mapping = JSON.parse(exprRaw) as Record<string, string>;
+        transformed = applyTransformMapping(input, mapping);
+      } catch {
+        transformed = {
+          ...input,
+          _error: `Invalid JSON in ${result ? "trueExpression" : "falseExpression"}`,
+        };
+      }
+    }
+
     return {
       port: result ? "true" : "false",
       output: {
-        ...input,
+        ...(typeof transformed === "object" && transformed !== null ? transformed : { value: transformed }),
         _evaluation: { field, operator, value: compareValue, fieldValue, result },
       },
     };
@@ -34,11 +51,24 @@ const MOCK_EVALUATORS: Record<
     const field = String(config.field ?? "");
     const arr = extractField(input, field);
     const items = Array.isArray(arr) ? arr : arr != null ? [arr] : [];
+    if (items.length === 0) return { port: "done", output: { total: 0 } };
+
+    const firstItem = items[0] as Record<string, unknown>;
+    const itemExpr = String(config.itemExpression ?? "").trim();
+    let transformedItem: unknown = firstItem;
+    if (itemExpr) {
+      try {
+        const mapping = JSON.parse(itemExpr) as Record<string, string>;
+        transformedItem = typeof firstItem === "object" && firstItem !== null
+          ? applyTransformMapping(firstItem, mapping)
+          : firstItem;
+      } catch {
+        transformedItem = { ...firstItem, _error: "Invalid itemExpression JSON" };
+      }
+    }
     return {
-      port: items.length > 0 ? "item" : "done",
-      output: items.length > 0
-        ? { item: items[0], index: 0, total: items.length, isFirst: true, isLast: items.length === 1 }
-        : { total: 0 },
+      port: "item",
+      output: { item: transformedItem, index: 0, total: items.length, isFirst: true, isLast: items.length === 1 },
     };
   },
   filter: (input, config) => {
@@ -47,14 +77,37 @@ const MOCK_EVALUATORS: Record<
     const val = config.value;
     const fieldValue = extractField(input, prop);
     const pass = evaluateCondition(fieldValue, condition === "gte" ? ">=" : condition === "lte" ? "<=" : "==", val);
-    return { port: pass ? "pass" : "reject", output: input };
+
+    const exprRaw = pass
+      ? String(config.passExpression ?? "").trim()
+      : String(config.rejectExpression ?? "").trim();
+
+    let transformed: unknown = input;
+    if (exprRaw) {
+      try {
+        const mapping = JSON.parse(exprRaw) as Record<string, string>;
+        transformed = applyTransformMapping(input, mapping);
+      } catch {
+        transformed = { ...input, _error: `Invalid ${pass ? "passExpression" : "rejectExpression"} JSON` };
+      }
+    }
+    return { port: pass ? "pass" : "reject", output: transformed };
   },
   switch: (input, config) => {
     const prop = String(config.property ?? "");
-    const rules = (config.rules ?? []) as Array<{ type: string; value: unknown; port: string }>;
+    const rules = (config.rules ?? []) as Array<{ type: string; value: unknown; port: string; transform?: string }>;
     const fieldValue = extractField(input, prop);
     for (const rule of rules) {
       if (evaluateCondition(fieldValue, rule.type === "eq" ? "==" : rule.type, rule.value)) {
+        const transformRaw = String(rule.transform ?? "").trim();
+        if (transformRaw) {
+          try {
+            const mapping = JSON.parse(transformRaw) as Record<string, string>;
+            return { port: rule.port, output: applyTransformMapping(input, mapping) };
+          } catch {
+            return { port: rule.port, output: { ...input, _error: "Invalid transform JSON in rule" } };
+          }
+        }
         return { port: rule.port, output: input };
       }
     }
@@ -177,6 +230,63 @@ function evaluateCondition(fieldValue: unknown, operator: string, compareValue: 
     case "is_not_empty": return fStr !== "" && !(Array.isArray(fieldValue) && fieldValue.length === 0);
     default: return fStr === cStr;
   }
+}
+
+/**
+ * Evaluate a simple math expression like ".amount * 10".
+ * Supports: .field references, numbers, and operators + - * /
+ */
+function evaluateExpression(expr: string, input: Record<string, unknown>): unknown {
+  const trimmed = expr.trim();
+
+  // If it's a static value (no dot references), return as-is
+  if (!trimmed.startsWith(".") && !/\.\w/.test(trimmed)) {
+    const num = Number(trimmed);
+    return Number.isNaN(num) ? trimmed : num;
+  }
+
+  // Match pattern: .field <op> <number|.field>
+  const mathMatch = trimmed.match(
+    /^(\.[\w.]+)\s*([+\-*/])\s*(.+)$/
+  );
+  if (mathMatch) {
+    const leftVal = Number(extractField(input, mathMatch[1]!.slice(1)));
+    const rightRaw = mathMatch[3]!.trim();
+    const rightVal = rightRaw.startsWith(".")
+      ? Number(extractField(input, rightRaw.slice(1)))
+      : Number(rightRaw);
+
+    if (!Number.isNaN(leftVal) && !Number.isNaN(rightVal)) {
+      switch (mathMatch[2]) {
+        case "+": return leftVal + rightVal;
+        case "-": return leftVal - rightVal;
+        case "*": return leftVal * rightVal;
+        case "/": return rightVal !== 0 ? leftVal / rightVal : 0;
+      }
+    }
+  }
+
+  // Simple field reference: ".amount" → input.amount
+  if (trimmed.startsWith(".")) {
+    return extractField(input, trimmed.slice(1));
+  }
+
+  return trimmed;
+}
+
+/**
+ * Apply a transform mapping object to input data.
+ * e.g. { "amount": ".amount * 10", "type": ".type" }
+ */
+function applyTransformMapping(
+  input: Record<string, unknown>,
+  mapping: Record<string, string>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...input };
+  for (const [key, expr] of Object.entries(mapping)) {
+    result[key] = evaluateExpression(String(expr), input);
+  }
+  return result;
 }
 
 /** Generate sample input data based on node type and config */
