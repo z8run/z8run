@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { NodeTestPanel } from "./NodeTestPanel";
+import { VaultCredentialField } from "@/components/ui/VaultCredentialField";
 
 const STATUS_BADGES: Record<
   NodeStatus,
@@ -369,12 +370,11 @@ function SmartConfigField({
   // Database password
   if (fieldKey === "password" && nodeType === "database") {
     return (
-      <input
-        type="password"
+      <VaultCredentialField
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="••••••••"
-        className={inputClass}
+        onChange={(v) => onChange(v)}
+        placeholder="Database password"
+        suggestedKeyName={`db-${String(allConfig?.dbType ?? "postgres")}-password`}
       />
     );
   }
@@ -622,15 +622,14 @@ function SmartConfigField({
     );
   }
 
-  // API Key (password field)
+  // API Key (vault-backed)
   if (fieldKey === "apiKey" && AI_NODE_TYPES.includes(nodeType)) {
     return (
-      <input
-        type="password"
+      <VaultCredentialField
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         placeholder="sk-..."
-        className={inputClass}
+        suggestedKeyName={`${String(allConfig?.provider ?? nodeType)}-api-key`}
       />
     );
   }
@@ -1070,12 +1069,11 @@ function SmartConfigField({
 
   if (fieldKey === "password" && nodeType === "mqtt") {
     return (
-      <input
-        type="password"
+      <VaultCredentialField
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="optional"
-        className={inputClass}
+        onChange={(v) => onChange(v)}
+        placeholder="MQTT password (optional)"
+        suggestedKeyName="mqtt-password"
       />
     );
   }
@@ -1142,12 +1140,11 @@ function SmartConfigField({
 
   if (fieldKey === "authToken" && nodeType === "twilio") {
     return (
-      <input
-        type="password"
+      <VaultCredentialField
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         placeholder="Twilio Auth Token"
-        className={inputClass}
+        suggestedKeyName="twilio-auth-token"
       />
     );
   }
@@ -1193,12 +1190,11 @@ function SmartConfigField({
 
   if (fieldKey === "accessToken" && nodeType === "whatsapp") {
     return (
-      <input
-        type="password"
+      <VaultCredentialField
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         placeholder="Meta Access Token"
-        className={inputClass}
+        suggestedKeyName="whatsapp-access-token"
       />
     );
   }
@@ -1268,12 +1264,11 @@ function SmartConfigField({
 
   if (fieldKey === "apiKey" && STT_TTS_NODES.includes(nodeType)) {
     return (
-      <input
-        type="password"
+      <VaultCredentialField
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         placeholder="API Key"
-        className={inputClass}
+        suggestedKeyName={`${String(allConfig?.provider ?? nodeType)}-api-key`}
       />
     );
   }
@@ -1455,12 +1450,11 @@ function SmartConfigField({
 
   if (fieldKey === "apiKey" && nodeType === "crm") {
     return (
-      <input
-        type="password"
+      <VaultCredentialField
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
         placeholder="API Key / Access Token"
-        className={inputClass}
+        suggestedKeyName={`${String(allConfig?.provider ?? "crm")}-api-key`}
       />
     );
   }
@@ -1747,6 +1741,29 @@ function SmartConfigField({
         <option value="basic">Basic Auth</option>
         <option value="hmac">HMAC Signature</option>
       </select>
+    );
+  }
+  if (fieldKey === "authToken" && nodeType === "webhook-trigger") {
+    const authType = String(allConfig?.authType ?? "none");
+    if (authType === "none") {
+      return (
+        <span className="text-[10px] text-slate-500 italic">
+          No auth required
+        </span>
+      );
+    }
+    const placeholders: Record<string, string> = {
+      bearer: "Bearer token (e.g. sk-abc123...)",
+      basic: "username:password",
+      hmac: "HMAC secret key",
+    };
+    return (
+      <VaultCredentialField
+        value={String(value ?? "")}
+        onChange={(v) => onChange(v)}
+        placeholder={placeholders[authType] ?? "Auth token"}
+        suggestedKeyName={`webhook-${authType}-token`}
+      />
     );
   }
   if (fieldKey === "responseMode" && nodeType === "webhook-trigger") {
@@ -2251,7 +2268,7 @@ export function ConfigPanel() {
         )}
 
         {/* Test / Mock panel */}
-        <NodeTestPanel nodeType={nodeType} config={config} />
+        <NodeTestPanel key={selectedNodeId} nodeType={nodeType} config={config} />
 
         {/* Ports section */}
         {(inputs.length > 0 || outputs.length > 0) && (

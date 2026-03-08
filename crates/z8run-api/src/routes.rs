@@ -14,10 +14,11 @@ use uuid::Uuid;
 use crate::auth::Claims;
 use crate::error::ApiError;
 use crate::state::AppState;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use z8run_core::flow::{Edge, Flow};
 use z8run_core::message::FlowMessage;
 use z8run_core::node::{Node, PortType};
+use z8run_storage::credential_vault::CredentialVault;
 
 /// Mounts the REST API routes (protected by JWT).
 pub fn api_routes() -> Router<Arc<AppState>> {
@@ -302,7 +303,7 @@ async fn start_flow(
         .map_err(ApiError::from)?;
 
     // Build an executable Flow from canvas state (returns id_map for frontend feedback)
-    let (exec_flow, id_map) = canvas_to_flow(&stored_flow)?;
+    let (exec_flow, id_map) = canvas_to_flow(&stored_flow, state.vault.as_ref()).await?;
 
     info!(
         flow_id = %id,
@@ -398,10 +399,49 @@ fn register_hook_routes(stored: &Flow, flow_id: Uuid) -> Vec<serde_json::Value> 
     registered
 }
 
+/// Recursively resolves `"vault:key-name"` references in a JSON value.
+/// Strings starting with `"vault:"` are replaced with the decrypted value
+/// from the credential vault. Other values pass through unchanged.
+async fn resolve_vault_refs(
+    value: serde_json::Value,
+    vault: &dyn CredentialVault,
+) -> serde_json::Value {
+    match value {
+        serde_json::Value::String(ref s) if s.starts_with("vault:") => {
+            let key = &s[6..]; // strip "vault:" prefix
+            match vault.retrieve(key).await {
+                Ok(secret) => serde_json::Value::String(secret),
+                Err(e) => {
+                    warn!(vault_key = key, error = %e, "Failed to resolve vault reference");
+                    // Return the original reference so the node can report a clear error
+                    value
+                }
+            }
+        }
+        serde_json::Value::Object(map) => {
+            let mut resolved = serde_json::Map::new();
+            for (k, v) in map {
+                resolved.insert(k, Box::pin(resolve_vault_refs(v, vault)).await);
+            }
+            serde_json::Value::Object(resolved)
+        }
+        serde_json::Value::Array(arr) => {
+            let mut resolved = Vec::with_capacity(arr.len());
+            for v in arr {
+                resolved.push(Box::pin(resolve_vault_refs(v, vault)).await);
+            }
+            serde_json::Value::Array(resolved)
+        }
+        // Numbers, bools, null — pass through
+        other => other,
+    }
+}
+
 /// Converts the frontend canvas state (stored in metadata) into
 /// an executable core Flow with proper Nodes and Edges.
-fn canvas_to_flow(
+async fn canvas_to_flow(
     stored: &Flow,
+    vault: &dyn CredentialVault,
 ) -> Result<(Flow, std::collections::HashMap<String, Uuid>), ApiError> {
     let canvas_nodes = stored
         .metadata
@@ -471,9 +511,10 @@ fn canvas_to_flow(
             core_node = core_node.with_output("output", PortType::Any);
         }
 
-        // Pass the node config
+        // Pass the node config (resolve vault references)
         if let Some(config) = data.get("config") {
-            core_node = core_node.with_config(config.clone());
+            let resolved = resolve_vault_refs(config.clone(), vault).await;
+            core_node = core_node.with_config(resolved);
         }
 
         id_map.insert(canvas_id, core_node.id);
@@ -662,7 +703,7 @@ async fn hook_handler(
     };
 
     // Build executable flow
-    let (exec_flow, _id_map) = match canvas_to_flow(&stored_flow) {
+    let (exec_flow, _id_map) = match canvas_to_flow(&stored_flow, state.vault.as_ref()).await {
         Ok(result) => result,
         Err(e) => {
             return (
