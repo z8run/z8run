@@ -1519,6 +1519,162 @@ function SmartConfigField({
     );
   }
 
+  // --- IF/ELSE node ---
+  if (fieldKey === "field" && nodeType === "if-else") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="payload.status"
+        className={`${inputClass} font-mono`}
+      />
+    );
+  }
+  if (fieldKey === "operator" && nodeType === "if-else") {
+    return (
+      <select
+        value={String(value ?? "==")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="==">== (equals)</option>
+        <option value="!=">!= (not equal)</option>
+        <option value=">">&gt; (greater than)</option>
+        <option value="<">&lt; (less than)</option>
+        <option value=">=">&gt;= (greater or equal)</option>
+        <option value="<=">&lt;= (less or equal)</option>
+        <option value="contains">contains</option>
+        <option value="not_contains">not contains</option>
+        <option value="starts_with">starts with</option>
+        <option value="ends_with">ends with</option>
+        <option value="matches">matches (regex)</option>
+        <option value="exists">exists</option>
+        <option value="not_exists">not exists</option>
+        <option value="is_empty">is empty</option>
+        <option value="is_not_empty">is not empty</option>
+      </select>
+    );
+  }
+  if (fieldKey === "value" && nodeType === "if-else") {
+    const op = String(allConfig?.operator ?? "==");
+    // No value needed for existence/empty checks
+    if (["exists", "not_exists", "is_empty", "is_not_empty"].includes(op)) {
+      return (
+        <span className="text-[10px] text-slate-500 italic">
+          No value needed for this operator
+        </span>
+      );
+    }
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Compare value"
+        className={inputClass}
+      />
+    );
+  }
+
+  // --- LOOP node ---
+  if (fieldKey === "field" && nodeType === "loop") {
+    return (
+      <input
+        type="text"
+        value={String(value ?? "")}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="payload.items"
+        className={`${inputClass} font-mono`}
+      />
+    );
+  }
+
+  // --- CRON TRIGGER ---
+  if (fieldKey === "cron" && nodeType === "cron-trigger") {
+    return (
+      <div className="space-y-1">
+        <input
+          type="text"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="0 * * * *"
+          className={`${inputClass} font-mono`}
+        />
+        <div className="text-[9px] text-slate-500">
+          Format: min hour dom month dow (e.g. "0 9 * * 1-5" = weekdays 9am)
+        </div>
+      </div>
+    );
+  }
+  if (fieldKey === "timezone" && nodeType === "cron-trigger") {
+    return (
+      <select
+        value={String(value ?? "UTC")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="UTC">UTC</option>
+        <option value="America/New_York">America/New_York</option>
+        <option value="America/Chicago">America/Chicago</option>
+        <option value="America/Denver">America/Denver</option>
+        <option value="America/Los_Angeles">America/Los_Angeles</option>
+        <option value="America/Bogota">America/Bogota</option>
+        <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+        <option value="America/Mexico_City">America/Mexico_City</option>
+        <option value="Europe/London">Europe/London</option>
+        <option value="Europe/Berlin">Europe/Berlin</option>
+        <option value="Europe/Madrid">Europe/Madrid</option>
+        <option value="Asia/Tokyo">Asia/Tokyo</option>
+        <option value="Asia/Shanghai">Asia/Shanghai</option>
+      </select>
+    );
+  }
+
+  // --- WEBHOOK TRIGGER ---
+  if (fieldKey === "method" && nodeType === "webhook-trigger") {
+    return (
+      <select
+        value={String(value ?? "POST")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="ANY">ANY</option>
+        <option value="GET">GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="PATCH">PATCH</option>
+        <option value="DELETE">DELETE</option>
+      </select>
+    );
+  }
+  if (fieldKey === "authType" && nodeType === "webhook-trigger") {
+    return (
+      <select
+        value={String(value ?? "none")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="none">None</option>
+        <option value="bearer">Bearer Token</option>
+        <option value="basic">Basic Auth</option>
+        <option value="hmac">HMAC Signature</option>
+      </select>
+    );
+  }
+  if (fieldKey === "responseMode" && nodeType === "webhook-trigger") {
+    return (
+      <select
+        value={String(value ?? "last_node")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="last_node">Last Node Output</option>
+        <option value="immediate">Immediate (202 Accepted)</option>
+      </select>
+    );
+  }
+
   // No smart field
   return null;
 }
@@ -1608,7 +1764,14 @@ function hasSmartField(key: string, nodeType: string): boolean {
     (nodeType === "crm" &&
       ["provider", "action", "apiKey", "baseUrl"].includes(key)) ||
     (nodeType === "human-handoff" &&
-      ["action", "priority", "webhookUrl"].includes(key))
+      ["action", "priority", "webhookUrl"].includes(key)) ||
+    (nodeType === "if-else" &&
+      ["field", "operator", "value"].includes(key)) ||
+    (nodeType === "loop" && ["field"].includes(key)) ||
+    (nodeType === "cron-trigger" &&
+      ["cron", "timezone"].includes(key)) ||
+    (nodeType === "webhook-trigger" &&
+      ["method", "path", "authType", "authToken", "responseMode"].includes(key))
   );
 }
 

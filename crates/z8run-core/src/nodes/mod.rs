@@ -8,6 +8,7 @@ pub mod ai_agent;
 pub mod batch;
 pub mod classifier;
 pub mod conversation_memory;
+pub mod cron_trigger;
 pub mod crm;
 pub mod csv_node;
 pub mod database;
@@ -20,9 +21,11 @@ pub mod http_in;
 pub mod http_out;
 pub mod http_request;
 pub mod human_handoff;
+pub mod if_else;
 pub mod image_gen;
 pub mod json_transform;
 pub mod llm;
+pub mod loop_node;
 pub mod mqtt;
 pub mod prompt_template;
 pub mod structured_output;
@@ -35,6 +38,7 @@ pub mod tts;
 pub mod twilio;
 pub mod vector_store;
 pub mod webhook;
+pub mod webhook_trigger;
 pub mod whatsapp;
 
 use crate::engine::{FlowEngine, NodeExecutorFactory};
@@ -153,6 +157,26 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .register_node_type(
             Arc::new(human_handoff::HumanHandoffNodeFactory) as Arc<dyn NodeExecutorFactory>
         )
+        .await;
+
+    // Trigger nodes
+    engine
+        .register_node_type(
+            Arc::new(cron_trigger::CronTriggerNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
+        .await;
+    engine
+        .register_node_type(
+            Arc::new(webhook_trigger::WebhookTriggerNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
+        .await;
+
+    // Control flow nodes
+    engine
+        .register_node_type(Arc::new(if_else::IfElseNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+    engine
+        .register_node_type(Arc::new(loop_node::LoopNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
 
     // Data Engineering nodes

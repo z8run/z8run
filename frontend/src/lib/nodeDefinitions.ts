@@ -22,15 +22,18 @@ import {
   Mic,
   Phone,
   Radio,
+  Repeat,
   Scissors,
   Send,
   ShieldCheck,
+  Split,
   Speech,
   Tags,
   Timer,
   UserCheck,
   Volume2,
   Webhook,
+  Zap,
 } from "lucide-react";
 
 /** Centralized icon registry — add new icons here only. */
@@ -68,6 +71,9 @@ export const NODE_ICON_MAP: Record<
   Headphones,
   UserCheck,
   ShieldCheck,
+  Zap,
+  Split,
+  Repeat,
 };
 
 export interface NodeDefinition {
@@ -112,6 +118,36 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     inputs: [],
     outputs: [{ id: "payload", name: "Payload", type: "object" }],
     defaultConfig: { path: "/hook", method: "POST" },
+  },
+  {
+    type: "cron-trigger",
+    label: "Cron Trigger",
+    category: "input",
+    icon: "Zap",
+    description: "Trigger flows on a schedule (cron expressions)",
+    inputs: [],
+    outputs: [{ id: "output", name: "Output", type: "object" }],
+    defaultConfig: {
+      cron: "0 * * * *",
+      timezone: "UTC",
+      payload: {},
+    },
+  },
+  {
+    type: "webhook-trigger",
+    label: "Webhook Trigger",
+    category: "input",
+    icon: "Webhook",
+    description: "Trigger flow on incoming HTTP request with auth",
+    inputs: [],
+    outputs: [{ id: "output", name: "Output", type: "object" }],
+    defaultConfig: {
+      method: "POST",
+      path: "",
+      authType: "none",
+      authToken: "",
+      responseMode: "last_node",
+    },
   },
 
   // Process nodes
@@ -209,6 +245,38 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
         { type: "eq", value: "create", port: "out1" },
         { type: "eq", value: "update", port: "out2" },
       ],
+    },
+  },
+  {
+    type: "if-else",
+    label: "If/Else",
+    category: "logic",
+    icon: "Split",
+    description: "Conditional routing: evaluate field and route to true/false",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "true", name: "True", type: "any" },
+      { id: "false", name: "False", type: "any" },
+    ],
+    defaultConfig: {
+      field: "payload.status",
+      operator: "==",
+      value: "success",
+    },
+  },
+  {
+    type: "loop",
+    label: "Loop",
+    category: "logic",
+    icon: "Repeat",
+    description: "Iterate over arrays, emitting one message per item",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [
+      { id: "item", name: "Item", type: "any" },
+      { id: "done", name: "Done", type: "object" },
+    ],
+    defaultConfig: {
+      field: "payload.items",
     },
   },
   {
