@@ -1797,6 +1797,175 @@ function SmartConfigField({
     );
   }
 
+  // ── Mapper node ───────────────────────────────────────────────
+  if (nodeType === "mapper" && fieldKey === "mappings") {
+    const mappings: { from: string; to: string }[] = Array.isArray(value)
+      ? (value as { from: string; to: string }[])
+      : [{ from: "", to: "" }];
+
+    const updateMapping = (idx: number, field: "from" | "to", val: string) => {
+      const updated = mappings.map((m, i) =>
+        i === idx ? { ...m, [field]: val } : m,
+      );
+      onChange(updated);
+    };
+
+    const addMapping = () => {
+      onChange([...mappings, { from: "", to: "" }]);
+    };
+
+    const removeMapping = (idx: number) => {
+      if (mappings.length <= 1) return;
+      onChange(mappings.filter((_, i) => i !== idx));
+    };
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-[9px] text-slate-500 px-1">
+          <span className="flex-1">Source (input path)</span>
+          <span className="w-4" />
+          <span className="flex-1">Target (output key)</span>
+          <span className="w-6" />
+        </div>
+        {mappings.map((m, idx) => (
+          <div key={idx} className="flex items-center gap-1.5">
+            <input
+              type="text"
+              value={m.from}
+              onChange={(e) => updateMapping(idx, "from", e.target.value)}
+              placeholder="body.name"
+              className={`${inputClass} flex-1 font-mono text-[11px]`}
+            />
+            <span className="text-slate-500 text-xs">→</span>
+            <input
+              type="text"
+              value={m.to}
+              onChange={(e) => updateMapping(idx, "to", e.target.value)}
+              placeholder="name"
+              className={`${inputClass} flex-1 font-mono text-[11px]`}
+            />
+            <button
+              type="button"
+              onClick={() => removeMapping(idx)}
+              disabled={mappings.length <= 1}
+              className="p-1 text-slate-500 hover:text-red-400 disabled:opacity-30
+                disabled:cursor-not-allowed transition-colors"
+              title="Remove mapping"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addMapping}
+          className="flex items-center gap-1 text-[10px] text-z8-400 hover:text-z8-300
+            transition-colors mt-1"
+        >
+          <Plus size={12} />
+          Add field mapping
+        </button>
+      </div>
+    );
+  }
+
+  if (nodeType === "mapper" && fieldKey === "passThrough") {
+    return (
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onChange(e.target.checked)}
+          className="rounded border-slate-600 bg-slate-800 text-z8-500 focus:ring-z8-500"
+        />
+        <span className="text-xs text-slate-300">
+          Include all original fields (merge mode)
+        </span>
+      </label>
+    );
+  }
+
+  // ── Sanitize node ──────────────────────────────────────────────
+  if (nodeType === "sanitize" && fieldKey === "fields") {
+    return (
+      <div>
+        <textarea
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="headers.authorization, body.password, body.ssn"
+          className={`${inputClass} font-mono resize-none`}
+          rows={3}
+        />
+        <p className="text-[9px] text-slate-500 mt-1">
+          Comma-separated dot-notation paths to sanitize
+        </p>
+      </div>
+    );
+  }
+
+  if (nodeType === "sanitize" && fieldKey === "strategy") {
+    return (
+      <select
+        value={String(value ?? "mask")}
+        onChange={(e) => onChange(e.target.value)}
+        className={selectClass}
+      >
+        <option value="mask">Mask (sk-***x8Y)</option>
+        <option value="redact">Redact ([REDACTED])</option>
+        <option value="hash">Hash (SHA-256)</option>
+        <option value="remove">Remove (set null)</option>
+      </select>
+    );
+  }
+
+  if (nodeType === "sanitize" && fieldKey === "detectPatterns") {
+    return (
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onChange(e.target.checked)}
+          className="rounded border-slate-600 bg-slate-800 text-z8-500 focus:ring-z8-500"
+        />
+        <span className="text-xs text-slate-300">
+          Auto-detect sensitive patterns in all values
+        </span>
+      </label>
+    );
+  }
+
+  if (nodeType === "sanitize" && fieldKey === "patterns") {
+    const allPatterns = [
+      { id: "credit_card", label: "Credit Cards" },
+      { id: "email", label: "Email Addresses" },
+      { id: "bearer_token", label: "Bearer Tokens" },
+      { id: "phone", label: "Phone Numbers" },
+      { id: "ip_address", label: "IP Addresses" },
+    ];
+    const current = String(value ?? "").split(",").map((s: string) => s.trim()).filter(Boolean);
+    const toggle = (id: string) => {
+      const newPatterns = current.includes(id)
+        ? current.filter((p: string) => p !== id)
+        : [...current, id];
+      onChange(newPatterns.join(","));
+    };
+    return (
+      <div className="space-y-1.5">
+        {allPatterns.map((p) => (
+          <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={current.includes(p.id)}
+              onChange={() => toggle(p.id)}
+              className="rounded border-slate-600 bg-slate-800 text-z8-500 focus:ring-z8-500"
+            />
+            <span className="text-xs text-slate-300">{p.label}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
   // No smart field
   return null;
 }
@@ -1900,7 +2069,11 @@ function hasSmartField(key: string, nodeType: string): boolean {
     (nodeType === "loop" && ["field", "itemExpression"].includes(key)) ||
     (nodeType === "cron-trigger" && ["cron", "timezone"].includes(key)) ||
     (nodeType === "webhook-trigger" &&
-      ["method", "path", "authType", "authToken", "responseMode"].includes(key))
+      ["method", "path", "authType", "authToken", "responseMode"].includes(key)) ||
+    (nodeType === "sanitize" &&
+      ["fields", "strategy", "detectPatterns", "patterns"].includes(key)) ||
+    (nodeType === "mapper" &&
+      ["mappings", "passThrough"].includes(key))
   );
 }
 

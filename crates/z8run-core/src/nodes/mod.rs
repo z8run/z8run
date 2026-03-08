@@ -26,8 +26,10 @@ pub mod image_gen;
 pub mod json_transform;
 pub mod llm;
 pub mod loop_node;
+pub mod mapper;
 pub mod mqtt;
 pub mod prompt_template;
+pub mod sanitize;
 pub mod structured_output;
 pub mod stt;
 pub mod summarizer;
@@ -190,5 +192,19 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .await;
     engine
         .register_node_type(Arc::new(batch::BatchNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .await;
+
+    // Security nodes
+    engine
+        .register_node_type(
+            Arc::new(sanitize::SanitizeNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
+        .await;
+
+    // Data shaping nodes
+    engine
+        .register_node_type(
+            Arc::new(mapper::MapperNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
 }

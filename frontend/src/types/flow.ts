@@ -14,7 +14,8 @@ export type NodeCategory =
   | "logic"
   | "data"
   | "ai"
-  | "communication";
+  | "communication"
+  | "security";
 
 export type NodeStatus = "idle" | "running" | "success" | "error" | "disabled";
 
@@ -111,4 +112,5 @@ export const CATEGORY_COLORS: Record<NodeCategory, string> = {
   data: "#06B6D4",
   ai: "#EC4899",
   communication: "#F97316",
+  security: "#EF4444",
 };

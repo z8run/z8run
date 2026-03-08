@@ -1,6 +1,7 @@
 import type { NodeCategory, PortDefinition, Z8NodeData } from "@/types/flow";
 import {
   AlignLeft,
+  ArrowRightLeft,
   Bot,
   Braces,
   Brain,
@@ -41,6 +42,7 @@ export const NODE_ICON_MAP: Record<
   React.ComponentType<{ size?: number; className?: string }>
 > = {
   Globe,
+  ArrowRightLeft,
   Clock,
   Webhook,
   Code,
@@ -398,6 +400,38 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     defaultConfig: {
       size: 100,
       field: "",
+    },
+  },
+
+  {
+    type: "mapper",
+    label: "Mapper",
+    category: "process",
+    icon: "ArrowRightLeft",
+    description: "Pick, rename, and reshape fields from the payload",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [{ id: "output", name: "Output", type: "object" }],
+    defaultConfig: {
+      mappings: [{ from: "", to: "" }],
+      passThrough: false,
+    },
+  },
+
+  // Security nodes
+  {
+    type: "sanitize",
+    label: "Sanitize",
+    category: "security",
+    icon: "ShieldCheck",
+    description: "Remove or mask sensitive data (tokens, emails, cards, IPs)",
+    inputs: [{ id: "input", name: "Input", type: "any" }],
+    outputs: [{ id: "output", name: "Output", type: "object" }],
+    defaultConfig: {
+      fields: "",
+      strategy: "mask",
+      detectPatterns: true,
+      patterns:
+        "credit_card,email,bearer_token,phone,ip_address",
     },
   },
 
@@ -759,6 +793,7 @@ export const NODE_CATEGORIES: { id: NodeCategory; label: string }[] = [
   { id: "data", label: "Data" },
   { id: "ai", label: "AI" },
   { id: "communication", label: "Communication" },
+  { id: "security", label: "Security" },
 ];
 
 /** Create Z8NodeData from a NodeDefinition */

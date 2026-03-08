@@ -1034,6 +1034,8 @@ async fn import_flow(
         "summarizer",
         "ai-agent",
         "image-gen",
+        "sanitize",
+        "mapper",
     ];
 
     if let Some(canvas_nodes) = flow_data["canvas_nodes"].as_array() {

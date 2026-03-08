@@ -242,6 +242,154 @@ const MOCK_EVALUATORS: Record<
       },
     };
   },
+  sanitize: (input, config) => {
+    const data =
+      typeof input === "object" && input !== null ? { ...(input as Record<string, unknown>) } : { data: input };
+    const strategy = String(config.strategy ?? "mask");
+    const fieldsStr = String(config.fields ?? "");
+    const fields = fieldsStr
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+
+    // Helper: mask a string value
+    const maskValue = (val: unknown): unknown => {
+      if (typeof val !== "string") return "***";
+      const len = val.length;
+      if (len <= 4) return "****";
+      if (len <= 8) return val.slice(0, 1) + "***";
+      const show = Math.min(3, Math.floor(len / 4));
+      return val.slice(0, show) + "***" + val.slice(-show);
+    };
+
+    const applyStrategy = (val: unknown): unknown => {
+      switch (strategy) {
+        case "remove":
+          return null;
+        case "redact":
+          return "[REDACTED]";
+        case "hash":
+          return `sha256:${Math.random().toString(16).slice(2, 18)}...`;
+        case "mask":
+        default:
+          return maskValue(val);
+      }
+    };
+
+    // Apply to explicit fields (simple dot notation)
+    const result = JSON.parse(JSON.stringify(data));
+    let count = 0;
+    for (const path of fields) {
+      const parts = path.split(".");
+      let current = result as Record<string, unknown>;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const p = parts[i] as string;
+        if (current[p] && typeof current[p] === "object") {
+          current = current[p] as Record<string, unknown>;
+        } else {
+          current = {} as Record<string, unknown>; // path doesn't exist
+          break;
+        }
+      }
+      const lastKey = parts[parts.length - 1] as string;
+      if (lastKey in current) {
+        current[lastKey] = applyStrategy(current[lastKey]);
+        count++;
+      }
+    }
+
+    // Pattern detection (simplified mock)
+    const detectPatterns = Boolean(config.detectPatterns);
+    if (detectPatterns) {
+      const scan = (obj: Record<string, unknown>) => {
+        for (const k of Object.keys(obj)) {
+          const v = obj[k];
+          if (typeof v === "string") {
+            // Bearer token
+            if (/Bearer\s+\S+/i.test(v)) {
+              obj[k] = v.replace(/Bearer\s+\S+/i, "Bearer [REDACTED]");
+              count++;
+            }
+            // Email
+            if (/\S+@\S+\.\S+/.test(v)) {
+              obj[k] = (obj[k] as string).replace(
+                /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
+                (m: string) => m[0] + "***@" + m.split("@")[1]
+              );
+              count++;
+            }
+          } else if (v && typeof v === "object") {
+            scan(v as Record<string, unknown>);
+          }
+        }
+      };
+      scan(result);
+    }
+
+    return {
+      port: "output",
+      output: {
+        ...result,
+        _sanitized: { fields, strategy, count, patterns_enabled: detectPatterns },
+      },
+    };
+  },
+  mapper: (input, config) => {
+    const data =
+      typeof input === "object" && input !== null ? (input as Record<string, unknown>) : { data: input };
+    const passThrough = Boolean(config.passThrough);
+    const mappings: { from: string; to: string }[] = Array.isArray(config.mappings)
+      ? (config.mappings as { from: string; to: string }[])
+      : [];
+
+    // Dot-notation lookup
+    const lookup = (obj: unknown, path: string): unknown => {
+      if (!path) return undefined;
+      let cur: unknown = obj;
+      for (const seg of path.split(".")) {
+        if (cur && typeof cur === "object" && seg in (cur as Record<string, unknown>)) {
+          cur = (cur as Record<string, unknown>)[seg];
+        } else {
+          return undefined;
+        }
+      }
+      return cur;
+    };
+
+    // Dot-notation set
+    const setPath = (obj: Record<string, unknown>, path: string, val: unknown) => {
+      const parts = path.split(".");
+      let cur = obj;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const p = parts[i] as string;
+        if (!(p in cur) || typeof cur[p] !== "object") {
+          cur[p] = {};
+        }
+        cur = cur[p] as Record<string, unknown>;
+      }
+      cur[parts[parts.length - 1] as string] = val;
+    };
+
+    const output: Record<string, unknown> = passThrough
+      ? JSON.parse(JSON.stringify(data))
+      : {};
+
+    let mapped = 0;
+    for (const m of mappings) {
+      if (!m.from) continue;
+      const val = lookup(data, m.from);
+      if (val !== undefined) {
+        const target = m.to || m.from.split(".").pop() || m.from;
+        setPath(output, target, val);
+        mapped++;
+      }
+    }
+
+    return {
+      port: "output",
+      output: { ...output, _mapped: { count: mapped, total: mappings.length } },
+    };
+  },
 };
 
 interface MockResult {
@@ -433,6 +581,31 @@ function generateSampleInput(
       return { payload: [{ value: 10 }, { value: 20 }, { value: 30 }] };
     case "batch":
       return { payload: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
+    case "mapper":
+      return {
+        method: "POST",
+        path: "/test-hook",
+        headers: {
+          authorization: "Bearer token123",
+          "content-type": "application/json",
+        },
+        body: { name: "Pool", email: "pool@example.com", role: "admin" },
+        query: {},
+      };
+    case "sanitize":
+      return {
+        headers: {
+          authorization: "Bearer GfEfqLalRgmJrlB4uF8HCnd4K26eoqA2lbjkXCd4x8Y",
+          "content-type": "application/json",
+        },
+        body: {
+          email: "john.doe@example.com",
+          phone: "+1-555-123-4567",
+          card: "4111-1111-1111-1111",
+          password: "supersecret123",
+          ip: "192.168.1.100",
+        },
+      };
     default:
       return {
         payload: { data: "sample", timestamp: new Date().toISOString() },
