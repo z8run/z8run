@@ -18,6 +18,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import { NodeTestPanel } from "./NodeTestPanel";
 
 const STATUS_BADGES: Record<
   NodeStatus,
@@ -2148,6 +2149,9 @@ export function ConfigPanel() {
             </div>
           </div>
         )}
+
+        {/* Test / Mock panel */}
+        <NodeTestPanel nodeType={nodeType} config={config} />
 
         {/* Ports section */}
         {(inputs.length > 0 || outputs.length > 0) && (
