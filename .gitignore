@@ -29,3 +29,6 @@ Thumbs.db
 /frontend/node_modules/
 /frontend/dist/
 /frontend/build/
+
+# Code quality reports
+.jscpd-report/
