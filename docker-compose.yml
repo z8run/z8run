@@ -12,6 +12,10 @@ services:
       Z8_LOG_LEVEL: "${Z8_LOG_LEVEL:-info}"
       Z8_JWT_SECRET: "${Z8_JWT_SECRET}"
       Z8_VAULT_SECRET: "${Z8_VAULT_SECRET:-change-me-in-production}"
+      Z8_RATE_LIMIT_API: "${Z8_RATE_LIMIT_API:-100}"
+      Z8_RATE_LIMIT_AUTH: "${Z8_RATE_LIMIT_AUTH:-20}"
+      Z8_RATE_LIMIT_HOOK: "${Z8_RATE_LIMIT_HOOK:-200}"
+      Z8_RATE_LIMIT_WINDOW: "${Z8_RATE_LIMIT_WINDOW:-60}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

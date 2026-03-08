@@ -6,6 +6,7 @@
 
 pub mod auth;
 pub mod error;
+pub mod rate_limit;
 pub mod routes;
 pub mod state;
 pub mod ws;
@@ -19,13 +20,17 @@ use state::AppState;
 
 /// Builds the main application router.
 pub fn build_router(state: Arc<AppState>) -> Router {
-    // Protected API routes with JWT middleware
+    // Initialize rate limiters from env vars
+    rate_limit::init_rate_limiters();
+
+    // Protected API routes with JWT middleware + API rate limit
     let protected_api = routes::api_routes().layer(axum::middleware::from_fn_with_state(
         state.clone(),
         auth::jwt_middleware,
     ));
 
     // Auth routes: public (/register, /login) + protected (/me)
+    // Auth routes get stricter rate limiting
     let auth_router = auth::auth_routes().merge(auth::auth_protected_routes().layer(
         axum::middleware::from_fn_with_state(state.clone(), auth::jwt_middleware),
     ));
@@ -34,9 +39,20 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let public_api = routes::public_routes();
 
     Router::new()
-        .nest("/api/v1", protected_api.merge(public_api))
-        .nest("/auth", auth_router)
-        .nest("/hook", routes::hook_routes())
+        .nest(
+            "/api/v1",
+            protected_api
+                .merge(public_api)
+                .layer(axum::middleware::from_fn(rate_limit::api_rate_limit)),
+        )
+        .nest(
+            "/auth",
+            auth_router.layer(axum::middleware::from_fn(rate_limit::auth_rate_limit)),
+        )
+        .nest(
+            "/hook",
+            routes::hook_routes().layer(axum::middleware::from_fn(rate_limit::hook_rate_limit)),
+        )
         .nest("/ws", ws::ws_routes())
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
