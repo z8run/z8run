@@ -196,15 +196,11 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
 
     // Security nodes
     engine
-        .register_node_type(
-            Arc::new(sanitize::SanitizeNodeFactory) as Arc<dyn NodeExecutorFactory>
-        )
+        .register_node_type(Arc::new(sanitize::SanitizeNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
 
     // Data shaping nodes
     engine
-        .register_node_type(
-            Arc::new(mapper::MapperNodeFactory) as Arc<dyn NodeExecutorFactory>
-        )
+        .register_node_type(Arc::new(mapper::MapperNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
 }

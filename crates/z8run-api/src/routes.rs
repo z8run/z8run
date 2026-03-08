@@ -719,15 +719,16 @@ async fn hook_handler(
                 if auth_type != "none" {
                     // Resolve the token (may be a vault reference like "vault:my-key")
                     let raw_token = config["authToken"].as_str().unwrap_or("");
-                    let expected_token = if raw_token.starts_with("vault:") {
-                        let key = &raw_token[6..];
+                    let expected_token = if let Some(key) = raw_token.strip_prefix("vault:") {
                         match state.vault.retrieve(key).await {
                             Ok(secret) => secret,
                             Err(e) => {
                                 warn!(error = %e, key = key, "Failed to resolve vault ref for webhook auth");
                                 return (
                                     StatusCode::INTERNAL_SERVER_ERROR,
-                                    Json(serde_json::json!({"error": "Failed to resolve auth credential"})),
+                                    Json(
+                                        serde_json::json!({"error": "Failed to resolve auth credential"}),
+                                    ),
                                 );
                             }
                         }
@@ -758,7 +759,9 @@ async fn hook_handler(
                                 info!(flow_id = %flow_id, "Webhook auth failed: invalid or missing Bearer token");
                                 return (
                                     StatusCode::UNAUTHORIZED,
-                                    Json(serde_json::json!({"error": "Unauthorized: invalid or missing Bearer token"})),
+                                    Json(
+                                        serde_json::json!({"error": "Unauthorized: invalid or missing Bearer token"}),
+                                    ),
                                 );
                             }
                         }
@@ -782,7 +785,9 @@ async fn hook_handler(
                                 info!(flow_id = %flow_id, "Webhook auth failed: invalid or missing Basic credentials");
                                 return (
                                     StatusCode::UNAUTHORIZED,
-                                    Json(serde_json::json!({"error": "Unauthorized: invalid or missing Basic credentials"})),
+                                    Json(
+                                        serde_json::json!({"error": "Unauthorized: invalid or missing Basic credentials"}),
+                                    ),
                                 );
                             }
                         }
@@ -793,18 +798,20 @@ async fn hook_handler(
                                 .or_else(|| headers.get("x-hub-signature-256"))
                                 .and_then(|v| v.to_str().ok())
                                 .unwrap_or("");
-                            let provided_sig = raw_sig
-                                .strip_prefix("sha256=")
-                                .unwrap_or(raw_sig);
+                            let provided_sig = raw_sig.strip_prefix("sha256=").unwrap_or(raw_sig);
                             use hmac::{Hmac, Mac};
                             use sha2::Sha256;
                             type HmacSha256 = Hmac<Sha256>;
-                            let mut mac = match HmacSha256::new_from_slice(expected_token.as_bytes()) {
+                            let mut mac = match HmacSha256::new_from_slice(
+                                expected_token.as_bytes(),
+                            ) {
                                 Ok(m) => m,
                                 Err(_) => {
                                     return (
                                         StatusCode::INTERNAL_SERVER_ERROR,
-                                        Json(serde_json::json!({"error": "Invalid HMAC key configuration"})),
+                                        Json(
+                                            serde_json::json!({"error": "Invalid HMAC key configuration"}),
+                                        ),
                                     );
                                 }
                             };
@@ -814,7 +821,9 @@ async fn hook_handler(
                                 info!(flow_id = %flow_id, "Webhook auth failed: HMAC signature mismatch");
                                 return (
                                     StatusCode::UNAUTHORIZED,
-                                    Json(serde_json::json!({"error": "Unauthorized: HMAC signature mismatch"})),
+                                    Json(
+                                        serde_json::json!({"error": "Unauthorized: HMAC signature mismatch"}),
+                                    ),
                                 );
                             }
                         }

@@ -161,7 +161,7 @@ fn apply_strategy(value: &Value, strategy: &str) -> Value {
             let hash = format!("sha256:{:x}", hasher.finalize());
             Value::String(hash)
         }
-        "mask" | _ => {
+        _ => {
             // Mask: show first and last few chars
             match value {
                 Value::String(s) => {
@@ -228,17 +228,11 @@ fn json_path_lookup(data: &Value, path: &str) -> Option<Value> {
     for segment in path.split('.') {
         match current {
             Value::Object(map) => {
-                current = match map.get(segment) {
-                    Some(v) => v,
-                    None => return None,
-                };
+                current = map.get(segment)?;
             }
             Value::Array(arr) => {
                 if let Ok(idx) = segment.parse::<usize>() {
-                    current = match arr.get(idx) {
-                        Some(v) => v,
-                        None => return None,
-                    };
+                    current = arr.get(idx)?;
                 } else {
                     return None;
                 }
@@ -250,11 +244,7 @@ fn json_path_lookup(data: &Value, path: &str) -> Option<Value> {
 }
 
 /// Recursively scan all string values and apply pattern detection.
-fn scan_and_sanitize_patterns(
-    value: &mut Value,
-    patterns: &SensitivePatterns,
-    enabled: &[String],
-) {
+fn scan_and_sanitize_patterns(value: &mut Value, patterns: &SensitivePatterns, enabled: &[String]) {
     match value {
         Value::String(s) => {
             let sanitized = patterns.apply(s, enabled);
@@ -280,8 +270,6 @@ fn scan_and_sanitize_patterns(
 impl NodeExecutor for SanitizeNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         let mut payload = msg.payload.clone();
-        let sanitized_count;
-
         // Step 1: Sanitize explicitly listed fields
         let mut count = 0usize;
         for field_path in &self.fields {
@@ -308,7 +296,7 @@ impl NodeExecutor for SanitizeNode {
             scan_and_sanitize_patterns(&mut payload, &sensitive_patterns, &self.patterns);
         }
 
-        sanitized_count = count;
+        let sanitized_count = count;
         debug!(
             node = %self.name,
             fields_sanitized = sanitized_count,
@@ -471,10 +459,7 @@ mod tests {
             "body": { "password": "supersecret123" }
         }));
         let result = node.process(msg).await.unwrap();
-        assert_eq!(
-            result[0].payload["body"]["password"],
-            "[REDACTED]"
-        );
+        assert_eq!(result[0].payload["body"]["password"], "[REDACTED]");
     }
 
     #[tokio::test]
@@ -525,7 +510,9 @@ mod tests {
             }
         }));
         let result = node.process(msg).await.unwrap();
-        let auth = result[0].payload["headers"]["authorization"].as_str().unwrap();
+        let auth = result[0].payload["headers"]["authorization"]
+            .as_str()
+            .unwrap();
         assert!(auth.contains("[REDACTED]"));
         assert!(!auth.contains("GfEfqLalRgmJrlB4uF8HCnd4K26eoqA2lbjkXCd4x8Y"));
     }

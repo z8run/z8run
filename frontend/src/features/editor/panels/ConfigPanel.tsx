@@ -1828,7 +1828,10 @@ function SmartConfigField({
           <span className="w-6" />
         </div>
         {mappings.map((m, idx) => (
-          <div key={idx} className="flex items-center gap-1.5">
+          <div
+            key={`mapping-${m.from}-${m.to}-${idx}`}
+            className="flex items-center gap-1.5"
+          >
             <input
               type="text"
               value={m.from}
@@ -1942,7 +1945,10 @@ function SmartConfigField({
       { id: "phone", label: "Phone Numbers" },
       { id: "ip_address", label: "IP Addresses" },
     ];
-    const current = String(value ?? "").split(",").map((s: string) => s.trim()).filter(Boolean);
+    const current = String(value ?? "")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean);
     const toggle = (id: string) => {
       const newPatterns = current.includes(id)
         ? current.filter((p: string) => p !== id)
@@ -2069,11 +2075,12 @@ function hasSmartField(key: string, nodeType: string): boolean {
     (nodeType === "loop" && ["field", "itemExpression"].includes(key)) ||
     (nodeType === "cron-trigger" && ["cron", "timezone"].includes(key)) ||
     (nodeType === "webhook-trigger" &&
-      ["method", "path", "authType", "authToken", "responseMode"].includes(key)) ||
+      ["method", "path", "authType", "authToken", "responseMode"].includes(
+        key,
+      )) ||
     (nodeType === "sanitize" &&
       ["fields", "strategy", "detectPatterns", "patterns"].includes(key)) ||
-    (nodeType === "mapper" &&
-      ["mappings", "passThrough"].includes(key))
+    (nodeType === "mapper" && ["mappings", "passThrough"].includes(key))
   );
 }
 

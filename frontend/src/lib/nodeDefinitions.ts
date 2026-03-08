@@ -430,8 +430,7 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       fields: "",
       strategy: "mask",
       detectPatterns: true,
-      patterns:
-        "credit_card,email,bearer_token,phone,ip_address",
+      patterns: "credit_card,email,bearer_token,phone,ip_address",
     },
   },
 

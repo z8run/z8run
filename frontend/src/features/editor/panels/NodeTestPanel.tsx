@@ -244,7 +244,9 @@ const MOCK_EVALUATORS: Record<
   },
   sanitize: (input, config) => {
     const data =
-      typeof input === "object" && input !== null ? { ...(input as Record<string, unknown>) } : { data: input };
+      typeof input === "object" && input !== null
+        ? { ...(input as Record<string, unknown>) }
+        : { data: input };
     const strategy = String(config.strategy ?? "mask");
     const fieldsStr = String(config.fields ?? "");
     const fields = fieldsStr
@@ -257,9 +259,9 @@ const MOCK_EVALUATORS: Record<
       if (typeof val !== "string") return "***";
       const len = val.length;
       if (len <= 4) return "****";
-      if (len <= 8) return val.slice(0, 1) + "***";
+      if (len <= 8) return `${val.slice(0, 1)}***`;
       const show = Math.min(3, Math.floor(len / 4));
-      return val.slice(0, show) + "***" + val.slice(-show);
+      return `${val.slice(0, show)}***${val.slice(-show)}`;
     };
 
     const applyStrategy = (val: unknown): unknown => {
@@ -270,7 +272,6 @@ const MOCK_EVALUATORS: Record<
           return "[REDACTED]";
         case "hash":
           return `sha256:${Math.random().toString(16).slice(2, 18)}...`;
-        case "mask":
         default:
           return maskValue(val);
       }
@@ -314,7 +315,7 @@ const MOCK_EVALUATORS: Record<
             if (/\S+@\S+\.\S+/.test(v)) {
               obj[k] = (obj[k] as string).replace(
                 /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,
-                (m: string) => m[0] + "***@" + m.split("@")[1]
+                (m: string) => `${m[0]}***@${m.split("@")[1]}`,
               );
               count++;
             }
@@ -330,15 +331,24 @@ const MOCK_EVALUATORS: Record<
       port: "output",
       output: {
         ...result,
-        _sanitized: { fields, strategy, count, patterns_enabled: detectPatterns },
+        _sanitized: {
+          fields,
+          strategy,
+          count,
+          patterns_enabled: detectPatterns,
+        },
       },
     };
   },
   mapper: (input, config) => {
     const data =
-      typeof input === "object" && input !== null ? (input as Record<string, unknown>) : { data: input };
+      typeof input === "object" && input !== null
+        ? (input as Record<string, unknown>)
+        : { data: input };
     const passThrough = Boolean(config.passThrough);
-    const mappings: { from: string; to: string }[] = Array.isArray(config.mappings)
+    const mappings: { from: string; to: string }[] = Array.isArray(
+      config.mappings,
+    )
       ? (config.mappings as { from: string; to: string }[])
       : [];
 
@@ -347,7 +357,11 @@ const MOCK_EVALUATORS: Record<
       if (!path) return undefined;
       let cur: unknown = obj;
       for (const seg of path.split(".")) {
-        if (cur && typeof cur === "object" && seg in (cur as Record<string, unknown>)) {
+        if (
+          cur &&
+          typeof cur === "object" &&
+          seg in (cur as Record<string, unknown>)
+        ) {
           cur = (cur as Record<string, unknown>)[seg];
         } else {
           return undefined;
@@ -357,7 +371,11 @@ const MOCK_EVALUATORS: Record<
     };
 
     // Dot-notation set
-    const setPath = (obj: Record<string, unknown>, path: string, val: unknown) => {
+    const setPath = (
+      obj: Record<string, unknown>,
+      path: string,
+      val: unknown,
+    ) => {
       const parts = path.split(".");
       let cur = obj;
       for (let i = 0; i < parts.length - 1; i++) {

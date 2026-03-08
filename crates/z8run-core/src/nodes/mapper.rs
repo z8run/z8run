@@ -18,7 +18,7 @@
 //! - `from`: dot-notation path in the input
 //! - `to`:   key name in the output (supports dot-notation for nested output)
 //! - `passThrough`: if true, include ALL input fields plus the mapped aliases.
-//!                   if false (default), output ONLY the mapped fields.
+//!   if false (default), output ONLY the mapped fields.
 
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
@@ -45,17 +45,11 @@ fn json_path_lookup(data: &Value, path: &str) -> Option<Value> {
     for segment in path.split('.') {
         match current {
             Value::Object(map) => {
-                current = match map.get(segment) {
-                    Some(v) => v,
-                    None => return None,
-                };
+                current = map.get(segment)?;
             }
             Value::Array(arr) => {
                 if let Ok(idx) = segment.parse::<usize>() {
-                    current = match arr.get(idx) {
-                        Some(v) => v,
-                        None => return None,
-                    };
+                    current = arr.get(idx)?;
                 } else {
                     return None;
                 }
@@ -180,11 +174,7 @@ impl NodeExecutor for MapperNode {
                         // Same name for from and to
                         let field = entry.trim().to_string();
                         // Use last segment as the output key
-                        let to = field
-                            .rsplit('.')
-                            .next()
-                            .unwrap_or(&field)
-                            .to_string();
+                        let to = field.rsplit('.').next().unwrap_or(&field).to_string();
                         FieldMapping {
                             from: field,
                             to,
