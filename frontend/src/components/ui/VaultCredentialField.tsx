@@ -2,6 +2,7 @@ import { vaultApi } from "@/api/vault";
 import {
   Check,
   ChevronDown,
+  Dices,
   Eye,
   EyeOff,
   KeyRound,
@@ -9,6 +10,17 @@ import {
   Plus,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+
+/** Generate a cryptographically secure random secret (base64url, 32 bytes = 256 bits). */
+function generateRandomSecret(length = 32): string {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  // base64url encoding (URL-safe, no padding)
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
 interface VaultCredentialFieldProps {
   /** Current value — either "vault:key-name" or a raw string */
@@ -199,14 +211,26 @@ export function VaultCredentialField({
                       className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1
                         text-[11px] text-slate-200 font-mono focus:outline-none focus:border-z8-500"
                     />
-                    <input
-                      type="password"
-                      value={newKeyValue}
-                      onChange={(e) => setNewKeyValue(e.target.value)}
-                      placeholder="Secret value"
-                      className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1
-                        text-[11px] text-slate-200 font-mono focus:outline-none focus:border-z8-500"
-                    />
+                    <div className="flex gap-1">
+                      <input
+                        type="password"
+                        value={newKeyValue}
+                        onChange={(e) => setNewKeyValue(e.target.value)}
+                        placeholder="Secret value"
+                        className="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1
+                          text-[11px] text-slate-200 font-mono focus:outline-none focus:border-z8-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewKeyValue(generateRandomSecret())}
+                        className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300
+                          text-[10px] rounded transition-colors flex items-center gap-1 shrink-0"
+                        title="Generate random 256-bit secret"
+                      >
+                        <Dices size={10} />
+                        Generate
+                      </button>
+                    </div>
                     <div className="flex gap-1">
                       <button
                         type="button"

@@ -702,6 +702,132 @@ async fn hook_handler(
         }
     };
 
+    // ── Webhook auth validation ─────────────────────────────────────
+    // Extract auth config from the webhook-trigger / webhook node in canvas
+    if let Some(canvas_nodes) = stored_flow
+        .metadata
+        .positions
+        .get("canvas_nodes")
+        .and_then(|v| v.as_array())
+    {
+        for node in canvas_nodes {
+            let node_type = node["data"]["type"].as_str().unwrap_or("");
+            if node_type == "webhook-trigger" || node_type == "webhook" {
+                let config = &node["data"]["config"];
+                let auth_type = config["authType"].as_str().unwrap_or("none");
+
+                if auth_type != "none" {
+                    // Resolve the token (may be a vault reference like "vault:my-key")
+                    let raw_token = config["authToken"].as_str().unwrap_or("");
+                    let expected_token = if raw_token.starts_with("vault:") {
+                        let key = &raw_token[6..];
+                        match state.vault.retrieve(key).await {
+                            Ok(secret) => secret,
+                            Err(e) => {
+                                warn!(error = %e, key = key, "Failed to resolve vault ref for webhook auth");
+                                return (
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    Json(serde_json::json!({"error": "Failed to resolve auth credential"})),
+                                );
+                            }
+                        }
+                    } else {
+                        raw_token.to_string()
+                    };
+
+                    if expected_token.is_empty() {
+                        warn!(flow_id = %flow_id, "Webhook auth configured but token is empty");
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({"error": "Webhook auth token not configured"})),
+                        );
+                    }
+
+                    match auth_type {
+                        "bearer" => {
+                            let provided = headers
+                                .get("authorization")
+                                .and_then(|v| v.to_str().ok())
+                                .unwrap_or("");
+                            let valid = provided
+                                .strip_prefix("Bearer ")
+                                .or_else(|| provided.strip_prefix("bearer "))
+                                .map(|t| t == expected_token)
+                                .unwrap_or(false);
+                            if !valid {
+                                info!(flow_id = %flow_id, "Webhook auth failed: invalid or missing Bearer token");
+                                return (
+                                    StatusCode::UNAUTHORIZED,
+                                    Json(serde_json::json!({"error": "Unauthorized: invalid or missing Bearer token"})),
+                                );
+                            }
+                        }
+                        "basic" => {
+                            // Expected token format: "username:password" (base64-encoded in the header)
+                            let provided = headers
+                                .get("authorization")
+                                .and_then(|v| v.to_str().ok())
+                                .unwrap_or("");
+                            let valid = provided
+                                .strip_prefix("Basic ")
+                                .or_else(|| provided.strip_prefix("basic "))
+                                .and_then(|b64| {
+                                    use base64::Engine;
+                                    base64::engine::general_purpose::STANDARD.decode(b64).ok()
+                                })
+                                .and_then(|bytes| String::from_utf8(bytes).ok())
+                                .map(|decoded| decoded == expected_token)
+                                .unwrap_or(false);
+                            if !valid {
+                                info!(flow_id = %flow_id, "Webhook auth failed: invalid or missing Basic credentials");
+                                return (
+                                    StatusCode::UNAUTHORIZED,
+                                    Json(serde_json::json!({"error": "Unauthorized: invalid or missing Basic credentials"})),
+                                );
+                            }
+                        }
+                        "hmac" => {
+                            // HMAC-SHA256: verify X-Signature header against body
+                            let raw_sig = headers
+                                .get("x-signature")
+                                .or_else(|| headers.get("x-hub-signature-256"))
+                                .and_then(|v| v.to_str().ok())
+                                .unwrap_or("");
+                            let provided_sig = raw_sig
+                                .strip_prefix("sha256=")
+                                .unwrap_or(raw_sig);
+                            use hmac::{Hmac, Mac};
+                            use sha2::Sha256;
+                            type HmacSha256 = Hmac<Sha256>;
+                            let mut mac = match HmacSha256::new_from_slice(expected_token.as_bytes()) {
+                                Ok(m) => m,
+                                Err(_) => {
+                                    return (
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        Json(serde_json::json!({"error": "Invalid HMAC key configuration"})),
+                                    );
+                                }
+                            };
+                            mac.update(body.as_bytes());
+                            let expected_sig = hex::encode(mac.finalize().into_bytes());
+                            if provided_sig != expected_sig {
+                                info!(flow_id = %flow_id, "Webhook auth failed: HMAC signature mismatch");
+                                return (
+                                    StatusCode::UNAUTHORIZED,
+                                    Json(serde_json::json!({"error": "Unauthorized: HMAC signature mismatch"})),
+                                );
+                            }
+                        }
+                        other => {
+                            warn!(flow_id = %flow_id, auth_type = other, "Unknown webhook auth type");
+                        }
+                    }
+                }
+                break; // Only check the first trigger node
+            }
+        }
+    }
+
     // Build executable flow
     let (exec_flow, _id_map) = match canvas_to_flow(&stored_flow, state.vault.as_ref()).await {
         Ok(result) => result,

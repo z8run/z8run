@@ -3,6 +3,7 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   AlertTriangle,
   Copy,
+  Dices,
   Eye,
   EyeOff,
   Loader2,
@@ -13,6 +14,16 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+/** Generate a cryptographically secure random secret (base64url, 32 bytes = 256 bits). */
+function generateRandomSecret(length = 32): string {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
 
 export function VaultPage() {
   const navigate = useNavigate();
@@ -256,6 +267,16 @@ export function VaultPage() {
                     focus:border-z8-500 font-mono resize-none"
                   rows={3}
                 />
+                <button
+                  type="button"
+                  onClick={() => setNewValue(generateRandomSecret())}
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700
+                    text-slate-300 text-xs rounded-md transition-colors border border-slate-700"
+                  title="Generate random 256-bit secret"
+                >
+                  <Dices size={14} />
+                  Generate Random Secret
+                </button>
               </div>
               <div className="flex gap-3 justify-end">
                 <button

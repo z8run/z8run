@@ -1731,6 +1731,22 @@ function SmartConfigField({
       </select>
     );
   }
+  if (fieldKey === "path" && nodeType === "webhook-trigger") {
+    return (
+      <div className="space-y-1">
+        <input
+          type="text"
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="/my-webhook"
+          className={`${inputClass} font-mono`}
+        />
+        <div className="text-[9px] text-slate-500">
+          Sub-path after /hook/&#123;flow_id&#125;/
+        </div>
+      </div>
+    );
+  }
   if (fieldKey === "authType" && nodeType === "webhook-trigger") {
     return (
       <select
