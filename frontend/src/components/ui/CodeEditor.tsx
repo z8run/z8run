@@ -1,12 +1,12 @@
+import { javascript } from "@codemirror/lang-javascript";
+import { json } from "@codemirror/lang-json";
+import { python } from "@codemirror/lang-python";
+import { rust } from "@codemirror/lang-rust";
+import { sql } from "@codemirror/lang-sql";
+import { EditorView } from "@codemirror/view";
+import CodeMirror from "@uiw/react-codemirror";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import CodeMirror from "@uiw/react-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
-import { python } from "@codemirror/lang-python";
-import { sql } from "@codemirror/lang-sql";
-import { json } from "@codemirror/lang-json";
-import { rust } from "@codemirror/lang-rust";
-import { EditorView } from "@codemirror/view";
 
 /** Supported languages for the code editor */
 export const CODE_LANGUAGES = [
@@ -48,9 +48,7 @@ export function detectLanguage(code: string): CodeLanguage {
 
   // Python detection
   if (
-    /^(def |class |import |from |print\(|if __name__|#!.*python)/m.test(
-      trimmed,
-    )
+    /^(def |class |import |from |print\(|if __name__|#!.*python)/m.test(trimmed)
   ) {
     return "python";
   }
@@ -95,8 +93,6 @@ function getLanguageExtension(lang: CodeLanguage) {
       return json();
     case "rust":
       return rust();
-    case "shell":
-    case "text":
     default:
       return [];
   }
@@ -215,7 +211,12 @@ const z8ThemeFullscreen = EditorView.theme(
 
 /* ─── SVG icon paths ─── */
 const ExpandIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5">
+  <svg
+    viewBox="0 0 16 16"
+    fill="none"
+    className="w-3.5 h-3.5"
+    aria-hidden="true"
+  >
     <path
       d="M6 1H1v5M15 10v5h-5M1 1l5.5 5.5M15 15l-5.5-5.5"
       stroke="currentColor"
@@ -227,7 +228,7 @@ const ExpandIcon = () => (
 );
 
 const ShrinkIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4">
+  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" aria-hidden="true">
     <path
       d="M1 6h5V1M10 15v-5h5M6 6L0.5 0.5M10 10l5.5 5.5"
       stroke="currentColor"
@@ -239,7 +240,7 @@ const ShrinkIcon = () => (
 );
 
 const CloseIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4">
+  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4" aria-hidden="true">
     <path
       d="M12 4L4 12M4 4l8 8"
       stroke="currentColor"
@@ -250,7 +251,12 @@ const CloseIcon = () => (
 );
 
 const BoltIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" className="w-3.5 h-3.5 text-slate-500">
+  <svg
+    viewBox="0 0 16 16"
+    fill="none"
+    className="w-3.5 h-3.5 text-slate-500"
+    aria-hidden="true"
+  >
     <path
       d="M4 1L1 8h3l-1 7 9-10H8l2-5H4z"
       stroke="currentColor"
@@ -389,6 +395,7 @@ function FullscreenEditor({
               viewBox="0 0 16 16"
               fill="none"
               className="w-4 h-4 text-indigo-400"
+              aria-hidden="true"
             >
               <path
                 d="M5 12l-3-3 3-3M11 4l3 3-3 3"
@@ -466,9 +473,7 @@ function FullscreenEditor({
           </span>
           <span>{charCount} chars</span>
         </div>
-        <span className="text-slate-600">
-          Ctrl+F to search · Esc to close
-        </span>
+        <span className="text-slate-600">Ctrl+F to search · Esc to close</span>
       </div>
     </div>,
     document.body,

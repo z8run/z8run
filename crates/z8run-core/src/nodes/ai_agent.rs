@@ -65,70 +65,67 @@ impl NodeExecutor for AiAgentNode {
         let timeout = std::time::Duration::from_millis(self.timeout_ms);
 
         // Check if this is a continuation (tool_result coming back)
-        let (mut history, iteration) = if let Some(history_val) =
-            msg.payload.get("conversation_history")
-        {
-            let history: Vec<serde_json::Value> = history_val
-                .as_array()
-                .cloned()
-                .unwrap_or_default();
-            let iter = msg
-                .payload
-                .get("iteration")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(1) as u32;
+        let (mut history, iteration) =
+            if let Some(history_val) = msg.payload.get("conversation_history") {
+                let history: Vec<serde_json::Value> =
+                    history_val.as_array().cloned().unwrap_or_default();
+                let iter = msg
+                    .payload
+                    .get("iteration")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(1) as u32;
 
-            // Append tool result to history
-            let tool_result = msg
-                .payload
-                .get("tool_result")
-                .cloned()
-                .unwrap_or(serde_json::json!(""));
-            let tool_call_id = msg
-                .payload
-                .get("tool_call_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("call_0")
-                .to_string();
+                // Append tool result to history
+                let tool_result = msg
+                    .payload
+                    .get("tool_result")
+                    .cloned()
+                    .unwrap_or(serde_json::json!(""));
+                let tool_call_id = msg
+                    .payload
+                    .get("tool_call_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("call_0")
+                    .to_string();
 
-            let mut h = history;
-            match self.provider.as_str() {
-                "anthropic" => {
-                    h.push(serde_json::json!({
-                        "role": "user",
-                        "content": [{
-                            "type": "tool_result",
-                            "tool_use_id": tool_call_id,
+                let mut h = history;
+                match self.provider.as_str() {
+                    "anthropic" => {
+                        h.push(serde_json::json!({
+                            "role": "user",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": tool_call_id,
+                                "content": tool_result.as_str().unwrap_or(&tool_result.to_string())
+                            }]
+                        }));
+                    }
+                    _ => {
+                        // OpenAI format
+                        h.push(serde_json::json!({
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
                             "content": tool_result.as_str().unwrap_or(&tool_result.to_string())
-                        }]
-                    }));
+                        }));
+                    }
                 }
-                _ => {
-                    // OpenAI format
-                    h.push(serde_json::json!({
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "content": tool_result.as_str().unwrap_or(&tool_result.to_string())
-                    }));
+
+                (h, iter + 1)
+            } else {
+                // Fresh conversation
+                let user_message = extract_text(&msg.payload);
+                if user_message.is_empty() {
+                    let err = serde_json::json!({"error": "No message text found in payload"});
+                    return Ok(vec![msg.derive(msg.source_node, "error", err)]);
                 }
-            }
 
-            (h, iter + 1)
-        } else {
-            // Fresh conversation
-            let user_message = extract_text(&msg.payload);
-            if user_message.is_empty() {
-                let err = serde_json::json!({"error": "No message text found in payload"});
-                return Ok(vec![msg.derive(msg.source_node, "error", err)]);
-            }
-
-            let mut h = Vec::new();
-            if !self.system_prompt.is_empty() {
-                h.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
-            }
-            h.push(serde_json::json!({"role": "user", "content": user_message}));
-            (h, 1u32)
-        };
+                let mut h = Vec::new();
+                if !self.system_prompt.is_empty() {
+                    h.push(serde_json::json!({"role": "system", "content": self.system_prompt}));
+                }
+                h.push(serde_json::json!({"role": "user", "content": user_message}));
+                (h, 1u32)
+            };
 
         // Check iteration limit
         if iteration > self.max_iterations {
@@ -166,15 +163,9 @@ impl NodeExecutor for AiAgentNode {
 
         // Call LLM
         let result = match self.provider.as_str() {
-            "anthropic" => {
-                self.call_anthropic_agent(&client, &history, timeout).await
-            }
-            "ollama" => {
-                self.call_ollama_agent(&client, &history, timeout).await
-            }
-            _ => {
-                self.call_openai_agent(&client, &history, timeout).await
-            }
+            "anthropic" => self.call_anthropic_agent(&client, &history, timeout).await,
+            "ollama" => self.call_ollama_agent(&client, &history, timeout).await,
+            _ => self.call_openai_agent(&client, &history, timeout).await,
         };
 
         match result {
@@ -376,15 +367,10 @@ impl AiAgentNode {
                     .as_str()
                     .unwrap_or("unknown")
                     .to_string();
-                let arguments_str = tc["function"]["arguments"]
-                    .as_str()
-                    .unwrap_or("{}");
-                let arguments = serde_json::from_str(arguments_str)
-                    .unwrap_or(serde_json::json!({}));
-                let tool_call_id = tc["id"]
-                    .as_str()
-                    .unwrap_or("call_0")
-                    .to_string();
+                let arguments_str = tc["function"]["arguments"].as_str().unwrap_or("{}");
+                let arguments =
+                    serde_json::from_str(arguments_str).unwrap_or(serde_json::json!({}));
+                let tool_call_id = tc["id"].as_str().unwrap_or("call_0").to_string();
 
                 return Ok((
                     AgentStep::ToolCall {
@@ -397,10 +383,7 @@ impl AiAgentNode {
             }
         }
 
-        let content = assistant_msg["content"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
+        let content = assistant_msg["content"].as_str().unwrap_or("").to_string();
         Ok((AgentStep::TextResponse(content), assistant_msg))
     }
 
@@ -486,15 +469,9 @@ impl AiAgentNode {
         if let Some(content) = json["content"].as_array() {
             for block in content {
                 if block.get("type").and_then(|t| t.as_str()) == Some("tool_use") {
-                    let tool_name = block["name"]
-                        .as_str()
-                        .unwrap_or("unknown")
-                        .to_string();
+                    let tool_name = block["name"].as_str().unwrap_or("unknown").to_string();
                     let arguments = block["input"].clone();
-                    let tool_call_id = block["id"]
-                        .as_str()
-                        .unwrap_or("call_0")
-                        .to_string();
+                    let tool_call_id = block["id"].as_str().unwrap_or("call_0").to_string();
 
                     return Ok((
                         AgentStep::ToolCall {

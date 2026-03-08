@@ -50,9 +50,18 @@ impl NodeExecutor for SttNode {
         let timeout = std::time::Duration::from_millis(self.timeout_ms);
 
         let result = match self.provider.as_str() {
-            "deepgram" => self.call_deepgram(&client, &audio_data, &audio_format, &language, timeout).await,
-            "google" => self.call_google(&client, &audio_data, &language, timeout).await,
-            _ => self.call_openai(&client, &audio_data, &language, timeout).await, // default to OpenAI
+            "deepgram" => {
+                self.call_deepgram(&client, &audio_data, &audio_format, &language, timeout)
+                    .await
+            }
+            "google" => {
+                self.call_google(&client, &audio_data, &language, timeout)
+                    .await
+            }
+            _ => {
+                self.call_openai(&client, &audio_data, &language, timeout)
+                    .await
+            } // default to OpenAI
         };
 
         match result {
@@ -63,7 +72,11 @@ impl NodeExecutor for SttNode {
                     text_len = transcript_data.get("text").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0),
                     "STT transcription completed"
                 );
-                Ok(vec![msg.derive(msg.source_node, "transcript", transcript_data)])
+                Ok(vec![msg.derive(
+                    msg.source_node,
+                    "transcript",
+                    transcript_data,
+                )])
             }
             Err(e) => {
                 warn!(node = %self.name, error = %e, "STT request failed");
@@ -138,7 +151,10 @@ impl SttNode {
 
         // Build multipart form
         let form = reqwest::multipart::Form::new()
-            .part("file", reqwest::multipart::Part::bytes(audio_data.to_vec()).file_name("audio.wav"))
+            .part(
+                "file",
+                reqwest::multipart::Part::bytes(audio_data.to_vec()).file_name("audio.wav"),
+            )
             .text("model", model.clone());
 
         let form = if !language.is_empty() {
@@ -196,7 +212,11 @@ impl SttNode {
     ) -> Result<serde_json::Value, String> {
         let mut url = format!(
             "https://api.deepgram.com/v1/listen?model={}",
-            if self.model.is_empty() { "default" } else { &self.model }
+            if self.model.is_empty() {
+                "default"
+            } else {
+                &self.model
+            }
         );
 
         if !language.is_empty() {
@@ -235,9 +255,7 @@ impl SttNode {
             .as_f64()
             .unwrap_or(0.0);
 
-        let duration = json["metadata"]["duration"]
-            .as_f64()
-            .unwrap_or(0.0);
+        let duration = json["metadata"]["duration"].as_f64().unwrap_or(0.0);
 
         if transcript.is_empty() {
             return Err("No transcript in response".to_string());
@@ -418,7 +436,6 @@ fn extract_language(payload: &serde_json::Value) -> Option<String> {
 
 /// Encode bytes to base64 string
 fn base64_encode(data: &[u8]) -> String {
-    use std::str;
     const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut result = String::new();
@@ -461,22 +478,30 @@ fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
     let mut i = 0;
 
     while i < s.len() {
-        let c1 = CHARSET.iter().position(|&b| b == s.as_bytes()[i] as u8)
+        let c1 = CHARSET
+            .iter()
+            .position(|&b| b == s.as_bytes()[i])
             .ok_or_else(|| "Invalid base64 character".to_string())? as u32;
         let c2 = if i + 1 < s.len() {
-            CHARSET.iter().position(|&b| b == s.as_bytes()[i + 1] as u8)
+            CHARSET
+                .iter()
+                .position(|&b| b == s.as_bytes()[i + 1])
                 .ok_or_else(|| "Invalid base64 character".to_string())? as u32
         } else {
             0
         };
         let c3 = if i + 2 < s.len() {
-            CHARSET.iter().position(|&b| b == s.as_bytes()[i + 2] as u8)
+            CHARSET
+                .iter()
+                .position(|&b| b == s.as_bytes()[i + 2])
                 .ok_or_else(|| "Invalid base64 character".to_string())? as u32
         } else {
             0
         };
         let c4 = if i + 3 < s.len() {
-            CHARSET.iter().position(|&b| b == s.as_bytes()[i + 3] as u8)
+            CHARSET
+                .iter()
+                .position(|&b| b == s.as_bytes()[i + 3])
                 .ok_or_else(|| "Invalid base64 character".to_string())? as u32
         } else {
             0
@@ -610,7 +635,7 @@ mod tests {
 
     #[test]
     fn test_stt_node_creation() {
-        let config = serde_json::json!({
+        let _config = serde_json::json!({
             "name": "STT Node",
             "provider": "openai",
             "apiKey": "test-key",

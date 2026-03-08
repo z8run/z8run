@@ -148,7 +148,7 @@ impl CsvNode {
                 let record = record.map_err(|e| {
                     crate::error::Z8Error::Internal(format!("CSV record error: {}", e))
                 })?;
-                let arr: Vec<Value> = record.iter().map(|f| parse_field_value(f)).collect();
+                let arr: Vec<Value> = record.iter().map(parse_field_value).collect();
                 rows.push(Value::Array(arr));
             }
         }
@@ -202,28 +202,23 @@ impl CsvNode {
                     })?;
                 }
             }
-            let csv_bytes = wtr.into_inner().map_err(|e| {
-                crate::error::Z8Error::Internal(format!("CSV flush error: {}", e))
-            })?;
+            let csv_bytes = wtr
+                .into_inner()
+                .map_err(|e| crate::error::Z8Error::Internal(format!("CSV flush error: {}", e)))?;
             let csv_text = String::from_utf8_lossy(&csv_bytes).to_string();
             return Ok(Value::String(csv_text));
         };
 
         // Write headers
-        wtr.write_record(&columns).map_err(|e| {
-            crate::error::Z8Error::Internal(format!("CSV write error: {}", e))
-        })?;
+        wtr.write_record(&columns)
+            .map_err(|e| crate::error::Z8Error::Internal(format!("CSV write error: {}", e)))?;
 
         // Write rows
         for item in &items {
             if let Some(obj) = item.as_object() {
                 let record: Vec<String> = columns
                     .iter()
-                    .map(|col| {
-                        obj.get(col)
-                            .map(value_to_csv_field)
-                            .unwrap_or_default()
-                    })
+                    .map(|col| obj.get(col).map(value_to_csv_field).unwrap_or_default())
                     .collect();
                 wtr.write_record(&record).map_err(|e| {
                     crate::error::Z8Error::Internal(format!("CSV write error: {}", e))
@@ -231,9 +226,9 @@ impl CsvNode {
             }
         }
 
-        let csv_bytes = wtr.into_inner().map_err(|e| {
-            crate::error::Z8Error::Internal(format!("CSV flush error: {}", e))
-        })?;
+        let csv_bytes = wtr
+            .into_inner()
+            .map_err(|e| crate::error::Z8Error::Internal(format!("CSV flush error: {}", e)))?;
         let csv_text = String::from_utf8_lossy(&csv_bytes).to_string();
         Ok(Value::String(csv_text))
     }
@@ -359,12 +354,7 @@ mod tests {
             {"name": "Alice", "age": 30},
             {"name": "Bob", "age": 25}
         ]);
-        let msg = FlowMessage::new(
-            uuid::Uuid::now_v7(),
-            "input",
-            data,
-            uuid::Uuid::now_v7(),
-        );
+        let msg = FlowMessage::new(uuid::Uuid::now_v7(), "input", data, uuid::Uuid::now_v7());
         let results = node.process(msg).await.unwrap();
         assert_eq!(results[0].source_port, "output");
         let csv_text = results[0].payload.as_str().unwrap();

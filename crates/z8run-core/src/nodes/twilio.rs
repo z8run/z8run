@@ -83,9 +83,10 @@ impl NodeExecutor for TwilioNode {
             }
             "lookup" => {}
             _ => {
-                return Err(crate::error::Z8Error::Internal(
-                    format!("Unknown Twilio action: {}", self.action),
-                ))
+                return Err(crate::error::Z8Error::Internal(format!(
+                    "Unknown Twilio action: {}",
+                    self.action
+                )))
             }
         }
         Ok(())
@@ -150,7 +151,7 @@ impl TwilioNode {
                 let status = response.status().as_u16();
                 let body_text = response.text().await.unwrap_or_default();
 
-                if status >= 200 && status < 300 {
+                if (200..300).contains(&status) {
                     info!(
                         node = %self.name,
                         to = %to,
@@ -252,7 +253,7 @@ impl TwilioNode {
                 let status = response.status().as_u16();
                 let body_text = response.text().await.unwrap_or_default();
 
-                if status >= 200 && status < 300 {
+                if (200..300).contains(&status) {
                     info!(
                         node = %self.name,
                         to = %to,
@@ -321,10 +322,7 @@ impl TwilioNode {
             "Twilio phone number lookup request"
         );
 
-        let url = format!(
-            "https://lookups.twilio.com/v1/PhoneNumbers/{}",
-            number
-        );
+        let url = format!("https://lookups.twilio.com/v1/PhoneNumbers/{}", number);
 
         let client = reqwest::Client::new();
 
@@ -339,7 +337,7 @@ impl TwilioNode {
                 let status = response.status().as_u16();
                 let body_text = response.text().await.unwrap_or_default();
 
-                if status >= 200 && status < 300 {
+                if (200..300).contains(&status) {
                     let lookup_data: serde_json::Value =
                         serde_json::from_str(&body_text).unwrap_or(serde_json::json!({}));
 
@@ -543,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_twilio_validation_missing_account_sid() {
-        let mut node = TwilioNode {
+        let node = TwilioNode {
             name: "test".to_string(),
             account_sid: String::new(),
             auth_token: "token".to_string(),
@@ -557,7 +555,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_twilio_validation_missing_auth_token() {
-        let mut node = TwilioNode {
+        let node = TwilioNode {
             name: "test".to_string(),
             account_sid: "ACtest".to_string(),
             auth_token: String::new(),

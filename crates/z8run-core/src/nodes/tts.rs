@@ -108,10 +108,7 @@ impl NodeExecutor for TtsNode {
                 "TTS node requires an API key".to_string(),
             ));
         }
-        if self.provider != "openai"
-            && self.provider != "elevenlabs"
-            && self.provider != "google"
-        {
+        if self.provider != "openai" && self.provider != "elevenlabs" && self.provider != "google" {
             return Err(crate::error::Z8Error::Internal(format!(
                 "Unknown provider: {}. Use 'openai', 'elevenlabs', or 'google'",
                 self.provider
@@ -211,10 +208,7 @@ impl TtsNode {
             self.model.clone()
         };
 
-        let url = format!(
-            "https://api.elevenlabs.io/v1/text-to-speech/{}",
-            voice_id
-        );
+        let url = format!("https://api.elevenlabs.io/v1/text-to-speech/{}", voice_id);
 
         let body = serde_json::json!({
             "text": text,
@@ -312,11 +306,14 @@ impl TtsNode {
             .map_err(|e| format!("Failed to read response: {}", e))?;
 
         if status != 200 {
-            return Err(format!("Google TTS API error ({}): {}", status, response_text));
+            return Err(format!(
+                "Google TTS API error ({}): {}",
+                status, response_text
+            ));
         }
 
-        let json: serde_json::Value = serde_json::from_str(&response_text)
-            .map_err(|e| format!("Parse error: {}", e))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&response_text).map_err(|e| format!("Parse error: {}", e))?;
 
         let audio_base64 = json["audioContent"]
             .as_str()
@@ -366,6 +363,7 @@ fn extract_voice(payload: &serde_json::Value) -> Option<String> {
 }
 
 /// Extract language from payload for Google provider
+#[allow(dead_code)]
 fn extract_language(payload: &serde_json::Value) -> Option<String> {
     for key in &["language", "lang"] {
         if let Some(s) = payload.get(key).and_then(|v| v.as_str()) {

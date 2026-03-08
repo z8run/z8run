@@ -16,7 +16,7 @@ use tracing::debug;
 pub struct BatchNode {
     name: String,
     size: usize,   // items per batch
-    field: String,  // payload field containing the array (empty = root payload)
+    field: String, // payload field containing the array (empty = root payload)
 }
 
 #[async_trait::async_trait]
@@ -140,12 +140,7 @@ mod tests {
             field: String::new(),
         };
         let data = serde_json::json!([1, 2, 3, 4, 5]);
-        let msg = FlowMessage::new(
-            uuid::Uuid::now_v7(),
-            "input",
-            data,
-            uuid::Uuid::now_v7(),
-        );
+        let msg = FlowMessage::new(uuid::Uuid::now_v7(), "input", data, uuid::Uuid::now_v7());
         let results = node.process(msg).await.unwrap();
         assert_eq!(results.len(), 3); // [1,2], [3,4], [5]
 
@@ -173,12 +168,7 @@ mod tests {
         let data = serde_json::json!({
             "records": [1, 2, 3, 4, 5, 6, 7]
         });
-        let msg = FlowMessage::new(
-            uuid::Uuid::now_v7(),
-            "input",
-            data,
-            uuid::Uuid::now_v7(),
-        );
+        let msg = FlowMessage::new(uuid::Uuid::now_v7(), "input", data, uuid::Uuid::now_v7());
         let results = node.process(msg).await.unwrap();
         assert_eq!(results.len(), 3); // [1,2,3], [4,5,6], [7]
     }
@@ -191,12 +181,7 @@ mod tests {
             field: String::new(),
         };
         let data = serde_json::json!([1, 2, 3]);
-        let msg = FlowMessage::new(
-            uuid::Uuid::now_v7(),
-            "input",
-            data,
-            uuid::Uuid::now_v7(),
-        );
+        let msg = FlowMessage::new(uuid::Uuid::now_v7(), "input", data, uuid::Uuid::now_v7());
         let results = node.process(msg).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].payload["batch_total"], 1);
@@ -212,12 +197,7 @@ mod tests {
         let data = serde_json::json!({
             "rows": [{"a": 1}, {"a": 2}, {"a": 3}]
         });
-        let msg = FlowMessage::new(
-            uuid::Uuid::now_v7(),
-            "input",
-            data,
-            uuid::Uuid::now_v7(),
-        );
+        let msg = FlowMessage::new(uuid::Uuid::now_v7(), "input", data, uuid::Uuid::now_v7());
         let results = node.process(msg).await.unwrap();
         assert_eq!(results.len(), 2);
     }

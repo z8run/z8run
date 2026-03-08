@@ -331,7 +331,8 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     label: "LLM",
     category: "ai",
     icon: "Brain",
-    description: "AI language model with vision support (OpenAI, Anthropic, Ollama)",
+    description:
+      "AI language model with vision support (OpenAI, Anthropic, Ollama)",
     inputs: [{ id: "input", name: "Input", type: "any" }],
     outputs: [
       { id: "response", name: "Response", type: "object" },

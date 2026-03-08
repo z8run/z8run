@@ -41,10 +41,10 @@ use tracing::{info, warn};
 
 pub struct CrmNode {
     name: String,
-    provider: String,           // "hubspot" or "salesforce"
+    provider: String, // "hubspot" or "salesforce"
     api_key: String,
     base_url: String,
-    action: String,             // create_contact, update_contact, get_contact, search_contacts, create_deal, list_deals
+    action: String, // create_contact, update_contact, get_contact, search_contacts, create_deal, list_deals
     timeout_ms: u64,
 }
 
@@ -77,16 +77,20 @@ impl CrmNode {
         if let Some(email) = Self::extract_field(payload, &["email"]) {
             props.insert("email".to_string(), Value::String(email));
         }
-        if let Some(firstname) = Self::extract_field(payload, &["firstName", "firstname", "first_name"]) {
+        if let Some(firstname) =
+            Self::extract_field(payload, &["firstName", "firstname", "first_name"])
+        {
             props.insert("firstname".to_string(), Value::String(firstname));
         }
-        if let Some(lastname) = Self::extract_field(payload, &["lastName", "lastname", "last_name"]) {
+        if let Some(lastname) = Self::extract_field(payload, &["lastName", "lastname", "last_name"])
+        {
             props.insert("lastname".to_string(), Value::String(lastname));
         }
         if let Some(phone) = Self::extract_field(payload, &["phone", "phoneNumber"]) {
             props.insert("phone".to_string(), Value::String(phone));
         }
-        if let Some(company) = Self::extract_field(payload, &["company", "accountName", "account"]) {
+        if let Some(company) = Self::extract_field(payload, &["company", "accountName", "account"])
+        {
             props.insert("company".to_string(), Value::String(company));
         }
 
@@ -101,7 +105,12 @@ impl CrmNode {
             props.insert("dealname".to_string(), Value::String(dealname));
         }
         if let Some(amount) = Self::extract_number(payload, &["amount", "value"]) {
-            props.insert("amount".to_string(), Value::Number(serde_json::Number::from_f64(amount).unwrap_or(serde_json::Number::from(0))));
+            props.insert(
+                "amount".to_string(),
+                Value::Number(
+                    serde_json::Number::from_f64(amount).unwrap_or(serde_json::Number::from(0)),
+                ),
+            );
         }
         if let Some(pipeline) = Self::extract_field(payload, &["pipeline"]) {
             props.insert("pipeline".to_string(), Value::String(pipeline));
@@ -111,7 +120,10 @@ impl CrmNode {
         if let Some(dealstage) = Self::extract_field(payload, &["dealStage", "stage"]) {
             props.insert("dealstage".to_string(), Value::String(dealstage));
         } else {
-            props.insert("dealstage".to_string(), Value::String("appointmentscheduled".to_string()));
+            props.insert(
+                "dealstage".to_string(),
+                Value::String("appointmentscheduled".to_string()),
+            );
         }
 
         Value::Object(props)
@@ -121,10 +133,13 @@ impl CrmNode {
     fn build_salesforce_contact_body(payload: &Value) -> Value {
         let mut body = serde_json::Map::new();
 
-        if let Some(firstname) = Self::extract_field(payload, &["firstName", "firstname", "first_name"]) {
+        if let Some(firstname) =
+            Self::extract_field(payload, &["firstName", "firstname", "first_name"])
+        {
             body.insert("FirstName".to_string(), Value::String(firstname));
         }
-        if let Some(lastname) = Self::extract_field(payload, &["lastName", "lastname", "last_name"]) {
+        if let Some(lastname) = Self::extract_field(payload, &["lastName", "lastname", "last_name"])
+        {
             body.insert("LastName".to_string(), Value::String(lastname));
         }
         if let Some(email) = Self::extract_field(payload, &["email"]) {
@@ -148,7 +163,12 @@ impl CrmNode {
             body.insert("Name".to_string(), Value::String(name));
         }
         if let Some(amount) = Self::extract_number(payload, &["amount", "value"]) {
-            body.insert("Amount".to_string(), Value::Number(serde_json::Number::from_f64(amount).unwrap_or(serde_json::Number::from(0))));
+            body.insert(
+                "Amount".to_string(),
+                Value::Number(
+                    serde_json::Number::from_f64(amount).unwrap_or(serde_json::Number::from(0)),
+                ),
+            );
         }
         if let Some(stage) = Self::extract_field(payload, &["stage", "stageName"]) {
             body.insert("StageName".to_string(), Value::String(stage));
@@ -183,8 +203,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -212,8 +232,11 @@ impl CrmNode {
             }
 
             "update_contact" => {
-                let contact_id = Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
-                    .ok_or_else(|| crate::error::Z8Error::Internal("Missing contactId".to_string()))?;
+                let contact_id =
+                    Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
+                        .ok_or_else(|| {
+                            crate::error::Z8Error::Internal("Missing contactId".to_string())
+                        })?;
 
                 let properties = Self::build_hubspot_contact_properties(&msg.payload);
                 let body = json!({ "properties": properties });
@@ -232,8 +255,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -261,8 +284,11 @@ impl CrmNode {
             }
 
             "get_contact" => {
-                let contact_id = Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
-                    .ok_or_else(|| crate::error::Z8Error::Internal("Missing contactId".to_string()))?;
+                let contact_id =
+                    Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
+                        .ok_or_else(|| {
+                            crate::error::Z8Error::Internal("Missing contactId".to_string())
+                        })?;
 
                 info!(node = %self.name, action = "get_contact", contact_id = %contact_id, "Executing HubSpot action");
 
@@ -280,8 +306,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -309,8 +335,9 @@ impl CrmNode {
             }
 
             "search_contacts" => {
-                let email = Self::extract_field(&msg.payload, &["email"])
-                    .ok_or_else(|| crate::error::Z8Error::Internal("Missing email for search".to_string()))?;
+                let email = Self::extract_field(&msg.payload, &["email"]).ok_or_else(|| {
+                    crate::error::Z8Error::Internal("Missing email for search".to_string())
+                })?;
 
                 let body = json!({
                     "filterGroups": [
@@ -340,8 +367,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -386,8 +413,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -428,8 +455,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -488,8 +515,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -517,8 +544,11 @@ impl CrmNode {
             }
 
             "update_contact" => {
-                let contact_id = Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
-                    .ok_or_else(|| crate::error::Z8Error::Internal("Missing contactId".to_string()))?;
+                let contact_id =
+                    Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
+                        .ok_or_else(|| {
+                            crate::error::Z8Error::Internal("Missing contactId".to_string())
+                        })?;
 
                 let body = Self::build_salesforce_contact_body(&msg.payload);
 
@@ -539,8 +569,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -568,8 +598,11 @@ impl CrmNode {
             }
 
             "get_contact" => {
-                let contact_id = Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
-                    .ok_or_else(|| crate::error::Z8Error::Internal("Missing contactId".to_string()))?;
+                let contact_id =
+                    Self::extract_field(&msg.payload, &["contactId", "contact_id", "id"])
+                        .ok_or_else(|| {
+                            crate::error::Z8Error::Internal("Missing contactId".to_string())
+                        })?;
 
                 info!(node = %self.name, action = "get_contact", contact_id = %contact_id, "Executing Salesforce action");
 
@@ -587,8 +620,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -616,8 +649,9 @@ impl CrmNode {
             }
 
             "search_contacts" => {
-                let email = Self::extract_field(&msg.payload, &["email"])
-                    .ok_or_else(|| crate::error::Z8Error::Internal("Missing email for search".to_string()))?;
+                let email = Self::extract_field(&msg.payload, &["email"]).ok_or_else(|| {
+                    crate::error::Z8Error::Internal("Missing email for search".to_string())
+                })?;
 
                 info!(node = %self.name, action = "search_contacts", "Executing Salesforce action");
 
@@ -641,8 +675,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -686,8 +720,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -734,8 +768,8 @@ impl CrmNode {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         let body_text = response.text().await.unwrap_or_default();
-                        let body_json: Value = serde_json::from_str(&body_text)
-                            .unwrap_or_else(|_| Value::String(body_text));
+                        let body_json: Value =
+                            serde_json::from_str(&body_text).unwrap_or(Value::String(body_text));
 
                         if status < 400 {
                             let out = msg.derive(msg.source_node, "result", body_json);
@@ -824,9 +858,10 @@ impl NodeExecutor for CrmNode {
         }
         match self.provider.as_str() {
             "hubspot" | "salesforce" => Ok(()),
-            _ => Err(crate::error::Z8Error::Internal(
-                format!("Unsupported CRM provider: '{}'. Supported: hubspot, salesforce", self.provider),
-            )),
+            _ => Err(crate::error::Z8Error::Internal(format!(
+                "Unsupported CRM provider: '{}'. Supported: hubspot, salesforce",
+                self.provider
+            ))),
         }
     }
 
@@ -997,11 +1032,23 @@ mod tests {
 
         let props = CrmNode::build_hubspot_contact_properties(&payload);
 
-        assert_eq!(props.get("email").and_then(|v| v.as_str()), Some("john@example.com"));
-        assert_eq!(props.get("firstname").and_then(|v| v.as_str()), Some("John"));
+        assert_eq!(
+            props.get("email").and_then(|v| v.as_str()),
+            Some("john@example.com")
+        );
+        assert_eq!(
+            props.get("firstname").and_then(|v| v.as_str()),
+            Some("John")
+        );
         assert_eq!(props.get("lastname").and_then(|v| v.as_str()), Some("Doe"));
-        assert_eq!(props.get("phone").and_then(|v| v.as_str()), Some("555-1234"));
-        assert_eq!(props.get("company").and_then(|v| v.as_str()), Some("ACME Inc"));
+        assert_eq!(
+            props.get("phone").and_then(|v| v.as_str()),
+            Some("555-1234")
+        );
+        assert_eq!(
+            props.get("company").and_then(|v| v.as_str()),
+            Some("ACME Inc")
+        );
     }
 
     #[test]
@@ -1015,10 +1062,19 @@ mod tests {
 
         let props = CrmNode::build_hubspot_deal_properties(&payload);
 
-        assert_eq!(props.get("dealname").and_then(|v| v.as_str()), Some("Enterprise Plan"));
+        assert_eq!(
+            props.get("dealname").and_then(|v| v.as_str()),
+            Some("Enterprise Plan")
+        );
         assert_eq!(props.get("amount").and_then(|v| v.as_f64()), Some(50000.0));
-        assert_eq!(props.get("pipeline").and_then(|v| v.as_str()), Some("sales"));
-        assert_eq!(props.get("dealstage").and_then(|v| v.as_str()), Some("negotiation"));
+        assert_eq!(
+            props.get("pipeline").and_then(|v| v.as_str()),
+            Some("sales")
+        );
+        assert_eq!(
+            props.get("dealstage").and_then(|v| v.as_str()),
+            Some("negotiation")
+        );
     }
 
     #[test]
@@ -1029,9 +1085,18 @@ mod tests {
 
         let props = CrmNode::build_hubspot_deal_properties(&payload);
 
-        assert_eq!(props.get("dealname").and_then(|v| v.as_str()), Some("Small Deal"));
-        assert_eq!(props.get("pipeline").and_then(|v| v.as_str()), Some("default"));
-        assert_eq!(props.get("dealstage").and_then(|v| v.as_str()), Some("appointmentscheduled"));
+        assert_eq!(
+            props.get("dealname").and_then(|v| v.as_str()),
+            Some("Small Deal")
+        );
+        assert_eq!(
+            props.get("pipeline").and_then(|v| v.as_str()),
+            Some("default")
+        );
+        assert_eq!(
+            props.get("dealstage").and_then(|v| v.as_str()),
+            Some("appointmentscheduled")
+        );
     }
 
     #[test]
@@ -1048,9 +1113,15 @@ mod tests {
 
         assert_eq!(body.get("FirstName").and_then(|v| v.as_str()), Some("Jane"));
         assert_eq!(body.get("LastName").and_then(|v| v.as_str()), Some("Smith"));
-        assert_eq!(body.get("Email").and_then(|v| v.as_str()), Some("jane@example.com"));
+        assert_eq!(
+            body.get("Email").and_then(|v| v.as_str()),
+            Some("jane@example.com")
+        );
         assert_eq!(body.get("Phone").and_then(|v| v.as_str()), Some("555-5678"));
-        assert_eq!(body.get("AccountId").and_then(|v| v.as_str()), Some("acc-123"));
+        assert_eq!(
+            body.get("AccountId").and_then(|v| v.as_str()),
+            Some("acc-123")
+        );
     }
 
     #[test]
@@ -1064,10 +1135,19 @@ mod tests {
 
         let body = CrmNode::build_salesforce_deal_body(&payload);
 
-        assert_eq!(body.get("Name").and_then(|v| v.as_str()), Some("Big Contract"));
+        assert_eq!(
+            body.get("Name").and_then(|v| v.as_str()),
+            Some("Big Contract")
+        );
         assert_eq!(body.get("Amount").and_then(|v| v.as_f64()), Some(100000.0));
-        assert_eq!(body.get("StageName").and_then(|v| v.as_str()), Some("closed_won"));
-        assert_eq!(body.get("CloseDate").and_then(|v| v.as_str()), Some("2026-03-31"));
+        assert_eq!(
+            body.get("StageName").and_then(|v| v.as_str()),
+            Some("closed_won")
+        );
+        assert_eq!(
+            body.get("CloseDate").and_then(|v| v.as_str()),
+            Some("2026-03-31")
+        );
     }
 
     #[tokio::test]
@@ -1091,7 +1171,10 @@ mod tests {
         let results = node.process(msg).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].source_port, "error");
-        assert!(results[0].payload["error"].as_str().unwrap().contains("Unsupported CRM provider"));
+        assert!(results[0].payload["error"]
+            .as_str()
+            .unwrap()
+            .contains("Unsupported CRM provider"));
     }
 
     #[tokio::test]

@@ -140,18 +140,23 @@ impl HumanHandoffNode {
         let payload = &msg.payload;
 
         // Extract fields with fallback names
-        let conversation_id = Self::extract_field(payload, &["conversationId", "conversation_id", "sessionId"])
-            .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+        let conversation_id =
+            Self::extract_field(payload, &["conversationId", "conversation_id", "sessionId"])
+                .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
 
-        let reason = Self::extract_field(payload, &["reason", "escalationReason", "issue", "description"])
-            .unwrap_or_else(|| "No reason provided".to_string());
+        let reason = Self::extract_field(
+            payload,
+            &["reason", "escalationReason", "issue", "description"],
+        )
+        .unwrap_or_else(|| "No reason provided".to_string());
 
-        let priority = Self::extract_field(payload, &["priority"])
-            .unwrap_or_else(|| self.priority.clone());
+        let priority =
+            Self::extract_field(payload, &["priority"]).unwrap_or_else(|| self.priority.clone());
 
         let customer = Self::extract_field(payload, &["customer", "customerName", "customer_name"]);
 
-        let metadata = payload.get("metadata")
+        let metadata = payload
+            .get("metadata")
             .or_else(|| payload.get("context"))
             .cloned()
             .unwrap_or(Value::Null);
@@ -202,8 +207,8 @@ impl HumanHandoffNode {
     async fn handle_check_status(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         let payload = &msg.payload;
 
-        let ticket_id = Self::extract_field(payload, &["ticketId", "ticket_id", "id"])
-            .unwrap_or_default();
+        let ticket_id =
+            Self::extract_field(payload, &["ticketId", "ticket_id", "id"]).unwrap_or_default();
 
         if ticket_id.is_empty() {
             let err = json!({
@@ -237,8 +242,8 @@ impl HumanHandoffNode {
     async fn handle_resolve(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         let payload = &msg.payload;
 
-        let ticket_id = Self::extract_field(payload, &["ticketId", "ticket_id", "id"])
-            .unwrap_or_default();
+        let ticket_id =
+            Self::extract_field(payload, &["ticketId", "ticket_id", "id"]).unwrap_or_default();
 
         if ticket_id.is_empty() {
             let err = json!({
@@ -265,7 +270,8 @@ impl HumanHandoffNode {
 
                 // Send webhook notification if configured
                 if let Some(webhook_url) = &self.webhook_url {
-                    self.notify_webhook("resolved", &ticket_copy, webhook_url).await;
+                    self.notify_webhook("resolved", &ticket_copy, webhook_url)
+                        .await;
                 }
 
                 let out = msg.derive(msg.source_node, "resolved", ticket_copy.to_json());
@@ -287,11 +293,14 @@ impl HumanHandoffNode {
     async fn handle_assign(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         let payload = &msg.payload;
 
-        let ticket_id = Self::extract_field(payload, &["ticketId", "ticket_id", "id"])
-            .unwrap_or_default();
+        let ticket_id =
+            Self::extract_field(payload, &["ticketId", "ticket_id", "id"]).unwrap_or_default();
 
-        let agent = Self::extract_field(payload, &["agentId", "agent_id", "agentName", "agent_name", "assignee"])
-            .unwrap_or_default();
+        let agent = Self::extract_field(
+            payload,
+            &["agentId", "agent_id", "agentName", "agent_name", "assignee"],
+        )
+        .unwrap_or_default();
 
         if ticket_id.is_empty() {
             let err = json!({
@@ -327,7 +336,8 @@ impl HumanHandoffNode {
 
                 // Send webhook notification if configured
                 if let Some(webhook_url) = &self.webhook_url {
-                    self.notify_webhook("assigned", &ticket_copy, webhook_url).await;
+                    self.notify_webhook("assigned", &ticket_copy, webhook_url)
+                        .await;
                 }
 
                 let out = msg.derive(msg.source_node, "assigned", ticket_copy.to_json());
@@ -418,9 +428,10 @@ impl NodeExecutor for HumanHandoffNode {
     async fn validate(&self) -> Z8Result<()> {
         match self.action.as_str() {
             "escalate" | "check_status" | "resolve" | "assign" => Ok(()),
-            other => Err(crate::error::Z8Error::Internal(
-                format!("Invalid action '{}'. Must be one of: escalate, check_status, resolve, assign", other),
-            )),
+            other => Err(crate::error::Z8Error::Internal(format!(
+                "Invalid action '{}'. Must be one of: escalate, check_status, resolve, assign",
+                other
+            ))),
         }
     }
 
@@ -463,7 +474,10 @@ mod tests {
         let payload = json!({
             "conversationId": "conv-123"
         });
-        let result = HumanHandoffNode::extract_field(&payload, &["conversationId", "conversation_id", "sessionId"]);
+        let result = HumanHandoffNode::extract_field(
+            &payload,
+            &["conversationId", "conversation_id", "sessionId"],
+        );
         assert_eq!(result, Some("conv-123".to_string()));
     }
 
@@ -472,7 +486,8 @@ mod tests {
         let payload = json!({
             "conversation_id": "conv-456"
         });
-        let result = HumanHandoffNode::extract_field(&payload, &["conversationId", "conversation_id"]);
+        let result =
+            HumanHandoffNode::extract_field(&payload, &["conversationId", "conversation_id"]);
         assert_eq!(result, Some("conv-456".to_string()));
     }
 
@@ -481,7 +496,8 @@ mod tests {
         let payload = json!({
             "other": "value"
         });
-        let result = HumanHandoffNode::extract_field(&payload, &["conversationId", "conversation_id"]);
+        let result =
+            HumanHandoffNode::extract_field(&payload, &["conversationId", "conversation_id"]);
         assert_eq!(result, None);
     }
 
@@ -551,7 +567,10 @@ mod tests {
         );
 
         let create_results = node.process(create_msg).await.unwrap();
-        let ticket_id = create_results[0].payload["id"].as_str().unwrap().to_string();
+        let ticket_id = create_results[0].payload["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
 
         // Now check status
         let status_msg = FlowMessage::new(
@@ -576,7 +595,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_check_status_not_found() {
-        let node = HumanHandoffNode::new("test".to_string());
+        let _node = HumanHandoffNode::new("test".to_string());
         let mut check_node = HumanHandoffNode::new("test".to_string());
         check_node.action = "check_status".to_string();
 
@@ -591,7 +610,10 @@ mod tests {
 
         let results = check_node.process(msg).await.unwrap();
         assert_eq!(results[0].source_port, "error");
-        assert!(results[0].payload["error"].as_str().unwrap().contains("not found"));
+        assert!(results[0].payload["error"]
+            .as_str()
+            .unwrap()
+            .contains("not found"));
     }
 
     #[tokio::test]
@@ -610,7 +632,10 @@ mod tests {
         );
 
         let create_results = node.process(create_msg).await.unwrap();
-        let ticket_id = create_results[0].payload["id"].as_str().unwrap().to_string();
+        let ticket_id = create_results[0].payload["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
 
         // Assign the ticket
         let assign_msg = FlowMessage::new(
@@ -649,7 +674,10 @@ mod tests {
         );
 
         let create_results = node.process(create_msg).await.unwrap();
-        let ticket_id = create_results[0].payload["id"].as_str().unwrap().to_string();
+        let ticket_id = create_results[0].payload["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
 
         // Resolve the ticket
         let resolve_msg = FlowMessage::new(
@@ -696,7 +724,10 @@ mod tests {
         assert_eq!(node.action, "assign");
         assert_eq!(node.priority, "high");
         assert_eq!(node.timeout_ms, 600000);
-        assert_eq!(node.webhook_url, Some("https://example.com/webhook".to_string()));
+        assert_eq!(
+            node.webhook_url,
+            Some("https://example.com/webhook".to_string())
+        );
     }
 
     #[test]

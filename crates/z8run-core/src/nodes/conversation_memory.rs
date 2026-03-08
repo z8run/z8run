@@ -21,7 +21,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Stores conversation history and metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,7 +78,13 @@ pub struct ConversationMemoryNode {
 /// Extract conversation ID from payload using multiple possible field names.
 fn extract_conversation_id(payload: &Value) -> Option<String> {
     // Try multiple field name variations
-    for field in &["conversationId", "conversation_id", "sessionId", "session_id", "chatId"] {
+    for field in &[
+        "conversationId",
+        "conversation_id",
+        "sessionId",
+        "session_id",
+        "chatId",
+    ] {
         if let Some(id) = payload.get(field).and_then(|v| v.as_str()) {
             return Some(id.to_string());
         }
@@ -186,7 +192,9 @@ impl ConversationMemoryNode {
         conversation.append_message(message);
 
         // Update metadata if provided
-        if !matches!(metadata, Value::Null) && metadata.as_object().map(|m| !m.is_empty()).unwrap_or(false) {
+        if !matches!(metadata, Value::Null)
+            && metadata.as_object().map(|m| !m.is_empty()).unwrap_or(false)
+        {
             conversation.metadata = metadata;
         }
 
@@ -249,22 +257,23 @@ impl ConversationMemoryNode {
         }
 
         // Get conversation or return empty
-        let (messages, created_at, updated_at) = if let Some(conversation) = conversations.get(&conversation_id) {
-            (
-                conversation.messages.clone(),
-                conversation.created_at,
-                conversation.updated_at,
-            )
-        } else {
-            (Vec::new(), 0, 0)
-        };
+        let (messages, created_at, updated_at) =
+            if let Some(conversation) = conversations.get(&conversation_id) {
+                (
+                    conversation.messages.clone(),
+                    conversation.created_at,
+                    conversation.updated_at,
+                )
+            } else {
+                (Vec::new(), 0, 0)
+            };
 
         let output_payload = serde_json::json!({
             "conversationId": conversation_id,
             "messages": messages,
             "messageCount": messages.len(),
-            "createdAt": if created_at > 0 { created_at } else { Value::Null },
-            "updatedAt": if updated_at > 0 { updated_at } else { Value::Null },
+            "createdAt": if created_at > 0 { Value::from(created_at) } else { Value::Null },
+            "updatedAt": if updated_at > 0 { Value::from(updated_at) } else { Value::Null },
         });
 
         info!(
@@ -363,19 +372,34 @@ mod tests {
     #[test]
     fn test_extract_conversation_id_variants() {
         let payload_1 = serde_json::json!({"conversationId": "conv123"});
-        assert_eq!(extract_conversation_id(&payload_1), Some("conv123".to_string()));
+        assert_eq!(
+            extract_conversation_id(&payload_1),
+            Some("conv123".to_string())
+        );
 
         let payload_2 = serde_json::json!({"conversation_id": "conv456"});
-        assert_eq!(extract_conversation_id(&payload_2), Some("conv456".to_string()));
+        assert_eq!(
+            extract_conversation_id(&payload_2),
+            Some("conv456".to_string())
+        );
 
         let payload_3 = serde_json::json!({"sessionId": "sess789"});
-        assert_eq!(extract_conversation_id(&payload_3), Some("sess789".to_string()));
+        assert_eq!(
+            extract_conversation_id(&payload_3),
+            Some("sess789".to_string())
+        );
 
         let payload_4 = serde_json::json!({"session_id": "sess101"});
-        assert_eq!(extract_conversation_id(&payload_4), Some("sess101".to_string()));
+        assert_eq!(
+            extract_conversation_id(&payload_4),
+            Some("sess101".to_string())
+        );
 
         let payload_5 = serde_json::json!({"chatId": "chat202"});
-        assert_eq!(extract_conversation_id(&payload_5), Some("chat202".to_string()));
+        assert_eq!(
+            extract_conversation_id(&payload_5),
+            Some("chat202".to_string())
+        );
 
         let payload_6 = serde_json::json!({"other": "value"});
         assert_eq!(extract_conversation_id(&payload_6), None);
@@ -391,7 +415,10 @@ mod tests {
 
         let msg = extract_message(&payload);
         assert_eq!(msg.get("role").and_then(|v| v.as_str()), Some("user"));
-        assert_eq!(msg.get("content").and_then(|v| v.as_str()), Some("Hello world"));
+        assert_eq!(
+            msg.get("content").and_then(|v| v.as_str()),
+            Some("Hello world")
+        );
     }
 
     #[test]
@@ -413,7 +440,10 @@ mod tests {
         });
 
         let msg = extract_message(&payload);
-        assert_eq!(msg.get("text").and_then(|v| v.as_str()), Some("Hello world"));
+        assert_eq!(
+            msg.get("text").and_then(|v| v.as_str()),
+            Some("Hello world")
+        );
     }
 
     #[test]
@@ -667,7 +697,10 @@ mod tests {
         let output = &results[0].payload;
         assert_eq!(output.get("total").and_then(|v| v.as_u64()), Some(2));
 
-        let conversations = output.get("conversations").and_then(|v| v.as_array()).unwrap();
+        let conversations = output
+            .get("conversations")
+            .and_then(|v| v.as_array())
+            .unwrap();
         assert_eq!(conversations.len(), 2);
 
         // Both should have 3 messages

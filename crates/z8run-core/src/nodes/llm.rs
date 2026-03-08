@@ -69,23 +69,53 @@ impl NodeExecutor for LlmNode {
         let result = if self.event_tx.is_some() {
             match self.provider.as_str() {
                 "anthropic" => {
-                    self.stream_anthropic(&client, &prompt, image.as_deref(), timeout, flow_id, node_id)
-                        .await
+                    self.stream_anthropic(
+                        &client,
+                        &prompt,
+                        image.as_deref(),
+                        timeout,
+                        flow_id,
+                        node_id,
+                    )
+                    .await
                 }
                 "ollama" => {
-                    self.stream_ollama(&client, &prompt, image.as_deref(), timeout, flow_id, node_id)
-                        .await
+                    self.stream_ollama(
+                        &client,
+                        &prompt,
+                        image.as_deref(),
+                        timeout,
+                        flow_id,
+                        node_id,
+                    )
+                    .await
                 }
                 _ => {
-                    self.stream_openai(&client, &prompt, image.as_deref(), timeout, flow_id, node_id)
-                        .await
+                    self.stream_openai(
+                        &client,
+                        &prompt,
+                        image.as_deref(),
+                        timeout,
+                        flow_id,
+                        node_id,
+                    )
+                    .await
                 }
             }
         } else {
             match self.provider.as_str() {
-                "anthropic" => self.call_anthropic(&client, &prompt, image.as_deref(), timeout).await,
-                "ollama" => self.call_ollama(&client, &prompt, image.as_deref(), timeout).await,
-                _ => self.call_openai(&client, &prompt, image.as_deref(), timeout).await,
+                "anthropic" => {
+                    self.call_anthropic(&client, &prompt, image.as_deref(), timeout)
+                        .await
+                }
+                "ollama" => {
+                    self.call_ollama(&client, &prompt, image.as_deref(), timeout)
+                        .await
+                }
+                _ => {
+                    self.call_openai(&client, &prompt, image.as_deref(), timeout)
+                        .await
+                }
             }
         };
 

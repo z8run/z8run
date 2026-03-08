@@ -1,3 +1,8 @@
+import {
+  CodeEditor,
+  type CodeLanguage,
+  detectLanguage,
+} from "@/components/ui/CodeEditor";
 import { useFlowStore } from "@/stores/flowStore";
 import { useUIStore } from "@/stores/uiStore";
 import type { NodeStatus, Z8NodeData } from "@/types/flow";
@@ -13,11 +18,6 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import {
-  CodeEditor,
-  type CodeLanguage,
-  detectLanguage,
-} from "@/components/ui/CodeEditor";
 
 const STATUS_BADGES: Record<
   NodeStatus,
@@ -439,21 +439,28 @@ function SmartConfigField({
           const newProvider = e.target.value;
           const defaultModels: Record<string, Record<string, string>> = {
             openai: {
-              llm: "gpt-4o", embeddings: "text-embedding-3-small",
-              classifier: "gpt-4o-mini", "structured-output": "gpt-4o",
-              summarizer: "gpt-4o-mini", "ai-agent": "gpt-4o",
+              llm: "gpt-4o",
+              embeddings: "text-embedding-3-small",
+              classifier: "gpt-4o-mini",
+              "structured-output": "gpt-4o",
+              summarizer: "gpt-4o-mini",
+              "ai-agent": "gpt-4o",
               "image-gen": "dall-e-3",
             },
             anthropic: {
-              llm: "claude-sonnet-4-20250514", classifier: "claude-haiku-3-5-20241022",
+              llm: "claude-sonnet-4-20250514",
+              classifier: "claude-haiku-3-5-20241022",
               "structured-output": "claude-sonnet-4-20250514",
               summarizer: "claude-haiku-3-5-20241022",
               "ai-agent": "claude-sonnet-4-20250514",
             },
             ollama: {
-              llm: "llama3", classifier: "llama3",
-              "structured-output": "llama3.1", summarizer: "llama3",
-              "ai-agent": "llama3.1", embeddings: "nomic-embed-text",
+              llm: "llama3",
+              classifier: "llama3",
+              "structured-output": "llama3.1",
+              summarizer: "llama3",
+              "ai-agent": "llama3.1",
+              embeddings: "nomic-embed-text",
             },
             stability: { "image-gen": "stable-diffusion-xl-1024-v1-0" },
           };
@@ -1232,10 +1239,17 @@ function SmartConfigField({
           const newProvider = e.target.value;
           const defaults: Record<string, Record<string, string>> = {
             stt: { openai: "whisper-1", deepgram: "nova-2", google: "default" },
-            tts: { openai: "tts-1", elevenlabs: "eleven_monolingual_v1", google: "en-US-Standard-A" },
+            tts: {
+              openai: "tts-1",
+              elevenlabs: "eleven_monolingual_v1",
+              google: "en-US-Standard-A",
+            },
           };
           if (onBatchConfigChange) {
-            onBatchConfigChange({ provider: newProvider, model: defaults[nodeType]?.[newProvider] ?? "" });
+            onBatchConfigChange({
+              provider: newProvider,
+              model: defaults[nodeType]?.[newProvider] ?? "",
+            });
           } else {
             onChange(newProvider);
           }
@@ -1265,7 +1279,10 @@ function SmartConfigField({
 
   if (fieldKey === "model" && STT_TTS_NODES.includes(nodeType)) {
     const provider = String(allConfig?.provider ?? "openai");
-    const models: Record<string, Record<string, { value: string; label: string }[]>> = {
+    const models: Record<
+      string,
+      Record<string, { value: string; label: string }[]>
+    > = {
       stt: {
         openai: [{ value: "whisper-1", label: "Whisper 1" }],
         deepgram: [
@@ -1520,7 +1537,16 @@ function hasSmartField(key: string, nodeType: string): boolean {
   return (
     ["method", "statusCode", "url", "timeout", "code"].includes(key) ||
     (key === "action" &&
-      ["json", "mqtt", "csv", "twilio", "whatsapp", "conversation-memory", "crm", "human-handoff"].includes(nodeType)) ||
+      [
+        "json",
+        "mqtt",
+        "csv",
+        "twilio",
+        "whatsapp",
+        "conversation-memory",
+        "crm",
+        "human-handoff",
+      ].includes(nodeType)) ||
     (nodeType === "csv" && ["delimiter", "hasHeaders"].includes(key)) ||
     (nodeType === "aggregator" &&
       ["operation", "field", "groupBy"].includes(key)) ||
@@ -1832,10 +1858,7 @@ export function ConfigPanel() {
             <div className="space-y-2.5">
               {Object.entries(config).map(([key, value]) => {
                 // Hide language field when it's paired with a code field (handled by CodeEditor)
-                if (
-                  key === "language" &&
-                  config.code !== undefined
-                ) {
+                if (key === "language" && config.code !== undefined) {
                   return null;
                 }
 

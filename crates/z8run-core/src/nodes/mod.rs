@@ -7,6 +7,8 @@ pub mod aggregator;
 pub mod ai_agent;
 pub mod batch;
 pub mod classifier;
+pub mod conversation_memory;
+pub mod crm;
 pub mod csv_node;
 pub mod database;
 pub mod debug;
@@ -17,25 +19,23 @@ pub mod function;
 pub mod http_in;
 pub mod http_out;
 pub mod http_request;
+pub mod human_handoff;
 pub mod image_gen;
 pub mod json_transform;
 pub mod llm;
 pub mod mqtt;
 pub mod prompt_template;
 pub mod structured_output;
-pub mod summarizer;
-pub mod conversation_memory;
-pub mod crm;
-pub mod human_handoff;
 pub mod stt;
+pub mod summarizer;
 pub mod switch;
-pub mod tts;
-pub mod twilio;
-pub mod whatsapp;
 pub mod text_splitter;
 pub mod timer;
+pub mod tts;
+pub mod twilio;
 pub mod vector_store;
 pub mod webhook;
+pub mod whatsapp;
 
 use crate::engine::{FlowEngine, NodeExecutorFactory};
 use std::sync::Arc;
@@ -143,13 +143,16 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .register_node_type(Arc::new(whatsapp::WhatsAppNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
     engine
-        .register_node_type(Arc::new(conversation_memory::ConversationMemoryNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(Arc::new(conversation_memory::ConversationMemoryNodeFactory)
+            as Arc<dyn NodeExecutorFactory>)
         .await;
     engine
         .register_node_type(Arc::new(crm::CrmNodeFactory) as Arc<dyn NodeExecutorFactory>)
         .await;
     engine
-        .register_node_type(Arc::new(human_handoff::HumanHandoffNodeFactory) as Arc<dyn NodeExecutorFactory>)
+        .register_node_type(
+            Arc::new(human_handoff::HumanHandoffNodeFactory) as Arc<dyn NodeExecutorFactory>
+        )
         .await;
 
     // Data Engineering nodes
@@ -158,7 +161,7 @@ pub async fn register_builtin_nodes(engine: &FlowEngine) {
         .await;
     engine
         .register_node_type(
-            Arc::new(aggregator::AggregatorNodeFactory) as Arc<dyn NodeExecutorFactory>,
+            Arc::new(aggregator::AggregatorNodeFactory) as Arc<dyn NodeExecutorFactory>
         )
         .await;
     engine

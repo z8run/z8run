@@ -393,12 +393,7 @@ mod tests {
         let payload = serde_json::json!({
             "rows": [{"a": 1}, {"a": 2}, {"a": 3}]
         });
-        let msg = FlowMessage::new(
-            uuid::Uuid::now_v7(),
-            "input",
-            payload,
-            uuid::Uuid::now_v7(),
-        );
+        let msg = FlowMessage::new(uuid::Uuid::now_v7(), "input", payload, uuid::Uuid::now_v7());
         let results = node.process(msg).await.unwrap();
         assert_eq!(results[0].payload["count"], 3);
     }

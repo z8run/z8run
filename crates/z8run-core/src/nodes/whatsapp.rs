@@ -76,9 +76,10 @@ impl NodeExecutor for WhatsAppNode {
         match self.action.as_str() {
             "send_text" | "send_template" | "send_media" => {}
             _ => {
-                return Err(crate::error::Z8Error::Internal(
-                    format!("Unknown WhatsApp action: {}", self.action),
-                ))
+                return Err(crate::error::Z8Error::Internal(format!(
+                    "Unknown WhatsApp action: {}",
+                    self.action
+                )))
             }
         }
         Ok(())
@@ -148,7 +149,7 @@ impl WhatsAppNode {
                 let status = response.status().as_u16();
                 let body_text = response.text().await.unwrap_or_default();
 
-                if status >= 200 && status < 300 {
+                if (200..300).contains(&status) {
                     info!(
                         node = %self.name,
                         to = %to,
@@ -258,7 +259,7 @@ impl WhatsAppNode {
                 let status = response.status().as_u16();
                 let body_text = response.text().await.unwrap_or_default();
 
-                if status >= 200 && status < 300 {
+                if (200..300).contains(&status) {
                     info!(
                         node = %self.name,
                         to = %to,
@@ -370,7 +371,7 @@ impl WhatsAppNode {
                 let status = response.status().as_u16();
                 let body_text = response.text().await.unwrap_or_default();
 
-                if status >= 200 && status < 300 {
+                if (200..300).contains(&status) {
                     info!(
                         node = %self.name,
                         to = %to,
@@ -676,7 +677,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_whatsapp_validation_missing_phone_number_id() {
-        let mut node = WhatsAppNode {
+        let node = WhatsAppNode {
             name: "test".to_string(),
             phone_number_id: String::new(),
             access_token: "token".to_string(),
@@ -690,7 +691,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_whatsapp_validation_missing_access_token() {
-        let mut node = WhatsAppNode {
+        let node = WhatsAppNode {
             name: "test".to_string(),
             phone_number_id: "123".to_string(),
             access_token: String::new(),
