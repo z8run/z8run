@@ -1,6 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
-import { KeyRound, Plus, ChevronDown, Eye, EyeOff, Check, Loader2 } from "lucide-react";
 import { vaultApi } from "@/api/vault";
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Plus,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 interface VaultCredentialFieldProps {
   /** Current value — either "vault:key-name" or a raw string */
@@ -161,7 +169,10 @@ export function VaultCredentialField({
                   <KeyRound size={10} className="text-amber-400 shrink-0" />
                   <span className="truncate font-mono">{key}</span>
                   {selectedKey === key && (
-                    <Check size={10} className="text-emerald-400 ml-auto shrink-0" />
+                    <Check
+                      size={10}
+                      className="text-emerald-400 ml-auto shrink-0"
+                    />
                   )}
                 </button>
               ))}
@@ -187,7 +198,6 @@ export function VaultCredentialField({
                       placeholder="Key name (e.g. openai-api-key)"
                       className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1
                         text-[11px] text-slate-200 font-mono focus:outline-none focus:border-z8-500"
-                      autoFocus
                     />
                     <input
                       type="password"
@@ -201,16 +211,26 @@ export function VaultCredentialField({
                       <button
                         type="button"
                         onClick={saveNewKey}
-                        disabled={saving || !newKeyName.trim() || !newKeyValue.trim()}
+                        disabled={
+                          saving || !newKeyName.trim() || !newKeyValue.trim()
+                        }
                         className="flex-1 px-2 py-1 bg-z8-600 hover:bg-z8-500 text-white text-[10px]
                           font-medium rounded transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
                       >
-                        {saving ? <Loader2 size={10} className="animate-spin" /> : <Plus size={10} />}
+                        {saving ? (
+                          <Loader2 size={10} className="animate-spin" />
+                        ) : (
+                          <Plus size={10} />
+                        )}
                         Save
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setShowNewForm(false); setNewKeyName(""); setNewKeyValue(""); }}
+                        onClick={() => {
+                          setShowNewForm(false);
+                          setNewKeyName("");
+                          setNewKeyValue("");
+                        }}
                         className="px-2 py-1 text-slate-400 hover:text-slate-200 text-[10px] transition-colors"
                       >
                         Cancel
@@ -245,7 +265,8 @@ export function VaultCredentialField({
       {/* Hint */}
       {mode === "vault" && (
         <div className="text-[9px] text-slate-600">
-          Credentials are encrypted with AES-256-GCM. Resolved at execution time.
+          Credentials are encrypted with AES-256-GCM. Resolved at execution
+          time.
         </div>
       )}
     </div>

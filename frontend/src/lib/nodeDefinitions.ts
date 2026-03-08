@@ -27,7 +27,6 @@ import {
   Send,
   ShieldCheck,
   Split,
-  Speech,
   Tags,
   Timer,
   UserCheck,
@@ -201,7 +200,13 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
       { id: "pass", name: "Pass", type: "any" },
       { id: "reject", name: "Reject", type: "any" },
     ],
-    defaultConfig: { property: "req.body.age", condition: "gte", value: 18, passExpression: "", rejectExpression: "" },
+    defaultConfig: {
+      property: "req.body.age",
+      condition: "gte",
+      value: 18,
+      passExpression: "",
+      rejectExpression: "",
+    },
   },
 
   // Output nodes

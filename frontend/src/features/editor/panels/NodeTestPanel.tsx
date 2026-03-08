@@ -1,19 +1,22 @@
-import { useState, useCallback, useMemo } from "react";
+import { NODE_DEFINITIONS } from "@/lib/nodeDefinitions";
 import {
-  Play,
+  AlertTriangle,
+  Check,
   ChevronDown,
   ChevronUp,
   Copy,
-  Check,
-  AlertTriangle,
+  Play,
   Sparkles,
 } from "lucide-react";
-import { NODE_DEFINITIONS } from "@/lib/nodeDefinitions";
+import { useCallback, useMemo, useState } from "react";
 
 /** Mock evaluators that simulate node behavior client-side */
 const MOCK_EVALUATORS: Record<
   string,
-  (input: Record<string, unknown>, config: Record<string, unknown>) => MockResult
+  (
+    input: Record<string, unknown>,
+    config: Record<string, unknown>,
+  ) => MockResult
 > = {
   "if-else": (input, config) => {
     const field = String(config.field ?? "");
@@ -42,8 +45,16 @@ const MOCK_EVALUATORS: Record<
     return {
       port: result ? "true" : "false",
       output: {
-        ...(typeof transformed === "object" && transformed !== null ? transformed : { value: transformed }),
-        _evaluation: { field, operator, value: compareValue, fieldValue, result },
+        ...(typeof transformed === "object" && transformed !== null
+          ? transformed
+          : { value: transformed }),
+        _evaluation: {
+          field,
+          operator,
+          value: compareValue,
+          fieldValue,
+          result,
+        },
       },
     };
   },
@@ -59,16 +70,26 @@ const MOCK_EVALUATORS: Record<
     if (itemExpr) {
       try {
         const mapping = JSON.parse(itemExpr) as Record<string, string>;
-        transformedItem = typeof firstItem === "object" && firstItem !== null
-          ? applyTransformMapping(firstItem, mapping)
-          : firstItem;
+        transformedItem =
+          typeof firstItem === "object" && firstItem !== null
+            ? applyTransformMapping(firstItem, mapping)
+            : firstItem;
       } catch {
-        transformedItem = { ...firstItem, _error: "Invalid itemExpression JSON" };
+        transformedItem = {
+          ...firstItem,
+          _error: "Invalid itemExpression JSON",
+        };
       }
     }
     return {
       port: "item",
-      output: { item: transformedItem, index: 0, total: items.length, isFirst: true, isLast: items.length === 1 },
+      output: {
+        item: transformedItem,
+        index: 0,
+        total: items.length,
+        isFirst: true,
+        isLast: items.length === 1,
+      },
     };
   },
   filter: (input, config) => {
@@ -76,7 +97,11 @@ const MOCK_EVALUATORS: Record<
     const condition = String(config.condition ?? "eq");
     const val = config.value;
     const fieldValue = extractField(input, prop);
-    const pass = evaluateCondition(fieldValue, condition === "gte" ? ">=" : condition === "lte" ? "<=" : "==", val);
+    const pass = evaluateCondition(
+      fieldValue,
+      condition === "gte" ? ">=" : condition === "lte" ? "<=" : "==",
+      val,
+    );
 
     const exprRaw = pass
       ? String(config.passExpression ?? "").trim()
@@ -88,24 +113,44 @@ const MOCK_EVALUATORS: Record<
         const mapping = JSON.parse(exprRaw) as Record<string, string>;
         transformed = applyTransformMapping(input, mapping);
       } catch {
-        transformed = { ...input, _error: `Invalid ${pass ? "passExpression" : "rejectExpression"} JSON` };
+        transformed = {
+          ...input,
+          _error: `Invalid ${pass ? "passExpression" : "rejectExpression"} JSON`,
+        };
       }
     }
     return { port: pass ? "pass" : "reject", output: transformed };
   },
   switch: (input, config) => {
     const prop = String(config.property ?? "");
-    const rules = (config.rules ?? []) as Array<{ type: string; value: unknown; port: string; transform?: string }>;
+    const rules = (config.rules ?? []) as Array<{
+      type: string;
+      value: unknown;
+      port: string;
+      transform?: string;
+    }>;
     const fieldValue = extractField(input, prop);
     for (const rule of rules) {
-      if (evaluateCondition(fieldValue, rule.type === "eq" ? "==" : rule.type, rule.value)) {
+      if (
+        evaluateCondition(
+          fieldValue,
+          rule.type === "eq" ? "==" : rule.type,
+          rule.value,
+        )
+      ) {
         const transformRaw = String(rule.transform ?? "").trim();
         if (transformRaw) {
           try {
             const mapping = JSON.parse(transformRaw) as Record<string, string>;
-            return { port: rule.port, output: applyTransformMapping(input, mapping) };
+            return {
+              port: rule.port,
+              output: applyTransformMapping(input, mapping),
+            };
           } catch {
-            return { port: rule.port, output: { ...input, _error: "Invalid transform JSON in rule" } };
+            return {
+              port: rule.port,
+              output: { ...input, _error: "Invalid transform JSON in rule" },
+            };
           }
         }
         return { port: rule.port, output: input };
@@ -114,19 +159,28 @@ const MOCK_EVALUATORS: Record<
     return { port: "default", output: input };
   },
   function: (input) => {
-    return { port: "output", output: { ...input, _note: "Function nodes run server-side" } };
+    return {
+      port: "output",
+      output: { ...input, _note: "Function nodes run server-side" },
+    };
   },
   json: (input, config) => {
     const action = String(config.action ?? "parse");
     if (action === "parse" && typeof input.payload === "string") {
       try {
-        return { port: "output", output: { ...input, payload: JSON.parse(input.payload as string) } };
+        return {
+          port: "output",
+          output: { ...input, payload: JSON.parse(input.payload as string) },
+        };
       } catch {
         return { port: "output", output: input, error: "Invalid JSON string" };
       }
     }
     if (action === "stringify") {
-      return { port: "output", output: { ...input, payload: JSON.stringify(input.payload) } };
+      return {
+        port: "output",
+        output: { ...input, payload: JSON.stringify(input.payload) },
+      };
     }
     return { port: "output", output: input };
   },
@@ -159,7 +213,10 @@ const MOCK_EVALUATORS: Record<
       output: {
         trigger: "webhook",
         method: config.method,
-        headers: { "content-type": "application/json", authorization: "Bearer ***" },
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer ***",
+        },
         query: {},
         body: { sample: "webhook payload" },
       },
@@ -206,7 +263,11 @@ function extractField(obj: unknown, path: string): unknown {
 }
 
 /** Evaluate a simple condition (mirrors the backend if-else logic) */
-function evaluateCondition(fieldValue: unknown, operator: string, compareValue: unknown): boolean {
+function evaluateCondition(
+  fieldValue: unknown,
+  operator: string,
+  compareValue: unknown,
+): boolean {
   const fStr = String(fieldValue ?? "");
   const cStr = String(compareValue ?? "");
   const fNum = Number(fieldValue);
@@ -214,21 +275,46 @@ function evaluateCondition(fieldValue: unknown, operator: string, compareValue: 
   const bothNumeric = !Number.isNaN(fNum) && !Number.isNaN(cNum);
 
   switch (operator) {
-    case "==": case "eq": return fStr === cStr;
-    case "!=": case "neq": return fStr !== cStr;
-    case ">": case "gt": return bothNumeric ? fNum > cNum : fStr > cStr;
-    case "<": case "lt": return bothNumeric ? fNum < cNum : fStr < cStr;
-    case ">=": case "gte": return bothNumeric ? fNum >= cNum : fStr >= cStr;
-    case "<=": case "lte": return bothNumeric ? fNum <= cNum : fStr <= cStr;
-    case "contains": return fStr.includes(cStr);
-    case "not_contains": return !fStr.includes(cStr);
-    case "starts_with": return fStr.startsWith(cStr);
-    case "ends_with": return fStr.endsWith(cStr);
-    case "exists": return fieldValue !== undefined && fieldValue !== null;
-    case "not_exists": return fieldValue === undefined || fieldValue === null;
-    case "is_empty": return fStr === "" || (Array.isArray(fieldValue) && fieldValue.length === 0);
-    case "is_not_empty": return fStr !== "" && !(Array.isArray(fieldValue) && fieldValue.length === 0);
-    default: return fStr === cStr;
+    case "==":
+    case "eq":
+      return fStr === cStr;
+    case "!=":
+    case "neq":
+      return fStr !== cStr;
+    case ">":
+    case "gt":
+      return bothNumeric ? fNum > cNum : fStr > cStr;
+    case "<":
+    case "lt":
+      return bothNumeric ? fNum < cNum : fStr < cStr;
+    case ">=":
+    case "gte":
+      return bothNumeric ? fNum >= cNum : fStr >= cStr;
+    case "<=":
+    case "lte":
+      return bothNumeric ? fNum <= cNum : fStr <= cStr;
+    case "contains":
+      return fStr.includes(cStr);
+    case "not_contains":
+      return !fStr.includes(cStr);
+    case "starts_with":
+      return fStr.startsWith(cStr);
+    case "ends_with":
+      return fStr.endsWith(cStr);
+    case "exists":
+      return fieldValue !== undefined && fieldValue !== null;
+    case "not_exists":
+      return fieldValue === undefined || fieldValue === null;
+    case "is_empty":
+      return (
+        fStr === "" || (Array.isArray(fieldValue) && fieldValue.length === 0)
+      );
+    case "is_not_empty":
+      return (
+        fStr !== "" && !(Array.isArray(fieldValue) && fieldValue.length === 0)
+      );
+    default:
+      return fStr === cStr;
   }
 }
 
@@ -236,7 +322,10 @@ function evaluateCondition(fieldValue: unknown, operator: string, compareValue: 
  * Evaluate a simple math expression like ".amount * 10".
  * Supports: .field references, numbers, and operators + - * /
  */
-function evaluateExpression(expr: string, input: Record<string, unknown>): unknown {
+function evaluateExpression(
+  expr: string,
+  input: Record<string, unknown>,
+): unknown {
   const trimmed = expr.trim();
 
   // If it's a static value (no dot references), return as-is
@@ -246,22 +335,24 @@ function evaluateExpression(expr: string, input: Record<string, unknown>): unkno
   }
 
   // Match pattern: .field <op> <number|.field>
-  const mathMatch = trimmed.match(
-    /^(\.[\w.]+)\s*([+\-*/])\s*(.+)$/
-  );
+  const mathMatch = trimmed.match(/^(\.[\w.]+)\s*([+\-*/])\s*(.+)$/);
   if (mathMatch) {
-    const leftVal = Number(extractField(input, mathMatch[1]!.slice(1)));
-    const rightRaw = mathMatch[3]!.trim();
+    const leftVal = Number(extractField(input, mathMatch[1]?.slice(1) ?? ""));
+    const rightRaw = mathMatch[3]?.trim() ?? "";
     const rightVal = rightRaw.startsWith(".")
       ? Number(extractField(input, rightRaw.slice(1)))
       : Number(rightRaw);
 
     if (!Number.isNaN(leftVal) && !Number.isNaN(rightVal)) {
       switch (mathMatch[2]) {
-        case "+": return leftVal + rightVal;
-        case "-": return leftVal - rightVal;
-        case "*": return leftVal * rightVal;
-        case "/": return rightVal !== 0 ? leftVal / rightVal : 0;
+        case "+":
+          return leftVal + rightVal;
+        case "-":
+          return leftVal - rightVal;
+        case "*":
+          return leftVal * rightVal;
+        case "/":
+          return rightVal !== 0 ? leftVal / rightVal : 0;
       }
     }
   }
@@ -290,7 +381,10 @@ function applyTransformMapping(
 }
 
 /** Generate sample input data based on node type and config */
-function generateSampleInput(nodeType: string, config: Record<string, unknown>): Record<string, unknown> {
+function generateSampleInput(
+  nodeType: string,
+  config: Record<string, unknown>,
+): Record<string, unknown> {
   const def = NODE_DEFINITIONS.find((d) => d.type === nodeType);
   const isInput = def?.category === "input";
 
@@ -340,7 +434,9 @@ function generateSampleInput(nodeType: string, config: Record<string, unknown>):
     case "batch":
       return { payload: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
     default:
-      return { payload: { data: "sample", timestamp: new Date().toISOString() } };
+      return {
+        payload: { data: "sample", timestamp: new Date().toISOString() },
+      };
   }
 }
 
@@ -350,8 +446,13 @@ interface NodeTestPanelProps {
 }
 
 export function NodeTestPanel({ nodeType, config }: NodeTestPanelProps) {
-  const sampleInput = useMemo(() => generateSampleInput(nodeType, config), [nodeType, config]);
-  const [inputText, setInputText] = useState(() => JSON.stringify(sampleInput, null, 2));
+  const sampleInput = useMemo(
+    () => generateSampleInput(nodeType, config),
+    [nodeType, config],
+  );
+  const [inputText, setInputText] = useState(() =>
+    JSON.stringify(sampleInput, null, 2),
+  );
   const [result, setResult] = useState<MockResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -408,9 +509,7 @@ export function NodeTestPanel({ nodeType, config }: NodeTestPanelProps) {
         <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex-1">
           Test / Mock
         </span>
-        {hasEvaluator && (
-          <Sparkles size={10} className="text-amber-400" />
-        )}
+        {hasEvaluator && <Sparkles size={10} className="text-amber-400" />}
         {expanded ? (
           <ChevronUp size={14} className="text-slate-500" />
         ) : (
@@ -423,10 +522,20 @@ export function NodeTestPanel({ nodeType, config }: NodeTestPanelProps) {
           {/* Input editor */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-slate-500 font-medium">Input Data (JSON)</span>
+              <span className="text-[10px] text-slate-500 font-medium">
+                Input Data (JSON)
+              </span>
               <button
                 type="button"
-                onClick={() => setInputText(JSON.stringify(generateSampleInput(nodeType, config), null, 2))}
+                onClick={() =>
+                  setInputText(
+                    JSON.stringify(
+                      generateSampleInput(nodeType, config),
+                      null,
+                      2,
+                    ),
+                  )
+                }
                 className="text-[10px] text-z8-400 hover:text-z8-300 transition-colors"
               >
                 Reset sample
@@ -470,7 +579,9 @@ export function NodeTestPanel({ nodeType, config }: NodeTestPanelProps) {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-500 font-medium">Output</span>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    Output
+                  </span>
                   {result.port && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-400 font-mono">
                       → {result.port}
@@ -482,7 +593,11 @@ export function NodeTestPanel({ nodeType, config }: NodeTestPanelProps) {
                   onClick={copyOutput}
                   className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
                 >
-                  {copied ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                  {copied ? (
+                    <Check size={10} className="text-emerald-400" />
+                  ) : (
+                    <Copy size={10} />
+                  )}
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
@@ -494,8 +609,10 @@ export function NodeTestPanel({ nodeType, config }: NodeTestPanelProps) {
                 </div>
               )}
 
-              <pre className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2
-                text-xs text-slate-300 font-mono overflow-x-auto max-h-[200px] overflow-y-auto leading-relaxed">
+              <pre
+                className="bg-slate-950 border border-slate-700 rounded-md px-3 py-2
+                text-xs text-slate-300 font-mono overflow-x-auto max-h-[200px] overflow-y-auto leading-relaxed"
+              >
                 {JSON.stringify(result.output, null, 2)}
               </pre>
             </div>

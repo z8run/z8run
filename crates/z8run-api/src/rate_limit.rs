@@ -156,10 +156,7 @@ fn too_many_requests(limit: u64, reset_secs: u64) -> Response<Body> {
     headers.insert("content-type", "application/json".parse().unwrap());
     headers.insert("x-ratelimit-limit", limit.to_string().parse().unwrap());
     headers.insert("x-ratelimit-remaining", "0".parse().unwrap());
-    headers.insert(
-        "x-ratelimit-reset",
-        reset_secs.to_string().parse().unwrap(),
-    );
+    headers.insert("x-ratelimit-reset", reset_secs.to_string().parse().unwrap());
     headers.insert("retry-after", reset_secs.to_string().parse().unwrap());
 
     resp
@@ -173,31 +170,28 @@ fn append_rate_headers(resp: &mut Response<Body>, limit: u64, remaining: u64, re
         "x-ratelimit-remaining",
         remaining.to_string().parse().unwrap(),
     );
-    headers.insert(
-        "x-ratelimit-reset",
-        reset_secs.to_string().parse().unwrap(),
-    );
+    headers.insert("x-ratelimit-reset", reset_secs.to_string().parse().unwrap());
 }
 
 /// Rate limit middleware for general API routes.
 ///
 /// Default: 100 requests per 60 seconds per IP.
 pub async fn api_rate_limit(req: Request<Body>, next: Next) -> Response<Body> {
-    rate_limit_inner(req, next, &api_limiter()).await
+    rate_limit_inner(req, next, api_limiter()).await
 }
 
 /// Rate limit middleware for auth routes (stricter).
 ///
 /// Default: 20 requests per 60 seconds per IP.
 pub async fn auth_rate_limit(req: Request<Body>, next: Next) -> Response<Body> {
-    rate_limit_inner(req, next, &auth_limiter()).await
+    rate_limit_inner(req, next, auth_limiter()).await
 }
 
 /// Rate limit middleware for webhook/hook routes.
 ///
 /// Default: 200 requests per 60 seconds per IP.
 pub async fn hook_rate_limit(req: Request<Body>, next: Next) -> Response<Body> {
-    rate_limit_inner(req, next, &hook_limiter()).await
+    rate_limit_inner(req, next, hook_limiter()).await
 }
 
 async fn rate_limit_inner(req: Request<Body>, next: Next, limiter: &RateLimiter) -> Response<Body> {
@@ -263,15 +257,21 @@ pub fn init_rate_limiters() {
 }
 
 fn api_limiter() -> &'static RateLimiter {
-    API_LIMITER.get().expect("Rate limiters not initialized — call init_rate_limiters() first")
+    API_LIMITER
+        .get()
+        .expect("Rate limiters not initialized — call init_rate_limiters() first")
 }
 
 fn auth_limiter() -> &'static RateLimiter {
-    AUTH_LIMITER.get().expect("Rate limiters not initialized — call init_rate_limiters() first")
+    AUTH_LIMITER
+        .get()
+        .expect("Rate limiters not initialized — call init_rate_limiters() first")
 }
 
 fn hook_limiter() -> &'static RateLimiter {
-    HOOK_LIMITER.get().expect("Rate limiters not initialized — call init_rate_limiters() first")
+    HOOK_LIMITER
+        .get()
+        .expect("Rate limiters not initialized — call init_rate_limiters() first")
 }
 
 #[cfg(test)]
@@ -321,9 +321,12 @@ mod tests {
 
     #[test]
     fn env_defaults_are_reasonable() {
-        // Just verify the defaults parse
-        assert!(100u64 > 0);
-        assert!(20u64 > 0);
-        assert!(200u64 > 0);
+        // Verify the default limits are positive
+        let api = 100u64;
+        let auth = 20u64;
+        let hook = 200u64;
+        assert!(api > 0);
+        assert!(auth > 0);
+        assert!(hook > 0);
     }
 }

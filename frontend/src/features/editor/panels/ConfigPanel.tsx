@@ -3,6 +3,7 @@ import {
   type CodeLanguage,
   detectLanguage,
 } from "@/components/ui/CodeEditor";
+import { VaultCredentialField } from "@/components/ui/VaultCredentialField";
 import { useFlowStore } from "@/stores/flowStore";
 import { useUIStore } from "@/stores/uiStore";
 import type { NodeStatus, Z8NodeData } from "@/types/flow";
@@ -19,7 +20,6 @@ import {
   Zap,
 } from "lucide-react";
 import { NodeTestPanel } from "./NodeTestPanel";
-import { VaultCredentialField } from "@/components/ui/VaultCredentialField";
 
 const STATUS_BADGES: Record<
   NodeStatus,
@@ -1353,7 +1353,7 @@ function SmartConfigField({
         { value: "en-US-Standard-D", label: "Male D" },
       ],
     };
-    const list = voices[provider] ?? voices.openai;
+    const list = voices[provider] ?? voices.openai ?? [];
     return (
       <select
         value={String(value ?? list[0]?.value ?? "")}
@@ -1585,7 +1585,8 @@ function SmartConfigField({
           className={`${inputClass} font-mono resize-y`}
         />
         <div className="text-[9px] text-slate-500">
-          JSON mapping for True branch. Use ".field" to reference input values, supports * + - /
+          JSON mapping for True branch. Use ".field" to reference input values,
+          supports * + - /
         </div>
       </div>
     );
@@ -1602,7 +1603,8 @@ function SmartConfigField({
           className={`${inputClass} font-mono resize-y`}
         />
         <div className="text-[9px] text-slate-500">
-          JSON mapping for False branch. Use ".field" to reference input values, supports * + - /
+          JSON mapping for False branch. Use ".field" to reference input values,
+          supports * + - /
         </div>
       </div>
     );
@@ -1870,12 +1872,17 @@ function hasSmartField(key: string, nodeType: string): boolean {
     (nodeType === "human-handoff" &&
       ["action", "priority", "webhookUrl"].includes(key)) ||
     (nodeType === "if-else" &&
-      ["field", "operator", "value", "trueExpression", "falseExpression"].includes(key)) ||
+      [
+        "field",
+        "operator",
+        "value",
+        "trueExpression",
+        "falseExpression",
+      ].includes(key)) ||
     (nodeType === "filter" &&
       ["passExpression", "rejectExpression"].includes(key)) ||
     (nodeType === "loop" && ["field", "itemExpression"].includes(key)) ||
-    (nodeType === "cron-trigger" &&
-      ["cron", "timezone"].includes(key)) ||
+    (nodeType === "cron-trigger" && ["cron", "timezone"].includes(key)) ||
     (nodeType === "webhook-trigger" &&
       ["method", "path", "authType", "authToken", "responseMode"].includes(key))
   );
@@ -2268,7 +2275,11 @@ export function ConfigPanel() {
         )}
 
         {/* Test / Mock panel */}
-        <NodeTestPanel key={selectedNodeId} nodeType={nodeType} config={config} />
+        <NodeTestPanel
+          key={selectedNodeId}
+          nodeType={nodeType}
+          config={config}
+        />
 
         {/* Ports section */}
         {(inputs.length > 0 || outputs.length > 0) && (

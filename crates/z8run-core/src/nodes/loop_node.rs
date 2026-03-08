@@ -150,14 +150,7 @@ mod tests {
     use uuid::Uuid;
 
     fn make_msg(payload: Value) -> FlowMessage {
-        FlowMessage {
-            id: Uuid::new_v4(),
-            flow_id: Uuid::new_v4(),
-            source_node: Uuid::new_v4(),
-            payload,
-            metadata: Default::default(),
-            timestamp: chrono::Utc::now(),
-        }
+        FlowMessage::new(Uuid::new_v4(), "input", payload, Uuid::new_v4())
     }
 
     #[tokio::test]

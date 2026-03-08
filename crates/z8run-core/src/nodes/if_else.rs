@@ -189,9 +189,27 @@ impl NodeExecutor for IfElseNode {
             return Err(crate::Z8Error::Internal("Field path is required".into()));
         }
         let valid_ops = [
-            "==", "!=", ">", "<", ">=", "<=", "eq", "neq", "gt", "lt", "gte", "lte",
-            "contains", "not_contains", "starts_with", "ends_with",
-            "is_empty", "is_not_empty", "exists", "not_exists", "matches",
+            "==",
+            "!=",
+            ">",
+            "<",
+            ">=",
+            "<=",
+            "eq",
+            "neq",
+            "gt",
+            "lt",
+            "gte",
+            "lte",
+            "contains",
+            "not_contains",
+            "starts_with",
+            "ends_with",
+            "is_empty",
+            "is_not_empty",
+            "exists",
+            "not_exists",
+            "matches",
         ];
         if !valid_ops.contains(&self.operator.as_str()) {
             return Err(crate::Z8Error::Internal(format!(

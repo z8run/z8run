@@ -34,11 +34,7 @@ impl NodeExecutor for CronTriggerNode {
             "payload": self.payload,
         });
 
-        let out = msg.derive(
-            msg.source_node,
-            "output",
-            trigger_payload,
-        );
+        let out = msg.derive(msg.source_node, "output", trigger_payload);
         Ok(vec![out])
     }
 
@@ -68,7 +64,8 @@ impl NodeExecutor for CronTriggerNode {
         let fields: Vec<&str> = self.cron_expression.split_whitespace().collect();
         if fields.len() < 5 || fields.len() > 6 {
             return Err(crate::Z8Error::Internal(
-                "Invalid cron expression: expected 5-6 fields (min hour dom month dow [year])".into(),
+                "Invalid cron expression: expected 5-6 fields (min hour dom month dow [year])"
+                    .into(),
             ));
         }
         Ok(())

@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::auth::Claims;
 use crate::error::ApiError;
 use crate::state::AppState;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 use z8run_core::flow::{Edge, Flow};
 use z8run_core::message::FlowMessage;
 use z8run_core::node::{Node, PortType};
