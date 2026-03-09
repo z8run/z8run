@@ -7,9 +7,11 @@
 //!   - "error" port: API or validation errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
+use crate::utils::encoding::base64_encode;
 use crate::utils::extract::TEXT_FIELDS;
 use crate::utils::node_helpers::{error_output, error_output_with_context, require_non_empty};
 use tracing::{info, warn};
@@ -336,38 +338,20 @@ fn extract_language(payload: &serde_json::Value) -> Option<String> {
     None
 }
 
-/// Encode bytes to base64 string
-fn base64_encode(data: &[u8]) -> String {
-    use base64::{engine::general_purpose, Engine as _};
-    general_purpose::STANDARD.encode(data)
-}
-
-pub struct TtsNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for TtsNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = TtsNode {
-            name: "Tts".to_string(),
-            provider: "openai".to_string(),
-            api_key: String::new(),
-            model: String::new(),
-            voice: String::new(),
-            language: String::new(),
-            timeout_ms: 30000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "tts"
-    }
-}
+node_factory!(TtsNodeFactory, TtsNode, "tts", {
+    name: "Tts".to_string(),
+    provider: "openai".to_string(),
+    api_key: String::new(),
+    model: String::new(),
+    voice: String::new(),
+    language: String::new(),
+    timeout_ms: 30000
+});
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::NodeExecutorFactory;
 
     #[test]
     fn test_extract_text_string_payload() {

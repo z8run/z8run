@@ -4,8 +4,9 @@
 //! Generates an initial message at each scheduled time.
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use crate::Z8Result;
 use serde_json::{json, Value};
@@ -68,22 +69,9 @@ impl NodeExecutor for CronTriggerNode {
     }
 }
 
-pub struct CronTriggerNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for CronTriggerNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = CronTriggerNode {
-            cron_expression: "0 * * * *".to_string(),
-            timezone: "UTC".to_string(),
-            payload: json!({}),
-            name: "Cron Trigger".to_string(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "cron-trigger"
-    }
-}
+node_factory!(CronTriggerNodeFactory, CronTriggerNode, "cron-trigger", {
+    cron_expression: "0 * * * *".to_string(),
+    timezone: "UTC".to_string(),
+    payload: json!({}),
+    name: "Cron Trigger".to_string()
+});

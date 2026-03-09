@@ -33,9 +33,10 @@
 //! Output ports: "result", "error"
 
 use super::switch::json_path_lookup;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use serde_json::{json, Value};
 use tracing::{info, warn};
@@ -865,27 +866,14 @@ impl NodeExecutor for CrmNode {
 
 // ---------- Factory ----------
 
-pub struct CrmNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for CrmNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = CrmNode {
-            name: "CRM".to_string(),
-            provider: "hubspot".to_string(),
-            api_key: String::new(),
-            base_url: String::new(),
-            action: String::new(),
-            timeout_ms: 5000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "crm"
-    }
-}
+node_factory!(CrmNodeFactory, CrmNode, "crm", {
+    name: "CRM".to_string(),
+    provider: "hubspot".to_string(),
+    api_key: String::new(),
+    base_url: String::new(),
+    action: String::new(),
+    timeout_ms: 5000
+});
 
 // ---------- Tests ----------
 

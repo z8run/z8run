@@ -10,9 +10,10 @@
 //!   - "error" port: API or validation errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::extract::extract_field;
 use crate::utils::node_helpers::{error_output, error_output_with_context, require_non_empty};
 use serde_json::Value;
@@ -432,31 +433,19 @@ fn extract_media_url(payload: &Value) -> String {
     String::new()
 }
 
-pub struct WhatsAppNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for WhatsAppNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = WhatsAppNode {
-            name: "WhatsApp".to_string(),
-            phone_number_id: String::new(),
-            access_token: String::new(),
-            action: "send_text".to_string(),
-            api_version: "v18.0".to_string(),
-            timeout_ms: 10000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "whatsapp"
-    }
-}
+node_factory!(WhatsAppNodeFactory, WhatsAppNode, "whatsapp", {
+    name: "WhatsApp".to_string(),
+    phone_number_id: String::new(),
+    access_token: String::new(),
+    action: "send_text".to_string(),
+    api_version: "v18.0".to_string(),
+    timeout_ms: 10000
+});
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::NodeExecutorFactory;
 
     #[test]
     fn test_extract_phone_number_first_field() {

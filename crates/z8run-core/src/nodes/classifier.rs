@@ -8,10 +8,12 @@
 //!   - "error" port: API errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::extract::TEXT_FIELDS;
+use crate::utils::llm_client::{call_llm, LlmCallParams};
 use tracing::{info, warn};
 
 pub struct ClassifierNode {
@@ -66,13 +68,17 @@ impl NodeExecutor for ClassifierNode {
         // Use the same LLM call pattern — reuse OpenAI-compatible API
         let result = call_llm(
             &client,
-            &self.provider,
-            &self.model,
-            &self.api_key,
-            &self.base_url,
-            &system_prompt,
-            &text,
-            timeout,
+            &LlmCallParams {
+                provider: &self.provider,
+                model: &self.model,
+                api_key: &self.api_key,
+                base_url: &self.base_url,
+                system_prompt: &system_prompt,
+                user_prompt: &text,
+                max_tokens: 256,
+                temperature: 0.1,
+                timeout,
+            },
         )
         .await;
 
@@ -143,139 +149,6 @@ impl NodeExecutor for ClassifierNode {
     }
 }
 
-/// Shared LLM call function (OpenAI-compatible, Anthropic, or Ollama).
-#[allow(clippy::too_many_arguments)]
-async fn call_llm(
-    client: &reqwest::Client,
-    provider: &str,
-    model: &str,
-    api_key: &str,
-    base_url: &str,
-    system_prompt: &str,
-    user_prompt: &str,
-    timeout: std::time::Duration,
-) -> Result<String, String> {
-    match provider {
-        "anthropic" => {
-            let base = if base_url.is_empty() {
-                "https://api.anthropic.com/v1"
-            } else {
-                base_url
-            };
-            let url = format!("{}/messages", base);
-            let body = serde_json::json!({
-                "model": model,
-                "max_tokens": 256,
-                "system": system_prompt,
-                "messages": [{"role": "user", "content": user_prompt}],
-            });
-            let resp = client
-                .post(&url)
-                .header("x-api-key", api_key)
-                .header("anthropic-version", "2023-06-01")
-                .header("Content-Type", "application/json")
-                .timeout(timeout)
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| format!("Request failed: {}", e))?;
-            let status = resp.status().as_u16();
-            let text = resp
-                .text()
-                .await
-                .map_err(|e| format!("Read error: {}", e))?;
-            if status != 200 {
-                return Err(format!("API error ({}): {}", status, text));
-            }
-            let json: serde_json::Value =
-                serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
-            Ok(json["content"][0]["text"]
-                .as_str()
-                .unwrap_or("")
-                .to_string())
-        }
-        "ollama" => {
-            let base = if base_url.is_empty() {
-                "http://localhost:11434"
-            } else {
-                base_url
-            };
-            let url = format!("{}/api/chat", base);
-            let body = serde_json::json!({
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "stream": false,
-                "options": {"temperature": 0.1, "num_predict": 256},
-            });
-            let resp = client
-                .post(&url)
-                .timeout(timeout)
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| format!("Request failed: {}", e))?;
-            let status = resp.status().as_u16();
-            let text = resp
-                .text()
-                .await
-                .map_err(|e| format!("Read error: {}", e))?;
-            if status != 200 {
-                return Err(format!("API error ({}): {}", status, text));
-            }
-            let json: serde_json::Value =
-                serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
-            Ok(json["message"]["content"]
-                .as_str()
-                .unwrap_or("")
-                .to_string())
-        }
-        _ => {
-            // OpenAI-compatible
-            let base = if base_url.is_empty() {
-                "https://api.openai.com/v1"
-            } else {
-                base_url
-            };
-            let url = format!("{}/chat/completions", base);
-            let body = serde_json::json!({
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                "temperature": 0.1,
-                "max_tokens": 256,
-            });
-            let resp = client
-                .post(&url)
-                .bearer_auth(api_key)
-                .header("Content-Type", "application/json")
-                .timeout(timeout)
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| format!("Request failed: {}", e))?;
-            let status = resp.status().as_u16();
-            let text = resp
-                .text()
-                .await
-                .map_err(|e| format!("Read error: {}", e))?;
-            if status != 200 {
-                return Err(format!("API error ({}): {}", status, text));
-            }
-            let json: serde_json::Value =
-                serde_json::from_str(&text).map_err(|e| format!("Parse error: {}", e))?;
-            Ok(json["choices"][0]["message"]["content"]
-                .as_str()
-                .unwrap_or("")
-                .to_string())
-        }
-    }
-}
-
 /// Parse the LLM response into a classification JSON.
 /// Falls back gracefully if the LLM doesn't return perfect JSON.
 fn parse_classification(response: &str, categories: &[String]) -> serde_json::Value {
@@ -330,30 +203,17 @@ fn parse_classification(response: &str, categories: &[String]) -> serde_json::Va
     })
 }
 
-pub struct ClassifierNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for ClassifierNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = ClassifierNode {
-            name: "Classifier".to_string(),
-            provider: "openai".to_string(),
-            model: "gpt-4o-mini".to_string(),
-            api_key: String::new(),
-            base_url: String::new(),
-            categories: vec![
-                "positive".to_string(),
-                "negative".to_string(),
-                "neutral".to_string(),
-            ],
-            context: String::new(),
-            timeout_ms: 15000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "classifier"
-    }
-}
+node_factory!(ClassifierNodeFactory, ClassifierNode, "classifier", {
+    name: "Classifier".to_string(),
+    provider: "openai".to_string(),
+    model: "gpt-4o-mini".to_string(),
+    api_key: String::new(),
+    base_url: String::new(),
+    categories: vec![
+        "positive".to_string(),
+        "negative".to_string(),
+        "neutral".to_string(),
+    ],
+    context: String::new(),
+    timeout_ms: 15000
+});

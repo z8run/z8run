@@ -458,6 +458,7 @@ impl NodeExecutorFactory for HumanHandoffNodeFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::NodeExecutorFactory;
 
     #[test]
     fn test_generate_ticket_id() {

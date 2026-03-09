@@ -23,9 +23,10 @@
 //! }
 //! ```
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::json_path::{json_path_get, json_path_remove, json_path_set};
 use regex::Regex;
 use serde_json::Value;
@@ -326,32 +327,19 @@ impl NodeExecutor for SanitizeNode {
     }
 }
 
-pub struct SanitizeNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for SanitizeNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = SanitizeNode {
-            name: "Sanitize".to_string(),
-            fields: vec![],
-            strategy: "mask".to_string(),
-            detect_patterns: true,
-            patterns: vec![
-                "credit_card".to_string(),
-                "email".to_string(),
-                "bearer_token".to_string(),
-                "phone".to_string(),
-                "ip_address".to_string(),
-            ],
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "sanitize"
-    }
-}
+node_factory!(SanitizeNodeFactory, SanitizeNode, "sanitize", {
+        name: String::new(),
+fields: vec![],
+    strategy: "mask".to_string(),
+    detect_patterns: true,
+    patterns: vec![
+        "credit_card".to_string(),
+        "email".to_string(),
+        "bearer_token".to_string(),
+        "phone".to_string(),
+        "ip_address".to_string()
+    ]
+});
 
 #[cfg(test)]
 mod tests {

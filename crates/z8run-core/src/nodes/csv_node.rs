@@ -11,9 +11,10 @@
 //! ```
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_one_of;
 use serde_json::Value;
 use tracing::debug;
@@ -260,26 +261,13 @@ fn value_to_csv_field(v: &Value) -> String {
     }
 }
 
-pub struct CsvNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for CsvNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = CsvNode {
-            name: "CSV".to_string(),
-            action: "parse".to_string(),
-            delimiter: b',',
-            has_headers: true,
-            columns: Vec::new(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "csv"
-    }
-}
+node_factory!(CsvNodeFactory, CsvNode, "csv", {
+        name: String::new(),
+action: "parse".to_string(),
+    delimiter: b',',
+    has_headers: true,
+    columns: Vec::new()
+});
 
 #[cfg(test)]
 mod tests {

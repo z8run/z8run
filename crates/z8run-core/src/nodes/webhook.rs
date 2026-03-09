@@ -21,9 +21,10 @@
 //! }
 //! ```
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use serde_json::Value;
 use tracing::{debug, warn};
@@ -320,28 +321,15 @@ impl NodeExecutor for WebhookNode {
     }
 }
 
-pub struct WebhookNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for WebhookNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = WebhookNode {
-            name: "Webhook".to_string(),
-            path: "/hook".to_string(),
-            method: "POST".to_string(),
-            secret: String::new(),
-            signature_header: "X-Hub-Signature-256".to_string(),
-            event_header: String::new(),
-            events: vec![],
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "webhook"
-    }
-}
+node_factory!(WebhookNodeFactory, WebhookNode, "webhook", {
+    name: "Webhook".to_string(),
+    path: "/hook".to_string(),
+    method: "POST".to_string(),
+    secret: String::new(),
+    signature_header: "X-Hub-Signature-256".to_string(),
+    event_header: String::new(),
+    events: vec![]
+});
 
 #[cfg(test)]
 mod tests {

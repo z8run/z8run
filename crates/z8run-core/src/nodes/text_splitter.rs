@@ -11,9 +11,10 @@
 //!   - "error" port: on processing errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::extract::TEXT_FIELDS;
 use crate::utils::node_helpers::error_output;
 use tracing::info;
@@ -228,23 +229,10 @@ fn split_by_tokens(text: &str, token_limit: usize, overlap: usize) -> Vec<(Strin
     chunks
 }
 
-pub struct TextSplitterNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for TextSplitterNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = TextSplitterNode {
-            name: "TextSplitter".to_string(),
-            strategy: "fixed".to_string(),
-            chunk_size: 512,
-            overlap: 50,
-            separator: None,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "text-splitter"
-    }
-}
+node_factory!(TextSplitterNodeFactory, TextSplitterNode, "text-splitter", {
+    name: "TextSplitter".to_string(),
+    strategy: "fixed".to_string(),
+    chunk_size: 512,
+    overlap: 50,
+    separator: None
+});

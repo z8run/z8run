@@ -6,9 +6,10 @@
 //! 2. **Static output** (`config.outputValue`): Returns a fixed JSON value.
 //! 3. **Pass-through**: If neither is set, forwards the input payload as-is.
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::json_path::json_path_lookup;
 use serde_json::Value;
 use tracing::{debug, warn};
@@ -136,24 +137,11 @@ impl NodeExecutor for FunctionNode {
     }
 }
 
-pub struct FunctionNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for FunctionNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = FunctionNode {
-            name: "Function".to_string(),
-            template: None,
-            output_value: None,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "function"
-    }
-}
+node_factory!(FunctionNodeFactory, FunctionNode, "function", {
+        name: String::new(),
+template: None,
+    output_value: None
+});
 
 #[cfg(test)]
 mod tests {

@@ -20,9 +20,10 @@
 //! - `passThrough`: if true, include ALL input fields plus the mapped aliases.
 //!   if false (default), output ONLY the mapped fields.
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::json_path::{json_path_get, json_path_set};
 use serde_json::Value;
 use tracing::debug;
@@ -165,24 +166,8 @@ impl NodeExecutor for MapperNode {
     }
 }
 
-pub struct MapperNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for MapperNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = MapperNode {
-            name: "Mapper".to_string(),
-            mappings: vec![],
-            pass_through: false,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "mapper"
-    }
-}
+node_factory!(MapperNodeFactory, MapperNode, "mapper", {     name: String::new(),
+mappings: vec![], pass_through: false });
 
 #[cfg(test)]
 mod tests {

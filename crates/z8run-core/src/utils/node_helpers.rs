@@ -134,6 +134,59 @@ macro_rules! configure_fields {
     };
 }
 
+/// Macro to generate a `NodeExecutorFactory` implementation.
+///
+/// Eliminates ~12-15 lines of boilerplate per node (40 nodes = ~500 lines).
+///
+/// # Examples
+/// ```ignore
+/// node_factory!(DebugNodeFactory, DebugNode, "debug", {
+///     name: "Debug".to_string(),
+///     log_payload: true,
+/// });
+///
+/// // With serde_json defaults:
+/// node_factory!(LlmNodeFactory, LlmNode, "llm", {
+///     name: "LLM".to_string(),
+///     provider: "openai".to_string(),
+///     model: "gpt-4o-mini".to_string(),
+///     api_key: String::new(),
+///     base_url: String::new(),
+///     system_prompt: String::new(),
+///     temperature: 0.7,
+///     max_tokens: 1024_u64,
+///     timeout_ms: 30000_u64,
+///     vision: false,
+///     event_tx: None,
+///     flow_id: None,
+///     node_id: None,
+/// });
+/// ```
+#[macro_export]
+macro_rules! node_factory {
+    ($factory:ident, $node:ident, $type_name:literal, { $($field:ident : $default:expr),* $(,)? }) => {
+        pub struct $factory;
+
+        #[async_trait::async_trait]
+        impl $crate::engine::NodeExecutorFactory for $factory {
+            async fn create(
+                &self,
+                config: serde_json::Value,
+            ) -> $crate::error::Z8Result<Box<dyn $crate::engine::NodeExecutor>> {
+                let mut node = $node {
+                    $($field: $default),*
+                };
+                node.configure(config).await?;
+                Ok(Box::new(node))
+            }
+
+            fn node_type(&self) -> &str {
+                $type_name
+            }
+        }
+    };
+}
+
 /// Create an error output message for a node's "error" port.
 ///
 /// Replaces the repeated pattern:

@@ -7,9 +7,10 @@
 //!   - "error" port: API or validation errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use tracing::{info, warn};
 
@@ -280,27 +281,14 @@ fn extract_prompt(payload: &serde_json::Value) -> String {
     String::new()
 }
 
-pub struct ImageGenNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for ImageGenNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = ImageGenNode {
-            name: "ImageGen".to_string(),
-            provider: "openai".to_string(),
-            model: "dall-e-3".to_string(),
-            api_key: String::new(),
-            base_url: String::new(),
-            size: "1024x1024".to_string(),
-            quality: "standard".to_string(),
-            style: "natural".to_string(),
-            timeout_ms: 60000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "image-gen"
-    }
-}
+node_factory!(ImageGenNodeFactory, ImageGenNode, "image-gen", {
+    name: "ImageGen".to_string(),
+    provider: "openai".to_string(),
+    model: "dall-e-3".to_string(),
+    api_key: String::new(),
+    base_url: String::new(),
+    size: "1024x1024".to_string(),
+    quality: "standard".to_string(),
+    style: "natural".to_string(),
+    timeout_ms: 60000
+});

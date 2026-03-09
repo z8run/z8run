@@ -15,9 +15,10 @@
 //!   - "error" port: API or configuration errors
 
 use crate::configure_fields;
-use crate::engine::{EngineEvent, NodeExecutor, NodeExecutorFactory};
+use crate::engine::{EngineEvent, NodeExecutor};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::extract::TEXT_FIELDS;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
@@ -577,31 +578,18 @@ impl AiAgentNode {
     }
 }
 
-pub struct AiAgentNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for AiAgentNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = AiAgentNode {
-            name: "AIAgent".to_string(),
-            provider: "openai".to_string(),
-            model: "gpt-4o-mini".to_string(),
-            api_key: String::new(),
-            base_url: String::new(),
-            system_prompt: String::new(),
-            tools: Vec::new(),
-            max_iterations: 5,
-            temperature: 0.7,
-            timeout_ms: 30000,
-            event_tx: None,
-            flow_id: None,
-            node_id: None,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "ai-agent"
-    }
-}
+node_factory!(AiAgentNodeFactory, AiAgentNode, "ai-agent", {
+        name: String::new(),
+provider: "openai".to_string(),
+    model: "gpt-4o-mini".to_string(),
+    api_key: String::new(),
+    base_url: String::new(),
+    system_prompt: String::new(),
+    tools: Vec::new(),
+    max_iterations: 5,
+    temperature: 0.7,
+    timeout_ms: 30000,
+    event_tx: None,
+    flow_id: None,
+    node_id: None
+});

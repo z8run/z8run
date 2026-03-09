@@ -10,9 +10,10 @@
 //!   - "error" port: Connection or operation errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::{
     error_output, error_output_with_context, require_non_empty, require_one_of,
 };
@@ -319,30 +320,17 @@ fn extract_payload(payload: &serde_json::Value) -> String {
     String::new()
 }
 
-pub struct MqttNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for MqttNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = MqttNode {
-            name: "MQTT".to_string(),
-            action: "publish".to_string(),
-            broker: "localhost".to_string(),
-            port: 1883,
-            topic: "z8run/default".to_string(),
-            qos: 0,
-            client_id: format!("z8run-{}", &uuid::Uuid::new_v4().to_string()[..8]),
-            username: String::new(),
-            password: String::new(),
-            use_tls: false,
-            keep_alive: 30,
-            timeout_ms: 30000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "mqtt"
-    }
-}
+node_factory!(MqttNodeFactory, MqttNode, "mqtt", {
+    name: "MQTT".to_string(),
+    action: "publish".to_string(),
+    broker: "localhost".to_string(),
+    port: 1883,
+    topic: "z8run/default".to_string(),
+    qos: 0,
+    client_id: format!("z8run-{}", &uuid::Uuid::new_v4().to_string()[..8]),
+    username: String::new(),
+    password: String::new(),
+    use_tls: false,
+    keep_alive: 30,
+    timeout_ms: 30000
+});

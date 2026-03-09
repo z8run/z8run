@@ -17,9 +17,10 @@
 //! }
 //! ```
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -224,25 +225,12 @@ impl NodeExecutor for SwitchNode {
     }
 }
 
-pub struct SwitchNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for SwitchNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = SwitchNode {
-            name: "Switch".to_string(),
-            property: "payload".to_string(),
-            rules: Vec::new(),
-            check_all: false,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "switch"
-    }
-}
+node_factory!(SwitchNodeFactory, SwitchNode, "switch", {
+        name: String::new(),
+property: "payload".to_string(),
+    rules: Vec::new(),
+    check_all: false
+});
 
 #[cfg(test)]
 mod tests {

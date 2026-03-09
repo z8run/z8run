@@ -1,9 +1,10 @@
 //! Debug node: logs message payload for inspection.
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use tracing::info;
 
 pub struct DebugNode {
@@ -53,20 +54,5 @@ impl NodeExecutor for DebugNode {
     }
 }
 
-pub struct DebugNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for DebugNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = DebugNode {
-            name: "Debug".to_string(),
-            log_payload: true,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "debug"
-    }
-}
+node_factory!(DebugNodeFactory, DebugNode, "debug", {     name: String::new(),
+log_payload: true });

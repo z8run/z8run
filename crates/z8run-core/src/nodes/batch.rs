@@ -8,9 +8,10 @@
 //! ```
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use serde_json::Value;
 use tracing::debug;
 
@@ -104,24 +105,8 @@ impl BatchNode {
     }
 }
 
-pub struct BatchNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for BatchNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = BatchNode {
-            name: "Batch".to_string(),
-            size: 100,
-            field: String::new(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "batch"
-    }
-}
+node_factory!(BatchNodeFactory, BatchNode, "batch", {     name: String::new(),
+size: 100, field: String::new() });
 
 #[cfg(test)]
 mod tests {

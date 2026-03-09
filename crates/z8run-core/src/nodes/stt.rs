@@ -7,9 +7,11 @@
 //!   - "error" port: API or validation errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
+use crate::utils::encoding::{base64_decode, base64_encode};
 use crate::utils::node_helpers::{error_output, error_output_with_context, require_non_empty};
 use tracing::{info, warn};
 
@@ -421,120 +423,19 @@ fn extract_language(payload: &serde_json::Value) -> Option<String> {
     None
 }
 
-/// Encode bytes to base64 string
-fn base64_encode(data: &[u8]) -> String {
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    let mut result = String::new();
-    let mut i = 0;
-
-    while i < data.len() {
-        let b1 = data[i];
-        let b2 = if i + 1 < data.len() { data[i + 1] } else { 0 };
-        let b3 = if i + 2 < data.len() { data[i + 2] } else { 0 };
-
-        let n = ((b1 as u32) << 16) | ((b2 as u32) << 8) | (b3 as u32);
-
-        result.push(CHARSET[((n >> 18) & 63) as usize] as char);
-        result.push(CHARSET[((n >> 12) & 63) as usize] as char);
-
-        if i + 1 < data.len() {
-            result.push(CHARSET[((n >> 6) & 63) as usize] as char);
-        } else {
-            result.push('=');
-        }
-
-        if i + 2 < data.len() {
-            result.push(CHARSET[(n & 63) as usize] as char);
-        } else {
-            result.push('=');
-        }
-
-        i += 3;
-    }
-
-    result
-}
-
-/// Decode base64 string to bytes
-fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
-    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-    let mut result = Vec::new();
-    let s = s.trim_end_matches('=');
-    let mut i = 0;
-
-    while i < s.len() {
-        let c1 = CHARSET
-            .iter()
-            .position(|&b| b == s.as_bytes()[i])
-            .ok_or_else(|| "Invalid base64 character".to_string())? as u32;
-        let c2 = if i + 1 < s.len() {
-            CHARSET
-                .iter()
-                .position(|&b| b == s.as_bytes()[i + 1])
-                .ok_or_else(|| "Invalid base64 character".to_string())? as u32
-        } else {
-            0
-        };
-        let c3 = if i + 2 < s.len() {
-            CHARSET
-                .iter()
-                .position(|&b| b == s.as_bytes()[i + 2])
-                .ok_or_else(|| "Invalid base64 character".to_string())? as u32
-        } else {
-            0
-        };
-        let c4 = if i + 3 < s.len() {
-            CHARSET
-                .iter()
-                .position(|&b| b == s.as_bytes()[i + 3])
-                .ok_or_else(|| "Invalid base64 character".to_string())? as u32
-        } else {
-            0
-        };
-
-        let n = (c1 << 18) | (c2 << 12) | (c3 << 6) | c4;
-
-        result.push((n >> 16) as u8);
-        if i + 2 < s.len() {
-            result.push((n >> 8) as u8);
-        }
-        if i + 3 < s.len() {
-            result.push(n as u8);
-        }
-
-        i += 4;
-    }
-
-    Ok(result)
-}
-
-pub struct SttNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for SttNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = SttNode {
-            name: "STT".to_string(),
-            provider: "openai".to_string(),
-            api_key: String::new(),
-            model: "whisper-1".to_string(),
-            language: String::new(),
-            timeout_ms: 30000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "stt"
-    }
-}
+node_factory!(SttNodeFactory, SttNode, "stt", {
+    name: "STT".to_string(),
+    provider: "openai".to_string(),
+    api_key: String::new(),
+    model: "whisper-1".to_string(),
+    language: String::new(),
+    timeout_ms: 30000
+});
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::NodeExecutorFactory;
 
     #[test]
     fn test_base64_encode_decode() {

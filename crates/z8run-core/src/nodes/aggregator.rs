@@ -9,9 +9,10 @@
 //! ```
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use serde_json::Value;
 use std::collections::HashMap;
 use tracing::debug;
@@ -230,25 +231,12 @@ fn extract_array(payload: &Value) -> Option<Vec<Value>> {
     None
 }
 
-pub struct AggregatorNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for AggregatorNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = AggregatorNode {
-            name: "Aggregator".to_string(),
-            operation: "count".to_string(),
-            field: String::new(),
-            group_by: String::new(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "aggregator"
-    }
-}
+node_factory!(AggregatorNodeFactory, AggregatorNode, "aggregator", {
+        name: String::new(),
+operation: "count".to_string(),
+    field: String::new(),
+    group_by: String::new()
+});
 
 #[cfg(test)]
 mod tests {

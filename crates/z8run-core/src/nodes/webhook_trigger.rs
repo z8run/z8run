@@ -5,8 +5,9 @@
 //! Extracts headers, query params, and body from the incoming request.
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::Z8Result;
 use serde_json::{json, Value};
 use tracing::info;
@@ -77,24 +78,11 @@ impl NodeExecutor for WebhookTriggerNode {
     }
 }
 
-pub struct WebhookTriggerNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for WebhookTriggerNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = WebhookTriggerNode {
-            method: "POST".to_string(),
-            path: "".to_string(),
-            auth_type: "none".to_string(),
-            auth_token: "".to_string(),
-            response_mode: "last_node".to_string(),
-            name: "Webhook Trigger".to_string(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "webhook-trigger"
-    }
-}
+node_factory!(WebhookTriggerNodeFactory, WebhookTriggerNode, "webhook-trigger", {
+    method: "POST".to_string(),
+    path: String::new(),
+    auth_type: "none".to_string(),
+    auth_token: String::new(),
+    response_mode: "last_node".to_string(),
+    name: "Webhook Trigger".to_string()
+});

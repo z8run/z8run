@@ -32,3 +32,4 @@ Thumbs.db
 
 # Code quality reports
 .jscpd-report/
+*_REPORT.md

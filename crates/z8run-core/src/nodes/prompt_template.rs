@@ -8,9 +8,10 @@
 //!   - "error" port: if template has unresolved variables in strict mode
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use std::collections::HashMap;
 use tracing::{info, warn};
@@ -137,21 +138,5 @@ fn render_template(template: &str, variables: &HashMap<String, String>) -> Strin
     result
 }
 
-pub struct PromptTemplateNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for PromptTemplateNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = PromptTemplateNode {
-            name: "PromptTemplate".to_string(),
-            template: String::new(),
-            strict_mode: false,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "prompt-template"
-    }
-}
+node_factory!(PromptTemplateNodeFactory, PromptTemplateNode, "prompt-template", {     name: String::new(),
+template: String::new(), strict_mode: false });

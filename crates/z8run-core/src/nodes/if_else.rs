@@ -7,8 +7,9 @@
 //! contains, not_contains, starts_with, ends_with, is_empty, is_not_empty,
 //! exists, not_exists, matches (regex).
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use crate::Z8Result;
 use regex::Regex;
@@ -224,25 +225,12 @@ impl NodeExecutor for IfElseNode {
     }
 }
 
-pub struct IfElseNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for IfElseNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = IfElseNode {
-            field: "payload.status".to_string(),
-            operator: "==".to_string(),
-            value: json!("success"),
-            name: "If/Else".to_string(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "if-else"
-    }
-}
+node_factory!(IfElseNodeFactory, IfElseNode, "if-else", {
+        name: String::new(),
+field: "payload.status".to_string(),
+    operator: "==".to_string(),
+    value: json!("success")
+});
 
 #[cfg(test)]
 mod tests {

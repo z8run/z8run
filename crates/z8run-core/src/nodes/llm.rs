@@ -8,10 +8,12 @@
 //!   - "error" port: API errors
 
 use crate::configure_fields;
-use crate::engine::{EngineEvent, NodeExecutor, NodeExecutorFactory};
+use crate::engine::{EngineEvent, NodeExecutor};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::extract::{extract_text, PROMPT_FIELDS};
+use crate::utils::http_helpers::resolve_api_url;
 use crate::utils::node_helpers::{error_output, error_output_with_context};
 use futures_util::StreamExt;
 use tokio::sync::broadcast;
@@ -189,12 +191,11 @@ impl LlmNode {
         image: Option<&str>,
         timeout: std::time::Duration,
     ) -> Result<String, String> {
-        let base = if self.base_url.is_empty() {
-            "https://api.openai.com/v1"
-        } else {
-            &self.base_url
-        };
-        let url = format!("{}/chat/completions", base);
+        let url = resolve_api_url(
+            &self.base_url,
+            "https://api.openai.com/v1",
+            "/chat/completions",
+        );
 
         let mut messages = Vec::new();
         if !self.system_prompt.is_empty() {
@@ -245,12 +246,7 @@ impl LlmNode {
         image: Option<&str>,
         timeout: std::time::Duration,
     ) -> Result<String, String> {
-        let base = if self.base_url.is_empty() {
-            "https://api.anthropic.com/v1"
-        } else {
-            &self.base_url
-        };
-        let url = format!("{}/messages", base);
+        let url = resolve_api_url(&self.base_url, "https://api.anthropic.com/v1", "/messages");
 
         let user_content = build_user_content_anthropic(prompt, image);
         let mut body = serde_json::json!({
@@ -301,12 +297,7 @@ impl LlmNode {
         image: Option<&str>,
         timeout: std::time::Duration,
     ) -> Result<String, String> {
-        let base = if self.base_url.is_empty() {
-            "http://localhost:11434"
-        } else {
-            &self.base_url
-        };
-        let url = format!("{}/api/chat", base);
+        let url = resolve_api_url(&self.base_url, "http://localhost:11434", "/api/chat");
 
         let mut messages = Vec::new();
         if !self.system_prompt.is_empty() {
@@ -361,12 +352,11 @@ impl LlmNode {
         flow_id: Uuid,
         node_id: Uuid,
     ) -> Result<String, String> {
-        let base = if self.base_url.is_empty() {
-            "https://api.openai.com/v1"
-        } else {
-            &self.base_url
-        };
-        let url = format!("{}/chat/completions", base);
+        let url = resolve_api_url(
+            &self.base_url,
+            "https://api.openai.com/v1",
+            "/chat/completions",
+        );
 
         let mut messages = Vec::new();
         if !self.system_prompt.is_empty() {
@@ -452,12 +442,7 @@ impl LlmNode {
         flow_id: Uuid,
         node_id: Uuid,
     ) -> Result<String, String> {
-        let base = if self.base_url.is_empty() {
-            "https://api.anthropic.com/v1"
-        } else {
-            &self.base_url
-        };
-        let url = format!("{}/messages", base);
+        let url = resolve_api_url(&self.base_url, "https://api.anthropic.com/v1", "/messages");
 
         let user_content = build_user_content_anthropic(prompt, image);
         let mut body = serde_json::json!({
@@ -547,12 +532,7 @@ impl LlmNode {
         flow_id: Uuid,
         node_id: Uuid,
     ) -> Result<String, String> {
-        let base = if self.base_url.is_empty() {
-            "http://localhost:11434"
-        } else {
-            &self.base_url
-        };
-        let url = format!("{}/api/chat", base);
+        let url = resolve_api_url(&self.base_url, "http://localhost:11434", "/api/chat");
 
         let mut messages = Vec::new();
         if !self.system_prompt.is_empty() {
@@ -724,31 +704,18 @@ fn build_user_message_ollama(prompt: &str, image: Option<&str>) -> serde_json::V
     }
 }
 
-pub struct LlmNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for LlmNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = LlmNode {
-            name: "LLM".to_string(),
-            provider: "openai".to_string(),
-            model: "gpt-4o-mini".to_string(),
-            api_key: String::new(),
-            base_url: String::new(),
-            system_prompt: String::new(),
-            temperature: 0.7,
-            max_tokens: 1024,
-            timeout_ms: 30000,
-            vision: false,
-            event_tx: None,
-            flow_id: None,
-            node_id: None,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "llm"
-    }
-}
+node_factory!(LlmNodeFactory, LlmNode, "llm", {
+        name: String::new(),
+provider: "openai".to_string(),
+    model: "gpt-4o-mini".to_string(),
+    api_key: String::new(),
+    base_url: String::new(),
+    system_prompt: String::new(),
+    temperature: 0.7,
+    max_tokens: 1024,
+    timeout_ms: 30000,
+    vision: false,
+    event_tx: None,
+    flow_id: None,
+    node_id: None
+});

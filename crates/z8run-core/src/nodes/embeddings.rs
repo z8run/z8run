@@ -7,9 +7,10 @@
 //!   - "error" port: API errors
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::extract::TEXT_FIELDS;
 use crate::utils::node_helpers::{error_output, error_output_with_context};
 use tracing::{info, warn};
@@ -186,24 +187,11 @@ impl EmbeddingsNode {
     }
 }
 
-pub struct EmbeddingsNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for EmbeddingsNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = EmbeddingsNode {
-            name: "Embeddings".to_string(),
-            provider: "openai".to_string(),
-            model: "text-embedding-3-small".to_string(),
-            api_key: String::new(),
-            base_url: String::new(),
-            timeout_ms: 15000,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "embeddings"
-    }
-}
+node_factory!(EmbeddingsNodeFactory, EmbeddingsNode, "embeddings", {
+    name: "Embeddings".to_string(),
+    provider: "openai".to_string(),
+    model: "text-embedding-3-small".to_string(),
+    api_key: String::new(),
+    base_url: String::new(),
+    timeout_ms: 15000
+});

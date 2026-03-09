@@ -14,9 +14,10 @@
 //! time it is invoked.
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use serde_json::Value;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tracing::debug;
@@ -78,24 +79,11 @@ impl NodeExecutor for TimerNode {
     }
 }
 
-pub struct TimerNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for TimerNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = TimerNode {
-            name: "Timer".to_string(),
-            interval_ms: 5000,
-            tick_count: AtomicU64::new(0),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "timer"
-    }
-}
+node_factory!(TimerNodeFactory, TimerNode, "timer", {
+    name: "Timer".to_string(),
+    interval_ms: 5000,
+    tick_count: AtomicU64::new(0)
+});
 
 #[cfg(test)]
 mod tests {

@@ -4,8 +4,9 @@
 //! Takes an array field from the input and emits one message per element.
 //! Each output message includes the item, index, and total count.
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_non_empty;
 use crate::Z8Result;
 use serde_json::{json, Value};
@@ -123,23 +124,8 @@ impl NodeExecutor for LoopNode {
     }
 }
 
-pub struct LoopNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for LoopNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = LoopNode {
-            field: "payload.items".to_string(),
-            name: "Loop".to_string(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "loop"
-    }
-}
+node_factory!(LoopNodeFactory, LoopNode, "loop", {     name: String::new(),
+field: "payload.items".to_string() });
 
 #[cfg(test)]
 mod tests {

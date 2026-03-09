@@ -13,9 +13,10 @@
 //! }
 //! ```
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::json_path::json_path_lookup;
 use crate::utils::node_helpers::require_non_empty;
 use serde_json::Value;
@@ -132,25 +133,8 @@ fn parse_expression(expr: &str) -> Option<(String, String, Value)> {
     None
 }
 
-pub struct FilterNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for FilterNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = FilterNode {
-            name: "Filter".to_string(),
-            property: "payload".to_string(),
-            condition: "notempty".to_string(),
-            value: Value::Null,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "filter"
-    }
-}
+node_factory!(FilterNodeFactory, FilterNode, "filter", {     name: String::new(),
+property: "payload".to_string(), condition: "notempty".to_string(), value: Value::Null });
 
 #[cfg(test)]
 mod tests {

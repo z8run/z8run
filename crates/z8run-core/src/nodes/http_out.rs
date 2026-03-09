@@ -10,9 +10,10 @@ use tokio::sync::{oneshot, RwLock};
 use uuid::Uuid;
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use tracing::{info, warn};
 
 /// Webhook response data sent through the oneshot channel.
@@ -104,20 +105,5 @@ impl NodeExecutor for HttpOutNode {
     }
 }
 
-pub struct HttpOutNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for HttpOutNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = HttpOutNode {
-            name: "HTTP Out".to_string(),
-            status_code: 200,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "http-out"
-    }
-}
+node_factory!(HttpOutNodeFactory, HttpOutNode, "http-out", {     name: String::new(),
+status_code: 200 });

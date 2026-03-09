@@ -5,9 +5,10 @@
 //! `{ req: { method, path, headers, query, body } }` format.
 
 use crate::configure_fields;
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use tracing::info;
 
 pub struct HttpInNode {
@@ -68,21 +69,5 @@ impl NodeExecutor for HttpInNode {
     }
 }
 
-pub struct HttpInNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for HttpInNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = HttpInNode {
-            name: "HTTP In".to_string(),
-            method: "GET".to_string(),
-            path: "/".to_string(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "http-in"
-    }
-}
+node_factory!(HttpInNodeFactory, HttpInNode, "http-in", {     name: String::new(),
+method: "GET".to_string(), path: "/".to_string() });

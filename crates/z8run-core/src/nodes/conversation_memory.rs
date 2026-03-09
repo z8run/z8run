@@ -13,9 +13,10 @@
 //!   - "cleared" port: Confirmation of deletion (clear action)
 //!   - "error" port: Errors during operation
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -342,31 +343,18 @@ impl ConversationMemoryNode {
     }
 }
 
-/// Factory for creating ConversationMemoryNode instances.
-pub struct ConversationMemoryNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for ConversationMemoryNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = ConversationMemoryNode {
-            name: "ConversationMemory".to_string(),
-            action: "save".to_string(),
-            max_messages: 50,
-            ttl_seconds: 3600,
-            conversations: Arc::new(RwLock::new(HashMap::new())),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "conversation-memory"
-    }
-}
+node_factory!(ConversationMemoryNodeFactory, ConversationMemoryNode, "conversation-memory", {
+        name: String::new(),
+action: "save".to_string(),
+    max_messages: 50,
+    ttl_seconds: 3600,
+    conversations: Arc::new(RwLock::new(HashMap::new()))
+});
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::NodeExecutorFactory;
     use uuid::Uuid;
 
     #[test]

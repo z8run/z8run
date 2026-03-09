@@ -15,9 +15,10 @@
 //!   - "cleared" port: Confirmation of clear operation
 //!   - "error" port: Operation errors
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_one_of;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -341,23 +342,10 @@ impl VectorStoreNode {
     }
 }
 
-pub struct VectorStoreNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for VectorStoreNodeFactory {
-    async fn create(&self, config: serde_json::Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = VectorStoreNode {
-            name: "VectorStore".to_string(),
-            action: "search".to_string(),
-            collection: "default".to_string(),
-            top_k: 5,
-            min_score: 0.0,
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "vector-store"
-    }
-}
+node_factory!(VectorStoreNodeFactory, VectorStoreNode, "vector-store", {
+    name: "VectorStore".to_string(),
+    action: "search".to_string(),
+    collection: "default".to_string(),
+    top_k: 5,
+    min_score: 0.0
+});

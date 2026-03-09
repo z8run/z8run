@@ -11,9 +11,10 @@
 //! { "action": "extract", "path": "data.users" }
 //! ```
 
-use crate::engine::{NodeExecutor, NodeExecutorFactory};
+use crate::engine::NodeExecutor;
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::node_factory;
 use crate::utils::node_helpers::require_one_of;
 use serde_json::Value;
 use tracing::debug;
@@ -120,24 +121,8 @@ impl NodeExecutor for JsonTransformNode {
     }
 }
 
-pub struct JsonTransformNodeFactory;
-
-#[async_trait::async_trait]
-impl NodeExecutorFactory for JsonTransformNodeFactory {
-    async fn create(&self, config: Value) -> Z8Result<Box<dyn NodeExecutor>> {
-        let mut node = JsonTransformNode {
-            name: "JSON Transform".to_string(),
-            action: "parse".to_string(),
-            path: String::new(),
-        };
-        node.configure(config).await?;
-        Ok(Box::new(node))
-    }
-
-    fn node_type(&self) -> &str {
-        "json"
-    }
-}
+node_factory!(JsonTransformNodeFactory, JsonTransformNode, "json", {     name: String::new(),
+action: "parse".to_string(), path: String::new() });
 
 #[cfg(test)]
 mod tests {
