@@ -14,9 +14,11 @@
 //!   - "tool_call" port: When agent wants to call a tool (includes conversation_history)
 //!   - "error" port: API or configuration errors
 
+use crate::configure_fields;
 use crate::engine::{EngineEvent, NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::extract::TEXT_FIELDS;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tracing::{info, warn};
@@ -113,7 +115,7 @@ impl NodeExecutor for AiAgentNode {
                 (h, iter + 1)
             } else {
                 // Fresh conversation
-                let user_message = extract_text(&msg.payload);
+                let user_message = crate::utils::extract::extract_text(&msg.payload, TEXT_FIELDS);
                 if user_message.is_empty() {
                     let err = serde_json::json!({"error": "No message text found in payload"});
                     return Ok(vec![msg.derive(msg.source_node, "error", err)]);
@@ -224,32 +226,19 @@ impl NodeExecutor for AiAgentNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("provider").and_then(|v| v.as_str()) {
-            self.provider = v.to_lowercase();
-        }
-        if let Some(v) = config.get("model").and_then(|v| v.as_str()) {
-            self.model = v.to_string();
-        }
-        if let Some(v) = config.get("apiKey").and_then(|v| v.as_str()) {
-            self.api_key = v.to_string();
-        }
-        if let Some(v) = config.get("baseUrl").and_then(|v| v.as_str()) {
-            self.base_url = v.to_string();
-        }
-        if let Some(v) = config.get("systemPrompt").and_then(|v| v.as_str()) {
-            self.system_prompt = v.to_string();
-        }
-        if let Some(v) = config.get("temperature").and_then(|v| v.as_f64()) {
-            self.temperature = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "provider" => provider: str_lower,
+            "model" => model: str,
+            "apiKey" => api_key: str,
+            "baseUrl" => base_url: str,
+            "systemPrompt" => system_prompt: str,
+            "temperature" => temperature: f64,
+            "timeout" => timeout_ms: u64,
+        );
+
         if let Some(v) = config.get("maxIterations").and_then(|v| v.as_u64()) {
             self.max_iterations = v as u32;
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
         }
         // Tools can come as array or JSON string
         if let Some(tools_arr) = config.get("tools").and_then(|v| v.as_array()) {
@@ -337,7 +326,7 @@ impl AiAgentNode {
 
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .header("Content-Type", "application/json")
             .timeout(timeout)
             .json(&body)
@@ -586,18 +575,6 @@ impl AiAgentNode {
             .to_string();
         Ok((AgentStep::TextResponse(content), assistant_msg))
     }
-}
-
-fn extract_text(payload: &serde_json::Value) -> String {
-    if let Some(s) = payload.as_str() {
-        return s.to_string();
-    }
-    for key in &["text", "input", "content", "message", "prompt", "body"] {
-        if let Some(s) = payload.get(key).and_then(|v| v.as_str()) {
-            return s.to_string();
-        }
-    }
-    String::new()
 }
 
 pub struct AiAgentNodeFactory;

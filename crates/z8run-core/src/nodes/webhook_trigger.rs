@@ -4,6 +4,7 @@
 //! at the flow's unique webhook URL.
 //! Extracts headers, query params, and body from the incoming request.
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::message::FlowMessage;
 use crate::Z8Result;
@@ -49,24 +50,14 @@ impl NodeExecutor for WebhookTriggerNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(v) = config.get("method").and_then(|v| v.as_str()) {
-            self.method = v.to_uppercase();
-        }
-        if let Some(v) = config.get("path").and_then(|v| v.as_str()) {
-            self.path = v.to_string();
-        }
-        if let Some(v) = config.get("authType").and_then(|v| v.as_str()) {
-            self.auth_type = v.to_string();
-        }
-        if let Some(v) = config.get("authToken").and_then(|v| v.as_str()) {
-            self.auth_token = v.to_string();
-        }
-        if let Some(v) = config.get("responseMode").and_then(|v| v.as_str()) {
-            self.response_mode = v.to_string();
-        }
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
+        configure_fields!(config, self,
+            "method" => method: str_upper,
+            "path" => path: str,
+            "authType" => auth_type: str,
+            "authToken" => auth_token: str,
+            "responseMode" => response_mode: str,
+            "name" => name: str,
+        );
         Ok(())
     }
 

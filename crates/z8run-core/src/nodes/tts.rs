@@ -6,9 +6,12 @@
 //!   - "audio" port: Generated audio data in base64 with metadata
 //!   - "error" port: API or validation errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::extract::TEXT_FIELDS;
+use crate::utils::node_helpers::{error_output, error_output_with_context, require_non_empty};
 use tracing::{info, warn};
 
 pub struct TtsNode {
@@ -25,13 +28,10 @@ pub struct TtsNode {
 impl NodeExecutor for TtsNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         // Extract text from payload
-        let text = extract_text(&msg.payload);
+        let text = crate::utils::extract::extract_text(&msg.payload, TEXT_FIELDS);
 
         if text.is_empty() {
-            let err = serde_json::json!({
-                "error": "No text found in message. Expected string payload or fields: text, message, body, content, input"
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err)]);
+            return Ok(error_output(&msg, "No text found in message. Expected string payload or fields: text, message, body, content, input"));
         }
 
         // Extract voice override from payload (optional)
@@ -67,47 +67,33 @@ impl NodeExecutor for TtsNode {
             }
             Err(e) => {
                 warn!(node = %self.name, error = %e, "TTS request failed");
-                let payload = serde_json::json!({
-                    "error": e,
-                    "provider": self.provider,
-                    "model": self.model,
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", payload)])
+                return Ok(error_output_with_context(
+                    &msg,
+                    &e,
+                    serde_json::json!({
+                        "provider": self.provider,
+                        "model": self.model,
+                    }),
+                ));
             }
         }
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("provider").and_then(|v| v.as_str()) {
-            self.provider = v.to_lowercase();
-        }
-        if let Some(v) = config.get("apiKey").and_then(|v| v.as_str()) {
-            self.api_key = v.to_string();
-        }
-        if let Some(v) = config.get("model").and_then(|v| v.as_str()) {
-            self.model = v.to_string();
-        }
-        if let Some(v) = config.get("voice").and_then(|v| v.as_str()) {
-            self.voice = v.to_string();
-        }
-        if let Some(v) = config.get("language").and_then(|v| v.as_str()) {
-            self.language = v.to_string();
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "provider" => provider: str_lower,
+            "apiKey" => api_key: str,
+            "model" => model: str,
+            "voice" => voice: str,
+            "language" => language: str,
+            "timeout" => timeout_ms: u64,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.api_key.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "TTS node requires an API key".to_string(),
-            ));
-        }
+        require_non_empty(&self.api_key, "TTS node requires an API key")?;
         if self.provider != "openai" && self.provider != "elevenlabs" && self.provider != "google" {
             return Err(crate::error::Z8Error::Internal(format!(
                 "Unknown provider: {}. Use 'openai', 'elevenlabs', or 'google'",
@@ -153,7 +139,7 @@ impl TtsNode {
 
         let resp = client
             .post(url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .header("Content-Type", "application/json")
             .timeout(timeout)
             .json(&body)
@@ -331,29 +317,6 @@ impl TtsNode {
     }
 }
 
-/// Extract text from payload using common field names
-fn extract_text(payload: &serde_json::Value) -> String {
-    // If payload is a string directly
-    if let Some(s) = payload.as_str() {
-        return s.to_string();
-    }
-    // Try common field names
-    for key in &["text", "message", "body", "content", "input"] {
-        if let Some(s) = payload.get(key).and_then(|v| v.as_str()) {
-            return s.to_string();
-        }
-    }
-    // Try nested: req.body.text, etc.
-    if let Some(body) = payload.get("req").and_then(|r| r.get("body")) {
-        for key in &["text", "message", "input", "content"] {
-            if let Some(s) = body.get(key).and_then(|v| v.as_str()) {
-                return s.to_string();
-            }
-        }
-    }
-    String::new()
-}
-
 /// Extract voice override from payload
 fn extract_voice(payload: &serde_json::Value) -> Option<String> {
     payload
@@ -409,7 +372,7 @@ mod tests {
     #[test]
     fn test_extract_text_string_payload() {
         let payload = serde_json::json!("Hello, world!");
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "Hello, world!");
     }
 
@@ -418,7 +381,7 @@ mod tests {
         let payload = serde_json::json!({
             "text": "Hello, world!"
         });
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "Hello, world!");
     }
 
@@ -427,7 +390,7 @@ mod tests {
         let payload = serde_json::json!({
             "message": "Hello from message"
         });
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "Hello from message");
     }
 
@@ -436,7 +399,7 @@ mod tests {
         let payload = serde_json::json!({
             "body": "Hello from body"
         });
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "Hello from body");
     }
 
@@ -445,7 +408,7 @@ mod tests {
         let payload = serde_json::json!({
             "content": "Hello from content"
         });
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "Hello from content");
     }
 
@@ -454,7 +417,7 @@ mod tests {
         let payload = serde_json::json!({
             "input": "Hello from input"
         });
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "Hello from input");
     }
 
@@ -467,14 +430,14 @@ mod tests {
                 }
             }
         });
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "Hello from nested");
     }
 
     #[test]
     fn test_extract_text_empty() {
         let payload = serde_json::json!({});
-        let text = extract_text(&payload);
+        let text = crate::utils::extract::extract_text(&payload, TEXT_FIELDS);
         assert_eq!(text, "");
     }
 

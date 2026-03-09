@@ -1,5 +1,6 @@
 //! Delay node: pauses message for a configured duration.
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
@@ -21,12 +22,10 @@ impl NodeExecutor for DelayNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(ms) = config.get("delayMs").and_then(|v| v.as_u64()) {
-            self.delay_ms = ms;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "delayMs" => delay_ms: u64,
+        );
         Ok(())
     }
 

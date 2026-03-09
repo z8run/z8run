@@ -24,6 +24,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use serde_json::Value;
 use tracing::{debug, warn};
 
@@ -310,11 +311,7 @@ impl NodeExecutor for WebhookNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.path.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Webhook node requires a 'path'".to_string(),
-            ));
-        }
+        require_non_empty(&self.path, "Webhook node requires a 'path'")?;
         Ok(())
     }
 

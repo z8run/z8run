@@ -9,6 +9,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::json_path::json_path_lookup;
 use serde_json::Value;
 use tracing::{debug, warn};
 
@@ -78,33 +79,6 @@ fn resolve_template(template: &Value, data: &Value) -> Value {
         // Pass through numbers, bools, null as-is
         other => other.clone(),
     }
-}
-
-/// Look up a value in a JSON object using dot-notation path (e.g. "req.body.name").
-fn json_path_lookup(data: &Value, path: &str) -> Value {
-    let mut current = data;
-    for segment in path.split('.') {
-        match current {
-            Value::Object(map) => {
-                current = match map.get(segment) {
-                    Some(v) => v,
-                    None => return Value::Null,
-                };
-            }
-            Value::Array(arr) => {
-                if let Ok(idx) = segment.parse::<usize>() {
-                    current = match arr.get(idx) {
-                        Some(v) => v,
-                        None => return Value::Null,
-                    };
-                } else {
-                    return Value::Null;
-                }
-            }
-            _ => return Value::Null,
-        }
-    }
-    current.clone()
 }
 
 #[async_trait::async_trait]

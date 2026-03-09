@@ -9,6 +9,7 @@
 
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use crate::Z8Result;
 use regex::Regex;
 use serde_json::{json, Value};
@@ -185,9 +186,7 @@ impl NodeExecutor for IfElseNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.field.is_empty() {
-            return Err(crate::Z8Error::Internal("Field path is required".into()));
-        }
+        require_non_empty(&self.field, "Field path is required")?;
         let valid_ops = [
             "==",
             "!=",

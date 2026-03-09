@@ -4,6 +4,7 @@
 //! the real HTTP request data. The node restructures it into a standard
 //! `{ req: { method, path, headers, query, body } }` format.
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
@@ -50,15 +51,11 @@ impl NodeExecutor for HttpInNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(method) = config.get("method").and_then(|v| v.as_str()) {
-            self.method = method.to_string();
-        }
-        if let Some(path) = config.get("path").and_then(|v| v.as_str()) {
-            self.path = path.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "method" => method: str,
+            "path" => path: str,
+        );
         Ok(())
     }
 

@@ -9,9 +9,12 @@
 //!   - "sent" port: successful API call (message accepted by WhatsApp)
 //!   - "error" port: API or validation errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::extract::extract_field;
+use crate::utils::node_helpers::{error_output, error_output_with_context, require_non_empty};
 use serde_json::Value;
 use tracing::{info, warn};
 
@@ -32,47 +35,29 @@ impl NodeExecutor for WhatsAppNode {
             "send_template" => self.handle_send_template(msg).await,
             "send_media" => self.handle_send_media(msg).await,
             _ => {
-                let err_payload = serde_json::json!({
-                    "error": format!("Unknown WhatsApp action: {}. Expected 'send_text', 'send_template', or 'send_media'", self.action),
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                return Ok(error_output(&msg, &format!("Unknown WhatsApp action: {}. Expected 'send_text', 'send_template', or 'send_media'", self.action)));
             }
         }
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("phoneNumberId").and_then(|v| v.as_str()) {
-            self.phone_number_id = v.to_string();
-        }
-        if let Some(v) = config.get("accessToken").and_then(|v| v.as_str()) {
-            self.access_token = v.to_string();
-        }
-        if let Some(v) = config.get("action").and_then(|v| v.as_str()) {
-            self.action = v.to_string();
-        }
-        if let Some(v) = config.get("apiVersion").and_then(|v| v.as_str()) {
-            self.api_version = v.to_string();
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "phoneNumberId" => phone_number_id: str,
+            "accessToken" => access_token: str,
+            "action" => action: str,
+            "apiVersion" => api_version: str,
+            "timeout" => timeout_ms: u64,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.phone_number_id.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "WhatsApp node requires phoneNumberId".to_string(),
-            ));
-        }
-        if self.access_token.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "WhatsApp node requires accessToken".to_string(),
-            ));
-        }
+        require_non_empty(
+            &self.phone_number_id,
+            "WhatsApp node requires phoneNumberId",
+        )?;
+        require_non_empty(&self.access_token, "WhatsApp node requires accessToken")?;
         match self.action.as_str() {
             "send_text" | "send_template" | "send_media" => {}
             _ => {
@@ -97,21 +82,18 @@ impl NodeExecutor for WhatsAppNode {
 impl WhatsAppNode {
     /// Send plain text message via WhatsApp Business Cloud API
     async fn handle_send_text(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let to = extract_phone_number(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
-        let text = extract_text(&msg.payload, &["body", "message", "text", "content"]);
+        let to = extract_field(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
+        let text = extract_field(&msg.payload, &["body", "message", "text", "content"]);
 
         if to.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field"));
         }
 
         if text.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No message text found. Expected 'body', 'message', 'text', or 'content' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(
+                &msg,
+                "No message text found. Expected 'body', 'message', 'text', or 'content' field",
+            ));
         }
 
         info!(
@@ -173,13 +155,11 @@ impl WhatsAppNode {
                         "WhatsApp text message send failed"
                     );
 
-                    let err_payload = serde_json::json!({
-                        "error": format!("WhatsApp API failed with status {}: {}", status, body_text),
-                        "status": status,
-                        "to": to,
-                    });
-
-                    Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                    Ok(error_output_with_context(
+                        &msg,
+                        &format!("WhatsApp API failed with status {}: {}", status, body_text),
+                        serde_json::json!({"status": status, "to": to}),
+                    ))
                 }
             }
             Err(e) => {
@@ -190,34 +170,30 @@ impl WhatsAppNode {
                     "WhatsApp text message request failed"
                 );
 
-                let err_payload = serde_json::json!({
-                    "error": format!("WhatsApp request failed: {}", e),
-                    "to": to,
-                });
-
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("WhatsApp request failed: {}", e),
+                    serde_json::json!({"to": to}),
+                ))
             }
         }
     }
 
     /// Send templated message via WhatsApp Business Cloud API
     async fn handle_send_template(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let to = extract_phone_number(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
+        let to = extract_field(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
         let template_name = extract_template_name(&msg.payload);
         let language_code = extract_language_code(&msg.payload);
 
         if to.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field"));
         }
 
         if template_name.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No template name found. Expected 'templateName' or 'template_name' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(
+                &msg,
+                "No template name found. Expected 'templateName' or 'template_name' field",
+            ));
         }
 
         info!(
@@ -286,14 +262,11 @@ impl WhatsAppNode {
                         "WhatsApp template message send failed"
                     );
 
-                    let err_payload = serde_json::json!({
-                        "error": format!("WhatsApp API failed with status {}: {}", status, body_text),
-                        "status": status,
-                        "to": to,
-                        "template": template_name,
-                    });
-
-                    Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                    Ok(error_output_with_context(
+                        &msg,
+                        &format!("WhatsApp API failed with status {}: {}", status, body_text),
+                        serde_json::json!({"status": status, "to": to, "template": template_name}),
+                    ))
                 }
             }
             Err(e) => {
@@ -305,34 +278,26 @@ impl WhatsAppNode {
                     "WhatsApp template message request failed"
                 );
 
-                let err_payload = serde_json::json!({
-                    "error": format!("WhatsApp request failed: {}", e),
-                    "to": to,
-                    "template": template_name,
-                });
-
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("WhatsApp request failed: {}", e),
+                    serde_json::json!({"to": to, "template": template_name}),
+                ))
             }
         }
     }
 
     /// Send media message via WhatsApp Business Cloud API
     async fn handle_send_media(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let to = extract_phone_number(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
+        let to = extract_field(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
         let media_url = extract_media_url(&msg.payload);
 
         if to.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field"));
         }
 
         if media_url.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No media URL found. Expected 'mediaUrl', 'media_url', 'image', or 'imageUrl' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No media URL found. Expected 'mediaUrl', 'media_url', 'image', or 'imageUrl' field"));
         }
 
         info!(
@@ -398,14 +363,11 @@ impl WhatsAppNode {
                         "WhatsApp media message send failed"
                     );
 
-                    let err_payload = serde_json::json!({
-                        "error": format!("WhatsApp API failed with status {}: {}", status, body_text),
-                        "status": status,
-                        "to": to,
-                        "media_url": media_url,
-                    });
-
-                    Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                    Ok(error_output_with_context(
+                        &msg,
+                        &format!("WhatsApp API failed with status {}: {}", status, body_text),
+                        serde_json::json!({"status": status, "to": to, "media_url": media_url}),
+                    ))
                 }
             }
             Err(e) => {
@@ -417,40 +379,14 @@ impl WhatsAppNode {
                     "WhatsApp media message request failed"
                 );
 
-                let err_payload = serde_json::json!({
-                    "error": format!("WhatsApp request failed: {}", e),
-                    "to": to,
-                    "media_url": media_url,
-                });
-
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("WhatsApp request failed: {}", e),
+                    serde_json::json!({"to": to, "media_url": media_url}),
+                ))
             }
         }
     }
-}
-
-/// Extract phone number from payload using multiple field name variations
-fn extract_phone_number(payload: &Value, field_names: &[&str]) -> String {
-    for field_name in field_names {
-        if let Some(s) = payload.get(field_name).and_then(|v| v.as_str()) {
-            if !s.is_empty() {
-                return s.to_string();
-            }
-        }
-    }
-    String::new()
-}
-
-/// Extract text content from payload using multiple field name variations
-fn extract_text(payload: &Value, field_names: &[&str]) -> String {
-    for field_name in field_names {
-        if let Some(s) = payload.get(field_name).and_then(|v| v.as_str()) {
-            if !s.is_empty() {
-                return s.to_string();
-            }
-        }
-    }
-    String::new()
 }
 
 /// Extract template name from payload
@@ -528,7 +464,7 @@ mod tests {
             "to": "+1234567890",
             "phone": "+0987654321"
         });
-        let number = extract_phone_number(&payload, &["to", "phone"]);
+        let number = extract_field(&payload, &["to", "phone"]);
         assert_eq!(number, "+1234567890");
     }
 
@@ -537,7 +473,7 @@ mod tests {
         let payload = serde_json::json!({
             "phone": "+1234567890",
         });
-        let number = extract_phone_number(&payload, &["to", "phone", "phoneNumber"]);
+        let number = extract_field(&payload, &["to", "phone", "phoneNumber"]);
         assert_eq!(number, "+1234567890");
     }
 
@@ -546,7 +482,7 @@ mod tests {
         let payload = serde_json::json!({
             "other": "+1234567890"
         });
-        let number = extract_phone_number(&payload, &["to", "phone", "phoneNumber"]);
+        let number = extract_field(&payload, &["to", "phone", "phoneNumber"]);
         assert_eq!(number, "");
     }
 
@@ -556,7 +492,7 @@ mod tests {
             "body": "Hello World",
             "message": "Goodbye"
         });
-        let text = extract_text(&payload, &["body", "message"]);
+        let text = extract_field(&payload, &["body", "message"]);
         assert_eq!(text, "Hello World");
     }
 
@@ -565,7 +501,7 @@ mod tests {
         let payload = serde_json::json!({
             "text": "Test message"
         });
-        let text = extract_text(&payload, &["body", "message", "text"]);
+        let text = extract_field(&payload, &["body", "message", "text"]);
         assert_eq!(text, "Test message");
     }
 
@@ -574,7 +510,7 @@ mod tests {
         let payload = serde_json::json!({
             "other": "Some text"
         });
-        let text = extract_text(&payload, &["body", "message", "text"]);
+        let text = extract_field(&payload, &["body", "message", "text"]);
         assert_eq!(text, "");
     }
 

@@ -24,6 +24,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_one_of;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -426,13 +427,12 @@ impl NodeExecutor for HumanHandoffNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        match self.action.as_str() {
-            "escalate" | "check_status" | "resolve" | "assign" => Ok(()),
-            other => Err(crate::error::Z8Error::Internal(format!(
-                "Invalid action '{}'. Must be one of: escalate, check_status, resolve, assign",
-                other
-            ))),
-        }
+        require_one_of(
+            &self.action,
+            &["escalate", "check_status", "resolve", "assign"],
+            "Invalid Human Handoff action",
+        )?;
+        Ok(())
     }
 
     fn node_type(&self) -> &str {

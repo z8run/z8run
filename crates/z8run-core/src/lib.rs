@@ -11,6 +11,7 @@ pub mod message;
 pub mod node;
 pub mod nodes;
 pub mod scheduler;
+pub mod utils;
 
 pub use engine::FlowEngine;
 pub use error::{Z8Error, Z8Result};

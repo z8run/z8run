@@ -9,9 +9,13 @@
 //!   - "published" port: Publish confirmation (publish mode)
 //!   - "error" port: Connection or operation errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::{
+    error_output, error_output_with_context, require_non_empty, require_one_of,
+};
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::time::Duration;
 use tracing::{info, warn};
@@ -38,73 +42,48 @@ impl NodeExecutor for MqttNode {
             "publish" => self.handle_publish(msg).await,
             "subscribe" => self.handle_subscribe(msg).await,
             _ => {
-                let err_payload = serde_json::json!({
-                    "error": format!("Unknown MQTT action: {}. Expected 'publish' or 'subscribe'", self.action),
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                return Ok(error_output(
+                    &msg,
+                    &format!(
+                        "Unknown MQTT action: {}. Expected 'publish' or 'subscribe'",
+                        self.action
+                    ),
+                ));
             }
         }
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("action").and_then(|v| v.as_str()) {
-            self.action = v.to_string();
-        }
-        if let Some(v) = config.get("broker").and_then(|v| v.as_str()) {
-            self.broker = v.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "action" => action: str,
+            "broker" => broker: str,
+            "topic" => topic: str,
+            "clientId" => client_id: str,
+            "username" => username: str,
+            "password" => password: str,
+            "useTls" => use_tls: bool,
+            "keepAlive" => keep_alive: u64,
+            "timeout" => timeout_ms: u64,
+        );
+
         if let Some(v) = config.get("port").and_then(|v| v.as_u64()) {
             self.port = v as u16;
         }
-        if let Some(v) = config.get("topic").and_then(|v| v.as_str()) {
-            self.topic = v.to_string();
-        }
         if let Some(v) = config.get("qos").and_then(|v| v.as_u64()) {
             self.qos = (v as u8).min(2);
-        }
-        if let Some(v) = config.get("clientId").and_then(|v| v.as_str()) {
-            if !v.is_empty() {
-                self.client_id = v.to_string();
-            }
-        }
-        if let Some(v) = config.get("username").and_then(|v| v.as_str()) {
-            self.username = v.to_string();
-        }
-        if let Some(v) = config.get("password").and_then(|v| v.as_str()) {
-            self.password = v.to_string();
-        }
-        if let Some(v) = config.get("useTls").and_then(|v| v.as_bool()) {
-            self.use_tls = v;
-        }
-        if let Some(v) = config.get("keepAlive").and_then(|v| v.as_u64()) {
-            self.keep_alive = v;
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
         }
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.action != "subscribe" && self.action != "publish" {
-            return Err(crate::error::Z8Error::Internal(format!(
-                "MQTT action must be 'subscribe' or 'publish', got: {}",
-                self.action
-            )));
-        }
-        if self.broker.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "MQTT broker cannot be empty".to_string(),
-            ));
-        }
-        if self.topic.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "MQTT topic cannot be empty".to_string(),
-            ));
-        }
+        require_one_of(
+            &self.action,
+            &["subscribe", "publish"],
+            "Invalid MQTT action",
+        )?;
+        require_non_empty(&self.broker, "MQTT broker cannot be empty")?;
+        require_non_empty(&self.topic, "MQTT topic cannot be empty")?;
         Ok(())
     }
 
@@ -127,10 +106,7 @@ impl MqttNode {
         let payload = extract_payload(&msg.payload);
 
         if payload.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No payload found in message. Expected string payload or 'payload'/'body'/'text' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No payload found in message. Expected string payload or 'payload'/'body'/'text' field"));
         }
 
         // Build MQTT options
@@ -183,11 +159,11 @@ impl MqttNode {
             }
             Err(e) => {
                 warn!(node = %self.name, error = %e, "MQTT publish failed");
-                let err_payload = serde_json::json!({
-                    "error": format!("MQTT publish failed: {}", e),
-                    "topic": self.topic,
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("MQTT publish failed: {}", e),
+                    serde_json::json!({"topic": self.topic}),
+                ))
             }
         }
     }
@@ -229,11 +205,11 @@ impl MqttNode {
             }
             Err(e) => {
                 warn!(node = %self.name, error = %e, "MQTT subscribe failed");
-                let err_payload = serde_json::json!({
-                    "error": format!("MQTT subscribe failed: {}", e),
-                    "topic": self.topic,
-                });
-                return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+                return Ok(error_output_with_context(
+                    &msg,
+                    &format!("MQTT subscribe failed: {}", e),
+                    serde_json::json!({"topic": self.topic}),
+                ));
             }
         }
 
@@ -261,19 +237,19 @@ impl MqttNode {
             }
             Ok(Ok(None)) => {
                 warn!(node = %self.name, "MQTT poll failed: unexpected None");
-                let err_payload = serde_json::json!({
-                    "error": "MQTT polling ended unexpectedly",
-                    "topic": self.topic,
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    "MQTT polling ended unexpectedly",
+                    serde_json::json!({"topic": self.topic}),
+                ))
             }
             Ok(Err(e)) => {
                 warn!(node = %self.name, error = %e, "MQTT poll error");
-                let err_payload = serde_json::json!({
-                    "error": format!("MQTT poll error: {}", e),
-                    "topic": self.topic,
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("MQTT poll error: {}", e),
+                    serde_json::json!({"topic": self.topic}),
+                ))
             }
             Err(_) => {
                 warn!(
@@ -281,11 +257,11 @@ impl MqttNode {
                     timeout_ms = self.timeout_ms,
                     "MQTT receive timeout"
                 );
-                let err_payload = serde_json::json!({
-                    "error": format!("MQTT receive timeout after {}ms", self.timeout_ms),
-                    "topic": self.topic,
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("MQTT receive timeout after {}ms", self.timeout_ms),
+                    serde_json::json!({"topic": self.topic}),
+                ))
             }
         }
     }

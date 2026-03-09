@@ -9,9 +9,12 @@
 //!   - "sent" port: successful operation (SMS sent, call initiated, or lookup completed)
 //!   - "error" port: API or validation errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::extract::extract_field;
+use crate::utils::node_helpers::{error_output, error_output_with_context, require_non_empty};
 use serde_json::Value;
 use tracing::{info, warn};
 
@@ -32,54 +35,38 @@ impl NodeExecutor for TwilioNode {
             "call" => self.handle_call(msg).await,
             "lookup" => self.handle_lookup(msg).await,
             _ => {
-                let err_payload = serde_json::json!({
-                    "error": format!("Unknown Twilio action: {}. Expected 'sms', 'call', or 'lookup'", self.action),
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                return Ok(error_output(
+                    &msg,
+                    &format!(
+                        "Unknown Twilio action: {}. Expected 'sms', 'call', or 'lookup'",
+                        self.action
+                    ),
+                ));
             }
         }
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("accountSid").and_then(|v| v.as_str()) {
-            self.account_sid = v.to_string();
-        }
-        if let Some(v) = config.get("authToken").and_then(|v| v.as_str()) {
-            self.auth_token = v.to_string();
-        }
-        if let Some(v) = config.get("fromNumber").and_then(|v| v.as_str()) {
-            self.from_number = v.to_string();
-        }
-        if let Some(v) = config.get("action").and_then(|v| v.as_str()) {
-            self.action = v.to_string();
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "accountSid" => account_sid: str,
+            "authToken" => auth_token: str,
+            "fromNumber" => from_number: str,
+            "action" => action: str,
+            "timeout" => timeout_ms: u64,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.account_sid.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Twilio node requires accountSid".to_string(),
-            ));
-        }
-        if self.auth_token.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Twilio node requires authToken".to_string(),
-            ));
-        }
+        require_non_empty(&self.account_sid, "Twilio node requires accountSid")?;
+        require_non_empty(&self.auth_token, "Twilio node requires authToken")?;
         match self.action.as_str() {
             "sms" | "call" => {
-                if self.from_number.is_empty() {
-                    return Err(crate::error::Z8Error::Internal(
-                        "Twilio node requires fromNumber for SMS and call actions".to_string(),
-                    ));
-                }
+                require_non_empty(
+                    &self.from_number,
+                    "Twilio node requires fromNumber for SMS and call actions",
+                )?;
             }
             "lookup" => {}
             _ => {
@@ -104,21 +91,18 @@ impl NodeExecutor for TwilioNode {
 impl TwilioNode {
     /// Send SMS via Twilio REST API
     async fn handle_sms(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let to = extract_phone_number(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
-        let body = extract_text(&msg.payload, &["body", "message", "text", "content"]);
+        let to = extract_field(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
+        let body = extract_field(&msg.payload, &["body", "message", "text", "content"]);
 
         if to.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field"));
         }
 
         if body.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No message body found. Expected 'body', 'message', 'text', or 'content' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(
+                &msg,
+                "No message body found. Expected 'body', 'message', 'text', or 'content' field",
+            ));
         }
 
         info!(
@@ -176,13 +160,11 @@ impl TwilioNode {
                         "Twilio SMS failed"
                     );
 
-                    let err_payload = serde_json::json!({
-                        "error": format!("Twilio SMS failed with status {}: {}", status, body_text),
-                        "status": status,
-                        "to": to,
-                    });
-
-                    Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                    Ok(error_output_with_context(
+                        &msg,
+                        &format!("Twilio SMS failed with status {}: {}", status, body_text),
+                        serde_json::json!({"status": status, "to": to}),
+                    ))
                 }
             }
             Err(e) => {
@@ -193,33 +175,29 @@ impl TwilioNode {
                     "Twilio SMS request failed"
                 );
 
-                let err_payload = serde_json::json!({
-                    "error": format!("Twilio SMS request failed: {}", e),
-                    "to": to,
-                });
-
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("Twilio SMS request failed: {}", e),
+                    serde_json::json!({"to": to}),
+                ))
             }
         }
     }
 
     /// Initiate voice call via Twilio REST API
     async fn handle_call(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let to = extract_phone_number(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
+        let to = extract_field(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
         let twiml_url = extract_twiml_url(&msg.payload);
 
         if to.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field"));
         }
 
         if twiml_url.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No TwiML URL found. Expected 'twimlUrl' in message payload",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(
+                &msg,
+                "No TwiML URL found. Expected 'twimlUrl' in message payload",
+            ));
         }
 
         info!(
@@ -278,13 +256,14 @@ impl TwilioNode {
                         "Twilio call initiation failed"
                     );
 
-                    let err_payload = serde_json::json!({
-                        "error": format!("Twilio call initiation failed with status {}: {}", status, body_text),
-                        "status": status,
-                        "to": to,
-                    });
-
-                    Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                    Ok(error_output_with_context(
+                        &msg,
+                        &format!(
+                            "Twilio call initiation failed with status {}: {}",
+                            status, body_text
+                        ),
+                        serde_json::json!({"status": status, "to": to}),
+                    ))
                 }
             }
             Err(e) => {
@@ -295,25 +274,21 @@ impl TwilioNode {
                     "Twilio call request failed"
                 );
 
-                let err_payload = serde_json::json!({
-                    "error": format!("Twilio call request failed: {}", e),
-                    "to": to,
-                });
-
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("Twilio call request failed: {}", e),
+                    serde_json::json!({"to": to}),
+                ))
             }
         }
     }
 
     /// Lookup phone number info via Twilio Lookups API
     async fn handle_lookup(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let number = extract_phone_number(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
+        let number = extract_field(&msg.payload, &["to", "phone", "phoneNumber", "number"]);
 
         if number.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No phone number found in message. Expected 'to', 'phone', 'phoneNumber', or 'number' field"));
         }
 
         info!(
@@ -364,13 +339,11 @@ impl TwilioNode {
                         "Twilio phone lookup failed"
                     );
 
-                    let err_payload = serde_json::json!({
-                        "error": format!("Twilio lookup failed with status {}: {}", status, body_text),
-                        "status": status,
-                        "number": number,
-                    });
-
-                    Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                    Ok(error_output_with_context(
+                        &msg,
+                        &format!("Twilio lookup failed with status {}: {}", status, body_text),
+                        serde_json::json!({"status": status, "number": number}),
+                    ))
                 }
             }
             Err(e) => {
@@ -381,39 +354,14 @@ impl TwilioNode {
                     "Twilio lookup request failed"
                 );
 
-                let err_payload = serde_json::json!({
-                    "error": format!("Twilio lookup request failed: {}", e),
-                    "number": number,
-                });
-
-                Ok(vec![msg.derive(msg.source_node, "error", err_payload)])
+                Ok(error_output_with_context(
+                    &msg,
+                    &format!("Twilio lookup request failed: {}", e),
+                    serde_json::json!({"number": number}),
+                ))
             }
         }
     }
-}
-
-/// Extract phone number from payload using multiple field name variations
-fn extract_phone_number(payload: &Value, field_names: &[&str]) -> String {
-    for field_name in field_names {
-        if let Some(s) = payload.get(field_name).and_then(|v| v.as_str()) {
-            if !s.is_empty() {
-                return s.to_string();
-            }
-        }
-    }
-    String::new()
-}
-
-/// Extract text content from payload using multiple field name variations
-fn extract_text(payload: &Value, field_names: &[&str]) -> String {
-    for field_name in field_names {
-        if let Some(s) = payload.get(field_name).and_then(|v| v.as_str()) {
-            if !s.is_empty() {
-                return s.to_string();
-            }
-        }
-    }
-    String::new()
 }
 
 /// Extract TwiML URL from payload or default to empty
@@ -456,7 +404,7 @@ mod tests {
             "to": "+1234567890",
             "phone": "+0987654321"
         });
-        let number = extract_phone_number(&payload, &["to", "phone"]);
+        let number = extract_field(&payload, &["to", "phone"]);
         assert_eq!(number, "+1234567890");
     }
 
@@ -465,7 +413,7 @@ mod tests {
         let payload = serde_json::json!({
             "phone": "+1234567890",
         });
-        let number = extract_phone_number(&payload, &["to", "phone", "phoneNumber"]);
+        let number = extract_field(&payload, &["to", "phone", "phoneNumber"]);
         assert_eq!(number, "+1234567890");
     }
 
@@ -474,7 +422,7 @@ mod tests {
         let payload = serde_json::json!({
             "other": "+1234567890"
         });
-        let number = extract_phone_number(&payload, &["to", "phone", "phoneNumber"]);
+        let number = extract_field(&payload, &["to", "phone", "phoneNumber"]);
         assert_eq!(number, "");
     }
 
@@ -484,7 +432,7 @@ mod tests {
             "body": "Hello World",
             "message": "Goodbye"
         });
-        let text = extract_text(&payload, &["body", "message"]);
+        let text = extract_field(&payload, &["body", "message"]);
         assert_eq!(text, "Hello World");
     }
 
@@ -493,7 +441,7 @@ mod tests {
         let payload = serde_json::json!({
             "text": "Test message"
         });
-        let text = extract_text(&payload, &["body", "message", "text"]);
+        let text = extract_field(&payload, &["body", "message", "text"]);
         assert_eq!(text, "Test message");
     }
 
@@ -502,7 +450,7 @@ mod tests {
         let payload = serde_json::json!({
             "other": "Some text"
         });
-        let text = extract_text(&payload, &["body", "message", "text"]);
+        let text = extract_field(&payload, &["body", "message", "text"]);
         assert_eq!(text, "");
     }
 

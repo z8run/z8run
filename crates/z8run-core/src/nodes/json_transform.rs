@@ -14,10 +14,12 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_one_of;
 use serde_json::Value;
 use tracing::debug;
 
 use super::switch::json_path_lookup;
+use crate::configure_fields;
 
 pub struct JsonTransformNode {
     name: String,
@@ -91,25 +93,20 @@ impl NodeExecutor for JsonTransformNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(action) = config.get("action").and_then(|v| v.as_str()) {
-            self.action = action.to_string();
-        }
-        if let Some(path) = config.get("path").and_then(|v| v.as_str()) {
-            self.path = path.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "action" => action: str,
+            "path" => path: str,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if !["parse", "stringify", "extract"].contains(&self.action.as_str()) {
-            return Err(crate::error::Z8Error::Internal(format!(
-                "Invalid JSON transform action: '{}'. Expected: parse, stringify, extract",
-                self.action
-            )));
-        }
+        require_one_of(
+            &self.action,
+            &["parse", "stringify", "extract"],
+            "Invalid JSON transform action",
+        )?;
         if self.action == "extract" && self.path.is_empty() {
             return Err(crate::error::Z8Error::Internal(
                 "Extract action requires a 'path' field".to_string(),

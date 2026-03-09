@@ -13,6 +13,7 @@
 //! flow engine or a supervisor. This node simply emits a tick message each
 //! time it is invoked.
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
@@ -43,9 +44,9 @@ impl NodeExecutor for TimerNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+        );
 
         let raw_interval = config
             .get("interval")

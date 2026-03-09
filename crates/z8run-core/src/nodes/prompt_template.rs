@@ -7,9 +7,11 @@
 //!   - "output" port: rendered template with metadata
 //!   - "error" port: if template has unresolved variables in strict mode
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use std::collections::HashMap;
 use tracing::{info, warn};
 
@@ -60,24 +62,16 @@ impl NodeExecutor for PromptTemplateNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("template").and_then(|v| v.as_str()) {
-            self.template = v.to_string();
-        }
-        if let Some(v) = config.get("strictMode").and_then(|v| v.as_bool()) {
-            self.strict_mode = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "template" => template: str,
+            "strictMode" => strict_mode: bool,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.template.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Prompt template node requires a template".to_string(),
-            ));
-        }
+        require_non_empty(&self.template, "Prompt template node requires a template")?;
         Ok(())
     }
 

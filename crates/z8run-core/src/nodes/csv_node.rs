@@ -10,9 +10,11 @@
 //! { "action": "stringify", "delimiter": ";", "columns": ["name", "email"] }
 //! ```
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_one_of;
 use serde_json::Value;
 use tracing::debug;
 
@@ -48,12 +50,12 @@ impl NodeExecutor for CsvNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(action) = config.get("action").and_then(|v| v.as_str()) {
-            self.action = action.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "action" => action: str,
+            "hasHeaders" => has_headers: bool,
+        );
+
         if let Some(delim) = config.get("delimiter").and_then(|v| v.as_str()) {
             self.delimiter = match delim {
                 ";" => b';',
@@ -61,9 +63,6 @@ impl NodeExecutor for CsvNode {
                 "|" => b'|',
                 _ => b',',
             };
-        }
-        if let Some(h) = config.get("hasHeaders").and_then(|v| v.as_bool()) {
-            self.has_headers = h;
         }
         if let Some(cols) = config.get("columns").and_then(|v| v.as_array()) {
             self.columns = cols
@@ -75,12 +74,7 @@ impl NodeExecutor for CsvNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if !["parse", "stringify"].contains(&self.action.as_str()) {
-            return Err(crate::error::Z8Error::Internal(format!(
-                "Invalid CSV action: '{}'. Expected: parse, stringify",
-                self.action
-            )));
-        }
+        require_one_of(&self.action, &["parse", "stringify"], "Invalid CSV action")?;
         Ok(())
     }
 

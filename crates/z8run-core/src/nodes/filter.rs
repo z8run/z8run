@@ -16,11 +16,14 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::json_path::json_path_lookup;
+use crate::utils::node_helpers::require_non_empty;
 use serde_json::Value;
 use tracing::debug;
 
 // Re-use evaluation helpers from the switch module.
 use super::switch::{evaluate_rule, SwitchRule};
+use crate::configure_fields;
 
 pub struct FilterNode {
     name: String,
@@ -30,33 +33,6 @@ pub struct FilterNode {
     condition: String,
     /// Value to compare against.
     value: Value,
-}
-
-/// Look up a value in a JSON object using dot-notation path.
-fn json_path_lookup(data: &Value, path: &str) -> Value {
-    let mut current = data;
-    for segment in path.split('.') {
-        match current {
-            Value::Object(map) => {
-                current = match map.get(segment) {
-                    Some(v) => v,
-                    None => return Value::Null,
-                };
-            }
-            Value::Array(arr) => {
-                if let Ok(idx) = segment.parse::<usize>() {
-                    current = match arr.get(idx) {
-                        Some(v) => v,
-                        None => return Value::Null,
-                    };
-                } else {
-                    return Value::Null;
-                }
-            }
-            _ => return Value::Null,
-        }
-    }
-    current.clone()
 }
 
 #[async_trait::async_trait]
@@ -81,18 +57,13 @@ impl NodeExecutor for FilterNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(prop) = config.get("property").and_then(|v| v.as_str()) {
-            self.property = prop.to_string();
-        }
-        if let Some(cond) = config.get("condition").and_then(|v| v.as_str()) {
-            self.condition = cond.to_string();
-        }
-        if let Some(val) = config.get("value") {
-            self.value = val.clone();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "property" => property: str,
+            "condition" => condition: str,
+            "value" => value: value,
+        );
+
         // Support "expression" as alias for simpler config (e.g. "msg.payload != null")
         if let Some(expr) = config.get("expression").and_then(|v| v.as_str()) {
             // Parse simple expressions like "property op value"
@@ -106,11 +77,10 @@ impl NodeExecutor for FilterNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.property.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Filter node requires a 'property' to evaluate".to_string(),
-            ));
-        }
+        require_non_empty(
+            &self.property,
+            "Filter node requires a 'property' to evaluate",
+        )?;
         Ok(())
     }
 

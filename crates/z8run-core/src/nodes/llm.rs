@@ -7,9 +7,12 @@
 //!   - "response" port: AI model response
 //!   - "error" port: API errors
 
+use crate::configure_fields;
 use crate::engine::{EngineEvent, NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::extract::{extract_text, PROMPT_FIELDS};
+use crate::utils::node_helpers::{error_output, error_output_with_context};
 use futures_util::StreamExt;
 use tokio::sync::broadcast;
 use tracing::{info, warn};
@@ -36,13 +39,13 @@ pub struct LlmNode {
 impl NodeExecutor for LlmNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         // Extract prompt from the incoming message
-        let prompt = extract_prompt(&msg.payload);
+        let prompt = extract_text(&msg.payload, PROMPT_FIELDS);
 
         if prompt.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No prompt found in message. Expected string payload or fields: prompt, body, text",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(
+                &msg,
+                "No prompt found in message. Expected string payload or fields: prompt, body, text",
+            ));
         }
 
         // Extract image for vision mode (base64 or URL)
@@ -132,47 +135,31 @@ impl NodeExecutor for LlmNode {
             }
             Err(e) => {
                 warn!(node = %self.name, error = %e, "LLM request failed");
-                let payload = serde_json::json!({
-                    "error": e,
-                    "provider": self.provider,
-                    "model": self.model,
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", payload)])
+                return Ok(error_output_with_context(
+                    &msg,
+                    &e,
+                    serde_json::json!({
+                        "provider": self.provider,
+                        "model": self.model,
+                    }),
+                ));
             }
         }
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("provider").and_then(|v| v.as_str()) {
-            self.provider = v.to_lowercase();
-        }
-        if let Some(v) = config.get("model").and_then(|v| v.as_str()) {
-            self.model = v.to_string();
-        }
-        if let Some(v) = config.get("apiKey").and_then(|v| v.as_str()) {
-            self.api_key = v.to_string();
-        }
-        if let Some(v) = config.get("baseUrl").and_then(|v| v.as_str()) {
-            self.base_url = v.to_string();
-        }
-        if let Some(v) = config.get("systemPrompt").and_then(|v| v.as_str()) {
-            self.system_prompt = v.to_string();
-        }
-        if let Some(v) = config.get("temperature").and_then(|v| v.as_f64()) {
-            self.temperature = v;
-        }
-        if let Some(v) = config.get("maxTokens").and_then(|v| v.as_u64()) {
-            self.max_tokens = v;
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
-        }
-        if let Some(v) = config.get("vision").and_then(|v| v.as_bool()) {
-            self.vision = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "provider" => provider: str_lower,
+            "model" => model: str,
+            "apiKey" => api_key: str,
+            "baseUrl" => base_url: str,
+            "systemPrompt" => system_prompt: str,
+            "temperature" => temperature: f64,
+            "maxTokens" => max_tokens: u64,
+            "timeout" => timeout_ms: u64,
+            "vision" => vision: bool,
+        );
         Ok(())
     }
 
@@ -224,7 +211,7 @@ impl LlmNode {
 
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .header("Content-Type", "application/json")
             .timeout(timeout)
             .json(&body)
@@ -397,7 +384,7 @@ impl LlmNode {
 
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .header("Content-Type", "application/json")
             .timeout(timeout)
             .json(&body)
@@ -735,32 +722,6 @@ fn build_user_message_ollama(prompt: &str, image: Option<&str>) -> serde_json::V
         }
         None => serde_json::json!({"role": "user", "content": prompt}),
     }
-}
-
-fn extract_prompt(payload: &serde_json::Value) -> String {
-    // If payload is a string directly
-    if let Some(s) = payload.as_str() {
-        return s.to_string();
-    }
-    // Try common field names
-    for key in &["prompt", "text", "body", "message", "content", "input"] {
-        if let Some(s) = payload.get(key).and_then(|v| v.as_str()) {
-            return s.to_string();
-        }
-    }
-    // Try nested: req.body.prompt, req.body.text, etc.
-    if let Some(body) = payload.get("req").and_then(|r| r.get("body")) {
-        for key in &["prompt", "text", "message", "content", "input"] {
-            if let Some(s) = body.get(key).and_then(|v| v.as_str()) {
-                return s.to_string();
-            }
-        }
-        // If body is a string
-        if let Some(s) = body.as_str() {
-            return s.to_string();
-        }
-    }
-    String::new()
 }
 
 pub struct LlmNodeFactory;

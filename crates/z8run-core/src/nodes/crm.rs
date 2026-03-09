@@ -36,6 +36,7 @@ use super::switch::json_path_lookup;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use serde_json::{json, Value};
 use tracing::{info, warn};
 
@@ -846,16 +847,8 @@ impl NodeExecutor for CrmNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.api_key.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "CRM node requires 'apiKey'".to_string(),
-            ));
-        }
-        if self.action.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "CRM node requires 'action'".to_string(),
-            ));
-        }
+        require_non_empty(&self.api_key, "CRM node requires 'apiKey'")?;
+        require_non_empty(&self.action, "CRM node requires 'action'")?;
         match self.provider.as_str() {
             "hubspot" | "salesforce" => Ok(()),
             _ => Err(crate::error::Z8Error::Internal(format!(

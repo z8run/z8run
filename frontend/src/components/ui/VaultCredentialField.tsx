@@ -1,4 +1,7 @@
 import { vaultApi } from "@/api/vault";
+import { useVaultKeys } from "@/hooks/useVaultKeys";
+import { generateRandomSecret } from "@/lib/crypto";
+import { inputClass as baseInputClass } from "@/lib/styles";
 import {
   Check,
   ChevronDown,
@@ -9,18 +12,7 @@ import {
   Loader2,
   Plus,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-
-/** Generate a cryptographically secure random secret (base64url, 32 bytes = 256 bits). */
-function generateRandomSecret(length = 32): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  // base64url encoding (URL-safe, no padding)
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
+import { useEffect, useState } from "react";
 
 interface VaultCredentialFieldProps {
   /** Current value — either "vault:key-name" or a raw string */
@@ -43,8 +35,13 @@ export function VaultCredentialField({
 }: VaultCredentialFieldProps) {
   const isVaultRef = value.startsWith("vault:");
   const [mode, setMode] = useState<Mode>(isVaultRef ? "vault" : "manual");
-  const [vaultKeys, setVaultKeys] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const {
+    keys: vaultKeys,
+    loading,
+    refetch: fetchKeys,
+  } = useVaultKeys({
+    fetchOnMount: false,
+  });
   const [showDropdown, setShowDropdown] = useState(false);
   const [showValue, setShowValue] = useState(false);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -53,18 +50,6 @@ export function VaultCredentialField({
   const [saving, setSaving] = useState(false);
 
   const selectedKey = isVaultRef ? value.slice(6) : "";
-
-  const fetchKeys = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await vaultApi.list();
-      setVaultKeys(res.keys ?? []);
-    } catch {
-      setVaultKeys([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     if (mode === "vault") {
@@ -105,8 +90,7 @@ export function VaultCredentialField({
     setShowDropdown(true);
   };
 
-  const inputClass =
-    "w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-z8-500 transition-colors";
+  const inputClass = `${baseInputClass} font-mono transition-colors`;
 
   return (
     <div className="space-y-1.5">

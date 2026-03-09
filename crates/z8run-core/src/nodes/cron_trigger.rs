@@ -3,8 +3,10 @@
 //! Triggers flow execution on a schedule using cron expressions.
 //! Generates an initial message at each scheduled time.
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use crate::Z8Result;
 use serde_json::{json, Value};
 use tracing::info;
@@ -39,27 +41,17 @@ impl NodeExecutor for CronTriggerNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(v) = config.get("cron").and_then(|v| v.as_str()) {
-            self.cron_expression = v.to_string();
-        }
-        if let Some(v) = config.get("timezone").and_then(|v| v.as_str()) {
-            self.timezone = v.to_string();
-        }
-        if let Some(v) = config.get("payload") {
-            self.payload = v.clone();
-        }
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
+        configure_fields!(config, self,
+            "cron" => cron_expression: str,
+            "timezone" => timezone: str,
+            "payload" => payload: value,
+            "name" => name: str,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.cron_expression.is_empty() {
-            return Err(crate::Z8Error::Internal(
-                "Cron expression is required".into(),
-            ));
-        }
+        require_non_empty(&self.cron_expression, "Cron expression is required")?;
         // Basic validation: cron should have 5 or 6 fields
         let fields: Vec<&str> = self.cron_expression.split_whitespace().collect();
         if fields.len() < 5 || fields.len() > 6 {

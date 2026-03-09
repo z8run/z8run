@@ -6,9 +6,11 @@
 //!   - "image" port: Generated image data with URL and metadata
 //!   - "error" port: API or validation errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use tracing::{info, warn};
 
 pub struct ImageGenNode {
@@ -70,42 +72,22 @@ impl NodeExecutor for ImageGenNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("provider").and_then(|v| v.as_str()) {
-            self.provider = v.to_lowercase();
-        }
-        if let Some(v) = config.get("model").and_then(|v| v.as_str()) {
-            self.model = v.to_string();
-        }
-        if let Some(v) = config.get("apiKey").and_then(|v| v.as_str()) {
-            self.api_key = v.to_string();
-        }
-        if let Some(v) = config.get("baseUrl").and_then(|v| v.as_str()) {
-            self.base_url = v.to_string();
-        }
-        if let Some(v) = config.get("size").and_then(|v| v.as_str()) {
-            self.size = v.to_string();
-        }
-        if let Some(v) = config.get("quality").and_then(|v| v.as_str()) {
-            self.quality = v.to_lowercase();
-        }
-        if let Some(v) = config.get("style").and_then(|v| v.as_str()) {
-            self.style = v.to_lowercase();
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "provider" => provider: str_lower,
+            "model" => model: str,
+            "apiKey" => api_key: str,
+            "baseUrl" => base_url: str,
+            "size" => size: str,
+            "quality" => quality: str_lower,
+            "style" => style: str_lower,
+            "timeout" => timeout_ms: u64,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.api_key.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Image generation requires an API key".to_string(),
-            ));
-        }
+        require_non_empty(&self.api_key, "Image generation requires an API key")?;
         if self.provider != "openai" && self.provider != "stability" {
             return Err(crate::error::Z8Error::Internal(format!(
                 "Unknown provider: {}. Use 'openai' or 'stability'",
@@ -145,7 +127,7 @@ impl ImageGenNode {
 
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .header("Content-Type", "application/json")
             .timeout(timeout)
             .json(&body)
@@ -223,7 +205,7 @@ impl ImageGenNode {
 
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .header("Content-Type", "application/json")
             .timeout(timeout)
             .json(&body)

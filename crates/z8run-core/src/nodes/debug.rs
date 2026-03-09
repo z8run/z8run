@@ -1,5 +1,6 @@
 //! Debug node: logs message payload for inspection.
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
@@ -36,12 +37,10 @@ impl NodeExecutor for DebugNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(log) = config.get("logPayload").and_then(|v| v.as_bool()) {
-            self.log_payload = log;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "logPayload" => log_payload: bool,
+        );
         Ok(())
     }
 

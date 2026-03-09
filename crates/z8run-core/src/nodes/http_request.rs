@@ -9,9 +9,11 @@
 //!   - "error" port: network/timeout/parse errors
 
 use super::switch::json_path_lookup;
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use tracing::{info, warn};
 
 /// Regex for `{path.to.field}` placeholders in URLs.
@@ -148,33 +150,19 @@ impl NodeExecutor for HttpRequestNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(url) = config.get("url").and_then(|v| v.as_str()) {
-            self.url = url.to_string();
-        }
-        if let Some(method) = config.get("method").and_then(|v| v.as_str()) {
-            self.method = method.to_uppercase();
-        }
-        if let Some(headers) = config.get("headers") {
-            self.headers = headers.clone();
-        }
-        if let Some(body_path) = config.get("bodyPath").and_then(|v| v.as_str()) {
-            self.body_path = body_path.to_string();
-        }
-        if let Some(timeout) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = timeout;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "url" => url: str,
+            "method" => method: str_upper,
+            "bodyPath" => body_path: str,
+            "timeout" => timeout_ms: u64,
+            "headers" => headers: value,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.url.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "HTTP Request node requires a URL".to_string(),
-            ));
-        }
+        require_non_empty(&self.url, "HTTP Request node requires a URL")?;
         Ok(())
     }
 

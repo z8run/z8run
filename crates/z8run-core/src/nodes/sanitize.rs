@@ -26,6 +26,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::json_path::{json_path_get, json_path_remove, json_path_set};
 use regex::Regex;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -187,62 +188,6 @@ fn apply_strategy(value: &Value, strategy: &str) -> Value {
     }
 }
 
-/// Set a value in a JSON object using dot-notation path.
-fn json_path_set(data: &mut Value, path: &str, new_value: Value) {
-    let parts: Vec<&str> = path.split('.').collect();
-    if parts.is_empty() {
-        return;
-    }
-
-    let mut current = data;
-    for (i, part) in parts.iter().enumerate() {
-        if i == parts.len() - 1 {
-            // Last segment: set the value
-            if let Value::Object(map) = current {
-                if new_value.is_null() && path.ends_with("__remove__") {
-                    map.remove(*part);
-                } else {
-                    map.insert(part.to_string(), new_value);
-                }
-            }
-            return;
-        }
-
-        // Navigate deeper
-        let next = if let Value::Object(map) = current {
-            map.get_mut(*part)
-        } else {
-            None
-        };
-
-        match next {
-            Some(v) => current = v,
-            None => return, // Path doesn't exist, nothing to sanitize
-        }
-    }
-}
-
-/// Look up a value in a JSON object using dot-notation path.
-fn json_path_lookup(data: &Value, path: &str) -> Option<Value> {
-    let mut current = data;
-    for segment in path.split('.') {
-        match current {
-            Value::Object(map) => {
-                current = map.get(segment)?;
-            }
-            Value::Array(arr) => {
-                if let Ok(idx) = segment.parse::<usize>() {
-                    current = arr.get(idx)?;
-                } else {
-                    return None;
-                }
-            }
-            _ => return None,
-        }
-    }
-    Some(current.clone())
-}
-
 /// Recursively scan all string values and apply pattern detection.
 fn scan_and_sanitize_patterns(value: &mut Value, patterns: &SensitivePatterns, enabled: &[String]) {
     match value {
@@ -273,17 +218,12 @@ impl NodeExecutor for SanitizeNode {
         // Step 1: Sanitize explicitly listed fields
         let mut count = 0usize;
         for field_path in &self.fields {
-            if let Some(current_value) = json_path_lookup(&payload, field_path) {
-                let sanitized = if self.strategy == "remove" {
-                    Value::Null // Will be treated as removal
-                } else {
-                    apply_strategy(&current_value, &self.strategy)
-                };
-
+            if let Some(current_value) = json_path_get(&payload, field_path) {
                 if self.strategy == "remove" {
-                    // For remove: set to null (a more sophisticated impl could delete the key)
-                    json_path_set(&mut payload, field_path, Value::Null);
+                    // For remove: delete the key entirely
+                    json_path_remove(&mut payload, field_path);
                 } else {
+                    let sanitized = apply_strategy(&current_value, &self.strategy);
                     json_path_set(&mut payload, field_path, sanitized);
                 }
                 count += 1;

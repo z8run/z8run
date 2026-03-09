@@ -1,4 +1,5 @@
 import { vaultApi } from "@/api/vault";
+import { generateRandomSecret } from "@/lib/crypto";
 import { useAuthStore } from "@/stores/authStore";
 import {
   AlertTriangle,
@@ -14,16 +15,6 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-/** Generate a cryptographically secure random secret (base64url, 32 bytes = 256 bits). */
-function generateRandomSecret(length = 32): string {
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
 
 export function VaultPage() {
   const navigate = useNavigate();

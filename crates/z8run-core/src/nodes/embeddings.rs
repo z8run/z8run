@@ -6,9 +6,12 @@
 //!   - "embedding" port: vector array + metadata
 //!   - "error" port: API errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::extract::TEXT_FIELDS;
+use crate::utils::node_helpers::{error_output, error_output_with_context};
 use tracing::{info, warn};
 
 pub struct EmbeddingsNode {
@@ -23,10 +26,9 @@ pub struct EmbeddingsNode {
 #[async_trait::async_trait]
 impl NodeExecutor for EmbeddingsNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let text = extract_text(&msg.payload);
+        let text = crate::utils::extract::extract_text(&msg.payload, TEXT_FIELDS);
         if text.is_empty() {
-            let err = serde_json::json!({"error": "No text found in message"});
-            return Ok(vec![msg.derive(msg.source_node, "error", err)]);
+            return Ok(error_output(&msg, "No text found in message"));
         }
 
         info!(node = %self.name, provider = %self.provider, chars = text.len(), "Embedding request");
@@ -52,31 +54,24 @@ impl NodeExecutor for EmbeddingsNode {
             }
             Err(e) => {
                 warn!(node = %self.name, error = %e, "Embedding request failed");
-                let payload = serde_json::json!({"error": e, "provider": self.provider});
-                Ok(vec![msg.derive(msg.source_node, "error", payload)])
+                return Ok(error_output_with_context(
+                    &msg,
+                    &e,
+                    serde_json::json!({"provider": self.provider}),
+                ));
             }
         }
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("provider").and_then(|v| v.as_str()) {
-            self.provider = v.to_lowercase();
-        }
-        if let Some(v) = config.get("model").and_then(|v| v.as_str()) {
-            self.model = v.to_string();
-        }
-        if let Some(v) = config.get("apiKey").and_then(|v| v.as_str()) {
-            self.api_key = v.to_string();
-        }
-        if let Some(v) = config.get("baseUrl").and_then(|v| v.as_str()) {
-            self.base_url = v.to_string();
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "provider" => provider: str_lower,
+            "model" => model: str,
+            "apiKey" => api_key: str,
+            "baseUrl" => base_url: str,
+            "timeout" => timeout_ms: u64,
+        );
         Ok(())
     }
 
@@ -115,7 +110,7 @@ impl EmbeddingsNode {
 
         let resp = client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .header("Content-Type", "application/json")
             .timeout(timeout)
             .json(&body)
@@ -189,28 +184,6 @@ impl EmbeddingsNode {
             .collect();
         Ok(embedding)
     }
-}
-
-fn extract_text(payload: &serde_json::Value) -> String {
-    if let Some(s) = payload.as_str() {
-        return s.to_string();
-    }
-    for key in &["text", "input", "content", "prompt", "body", "message"] {
-        if let Some(s) = payload.get(key).and_then(|v| v.as_str()) {
-            return s.to_string();
-        }
-    }
-    if let Some(body) = payload.get("req").and_then(|r| r.get("body")) {
-        for key in &["text", "input", "content", "prompt"] {
-            if let Some(s) = body.get(key).and_then(|v| v.as_str()) {
-                return s.to_string();
-            }
-        }
-        if let Some(s) = body.as_str() {
-            return s.to_string();
-        }
-    }
-    String::new()
 }
 
 pub struct EmbeddingsNodeFactory;

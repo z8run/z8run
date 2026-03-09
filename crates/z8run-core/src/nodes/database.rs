@@ -28,6 +28,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use serde_json::Value;
 use tracing::{debug, error};
 
@@ -186,11 +187,7 @@ impl NodeExecutor for DatabaseNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.query.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Database node requires a 'query'".to_string(),
-            ));
-        }
+        require_non_empty(&self.query, "Database node requires a 'query'")?;
         if self.connection_string.is_empty() && self.database.is_empty() && self.db_type != "sqlite"
         {
             return Err(crate::error::Z8Error::Internal(

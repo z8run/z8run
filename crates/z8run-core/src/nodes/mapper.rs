@@ -23,6 +23,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::json_path::{json_path_get, json_path_set};
 use serde_json::Value;
 use tracing::debug;
 
@@ -39,56 +40,6 @@ pub struct MapperNode {
     pass_through: bool,
 }
 
-/// Look up a value in a JSON value using dot-notation path.
-fn json_path_lookup(data: &Value, path: &str) -> Option<Value> {
-    let mut current = data;
-    for segment in path.split('.') {
-        match current {
-            Value::Object(map) => {
-                current = map.get(segment)?;
-            }
-            Value::Array(arr) => {
-                if let Ok(idx) = segment.parse::<usize>() {
-                    current = arr.get(idx)?;
-                } else {
-                    return None;
-                }
-            }
-            _ => return None,
-        }
-    }
-    Some(current.clone())
-}
-
-/// Set a value in a JSON object using dot-notation path, creating
-/// intermediate objects as needed.
-fn json_path_set(data: &mut Value, path: &str, value: Value) {
-    let parts: Vec<&str> = path.split('.').collect();
-    if parts.is_empty() {
-        return;
-    }
-
-    let mut current = data;
-    for (i, part) in parts.iter().enumerate() {
-        if i == parts.len() - 1 {
-            if let Value::Object(map) = current {
-                map.insert(part.to_string(), value);
-            }
-            return;
-        }
-
-        // Ensure intermediate object exists
-        if let Value::Object(map) = current {
-            if !map.contains_key(*part) || !map[*part].is_object() {
-                map.insert(part.to_string(), Value::Object(serde_json::Map::new()));
-            }
-            current = map.get_mut(*part).unwrap();
-        } else {
-            return;
-        }
-    }
-}
-
 #[async_trait::async_trait]
 impl NodeExecutor for MapperNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
@@ -102,7 +53,7 @@ impl NodeExecutor for MapperNode {
         let mut missing_fields: Vec<String> = Vec::new();
 
         for mapping in &self.mappings {
-            match json_path_lookup(&msg.payload, &mapping.from) {
+            match json_path_get(&msg.payload, &mapping.from) {
                 Some(value) => {
                     json_path_set(&mut output, &mapping.to, value);
                     mapped_count += 1;

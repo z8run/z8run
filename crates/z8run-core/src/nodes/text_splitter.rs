@@ -10,9 +10,12 @@
 //!   - "chunks" port: array of text chunks with metadata
 //!   - "error" port: on processing errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::extract::TEXT_FIELDS;
+use crate::utils::node_helpers::error_output;
 use tracing::info;
 
 pub struct TextSplitterNode {
@@ -26,12 +29,9 @@ pub struct TextSplitterNode {
 #[async_trait::async_trait]
 impl NodeExecutor for TextSplitterNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        let text = extract_text(&msg.payload);
+        let text = crate::utils::extract::extract_text(&msg.payload, TEXT_FIELDS);
         if text.is_empty() {
-            let err_payload = serde_json::json!({
-                "error": "No text found in message",
-            });
-            return Ok(vec![msg.derive(msg.source_node, "error", err_payload)]);
+            return Ok(error_output(&msg, "No text found in message"));
         }
 
         info!(
@@ -73,18 +73,13 @@ impl NodeExecutor for TextSplitterNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("strategy").and_then(|v| v.as_str()) {
-            self.strategy = v.to_string();
-        }
-        if let Some(v) = config.get("chunkSize").and_then(|v| v.as_u64()) {
-            self.chunk_size = v as usize;
-        }
-        if let Some(v) = config.get("overlap").and_then(|v| v.as_u64()) {
-            self.overlap = v as usize;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "strategy" => strategy: str,
+            "chunkSize" => chunk_size: usize,
+            "overlap" => overlap: usize,
+        );
+
         if let Some(v) = config.get("separator").and_then(|v| v.as_str()) {
             self.separator = Some(v.to_string());
         }
@@ -231,18 +226,6 @@ fn split_by_tokens(text: &str, token_limit: usize, overlap: usize) -> Vec<(Strin
     }
 
     chunks
-}
-
-fn extract_text(payload: &serde_json::Value) -> String {
-    if let Some(s) = payload.as_str() {
-        return s.to_string();
-    }
-    for key in &["text", "content", "body", "prompt", "input", "message"] {
-        if let Some(s) = payload.get(key).and_then(|v| v.as_str()) {
-            return s.to_string();
-        }
-    }
-    String::new()
 }
 
 pub struct TextSplitterNodeFactory;

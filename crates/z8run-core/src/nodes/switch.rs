@@ -20,9 +20,13 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, warn};
+
+/// Re-export json_path_lookup from the shared utilities module
+pub use crate::utils::json_path::json_path_lookup;
 
 /// A single routing rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,33 +54,6 @@ pub struct SwitchNode {
     rules: Vec<SwitchRule>,
     /// If true, check all rules (fan-out). If false, stop at first match.
     check_all: bool,
-}
-
-/// Look up a value in a JSON object using dot-notation path.
-pub fn json_path_lookup(data: &Value, path: &str) -> Value {
-    let mut current = data;
-    for segment in path.split('.') {
-        match current {
-            Value::Object(map) => {
-                current = match map.get(segment) {
-                    Some(v) => v,
-                    None => return Value::Null,
-                };
-            }
-            Value::Array(arr) => {
-                if let Ok(idx) = segment.parse::<usize>() {
-                    current = match arr.get(idx) {
-                        Some(v) => v,
-                        None => return Value::Null,
-                    };
-                } else {
-                    return Value::Null;
-                }
-            }
-            _ => return Value::Null,
-        }
-    }
-    current.clone()
 }
 
 /// Evaluate a single rule against a value.
@@ -235,11 +212,10 @@ impl NodeExecutor for SwitchNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.property.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Switch node requires a 'property' to evaluate".to_string(),
-            ));
-        }
+        require_non_empty(
+            &self.property,
+            "Switch node requires a 'property' to evaluate",
+        )?;
         Ok(())
     }
 

@@ -8,6 +8,7 @@
 //! { "operation": "group_by", "field": "amount", "groupBy": "category" }
 //! ```
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
@@ -46,18 +47,12 @@ impl NodeExecutor for AggregatorNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(op) = config.get("operation").and_then(|v| v.as_str()) {
-            self.operation = op.to_string();
-        }
-        if let Some(f) = config.get("field").and_then(|v| v.as_str()) {
-            self.field = f.to_string();
-        }
-        if let Some(g) = config.get("groupBy").and_then(|v| v.as_str()) {
-            self.group_by = g.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "operation" => operation: str,
+            "field" => field: str,
+            "groupBy" => group_by: str,
+        );
         Ok(())
     }
 

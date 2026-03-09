@@ -7,6 +7,7 @@
 //! { "size": 100, "field": "data" }
 //! ```
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
@@ -56,17 +57,11 @@ impl NodeExecutor for BatchNode {
     }
 
     async fn configure(&mut self, config: Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
-        if let Some(s) = config.get("size").and_then(|v| v.as_u64()) {
-            if s > 0 {
-                self.size = s as usize;
-            }
-        }
-        if let Some(f) = config.get("field").and_then(|v| v.as_str()) {
-            self.field = f.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "size" => size: usize,
+            "field" => field: str,
+        );
         Ok(())
     }
 

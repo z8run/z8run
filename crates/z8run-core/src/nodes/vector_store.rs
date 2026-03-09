@@ -18,6 +18,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_one_of;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -104,18 +105,12 @@ impl NodeExecutor for VectorStoreNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.action.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "Vector store requires an action".to_string(),
-            ));
-        }
-        match self.action.as_str() {
-            "store" | "search" | "delete" | "clear" => Ok(()),
-            _ => Err(crate::error::Z8Error::Internal(format!(
-                "Invalid action: {}",
-                self.action
-            ))),
-        }
+        require_one_of(
+            &self.action,
+            &["store", "search", "delete", "clear"],
+            "Invalid Vector Store action",
+        )?;
+        Ok(())
     }
 
     fn node_type(&self) -> &str {

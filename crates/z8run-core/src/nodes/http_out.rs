@@ -9,6 +9,7 @@ use std::sync::{Arc, OnceLock};
 use tokio::sync::{oneshot, RwLock};
 use uuid::Uuid;
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
@@ -85,9 +86,9 @@ impl NodeExecutor for HttpOutNode {
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = name.to_string();
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+        );
         if let Some(code) = config.get("statusCode").and_then(|v| v.as_u64()) {
             self.status_code = code as u16;
         }

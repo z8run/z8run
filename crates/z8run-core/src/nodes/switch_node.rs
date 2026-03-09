@@ -7,6 +7,7 @@
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::message::FlowMessage;
 use crate::Z8Result;
+use crate::utils::node_helpers::require_non_empty;
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::info;
@@ -100,9 +101,7 @@ impl NodeExecutor for SwitchNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.field.is_empty() {
-            return Err(crate::Z8Error::Config("Field path is required".into()));
-        }
+        require_non_empty(&self.field, "Field path is required")?;
         if self.cases.is_empty() {
             return Err(crate::Z8Error::Config(
                 "At least one case is required".into(),

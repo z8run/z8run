@@ -6,6 +6,7 @@
 
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::require_non_empty;
 use crate::Z8Result;
 use serde_json::{json, Value};
 use tracing::info;
@@ -113,11 +114,7 @@ impl NodeExecutor for LoopNode {
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.field.is_empty() {
-            return Err(crate::Z8Error::Internal(
-                "Array field path is required".into(),
-            ));
-        }
+        require_non_empty(&self.field, "Array field path is required")?;
         Ok(())
     }
 

@@ -6,9 +6,11 @@
 //!   - "transcript" port: Transcription result with text, confidence, duration, language, and provider
 //!   - "error" port: API or validation errors
 
+use crate::configure_fields;
 use crate::engine::{NodeExecutor, NodeExecutorFactory};
 use crate::error::Z8Result;
 use crate::message::FlowMessage;
+use crate::utils::node_helpers::{error_output, error_output_with_context, require_non_empty};
 use tracing::{info, warn};
 
 pub struct SttNode {
@@ -27,10 +29,7 @@ impl NodeExecutor for SttNode {
         let (audio_data, audio_format) = match extract_audio_data(&msg.payload) {
             Some((data, format)) => (data, format),
             None => {
-                let err = serde_json::json!({
-                    "error": "No audio data found in message. Expected fields: audio, audioData, audio_data, file, or data"
-                });
-                return Ok(vec![msg.derive(msg.source_node, "error", err)]);
+                return Ok(error_output(&msg, "No audio data found in message. Expected fields: audio, audioData, audio_data, file, or data"));
             }
         };
 
@@ -80,44 +79,32 @@ impl NodeExecutor for SttNode {
             }
             Err(e) => {
                 warn!(node = %self.name, error = %e, "STT request failed");
-                let payload = serde_json::json!({
-                    "error": e,
-                    "provider": self.provider,
-                    "model": self.model,
-                });
-                Ok(vec![msg.derive(msg.source_node, "error", payload)])
+                return Ok(error_output_with_context(
+                    &msg,
+                    &e,
+                    serde_json::json!({
+                        "provider": self.provider,
+                        "model": self.model,
+                    }),
+                ));
             }
         }
     }
 
     async fn configure(&mut self, config: serde_json::Value) -> Z8Result<()> {
-        if let Some(v) = config.get("name").and_then(|v| v.as_str()) {
-            self.name = v.to_string();
-        }
-        if let Some(v) = config.get("provider").and_then(|v| v.as_str()) {
-            self.provider = v.to_lowercase();
-        }
-        if let Some(v) = config.get("apiKey").and_then(|v| v.as_str()) {
-            self.api_key = v.to_string();
-        }
-        if let Some(v) = config.get("model").and_then(|v| v.as_str()) {
-            self.model = v.to_string();
-        }
-        if let Some(v) = config.get("language").and_then(|v| v.as_str()) {
-            self.language = v.to_string();
-        }
-        if let Some(v) = config.get("timeout").and_then(|v| v.as_u64()) {
-            self.timeout_ms = v;
-        }
+        configure_fields!(config, self,
+            "name" => name: str,
+            "provider" => provider: str_lower,
+            "apiKey" => api_key: str,
+            "model" => model: str,
+            "language" => language: str,
+            "timeout" => timeout_ms: u64,
+        );
         Ok(())
     }
 
     async fn validate(&self) -> Z8Result<()> {
-        if self.api_key.is_empty() {
-            return Err(crate::error::Z8Error::Internal(
-                "STT node requires an API key".to_string(),
-            ));
-        }
+        require_non_empty(&self.api_key, "STT node requires an API key")?;
         if self.provider != "openai" && self.provider != "google" && self.provider != "deepgram" {
             return Err(crate::error::Z8Error::Internal(format!(
                 "Unknown provider: {}. Use 'openai', 'google', or 'deepgram'",
@@ -165,7 +152,7 @@ impl SttNode {
 
         let resp = client
             .post(url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .bearer_auth(&self.api_key)
             .timeout(timeout)
             .multipart(form)
             .send()
