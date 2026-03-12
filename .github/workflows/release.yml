@@ -108,7 +108,7 @@ jobs:
           cd dist && shasum -a 256 ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
           path: dist/
