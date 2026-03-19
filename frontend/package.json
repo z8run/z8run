@@ -23,7 +23,7 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.1",
     "tailwind-merge": "^2.6.0",
-    "zustand": "^5.0.3",
+    "zustand": "^5.0.12",
     "@uiw/react-codemirror": "^4.23.0",
     "@codemirror/lang-javascript": "^6.2.0",
     "@codemirror/lang-python": "^6.1.0",
