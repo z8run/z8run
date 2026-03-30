@@ -42,24 +42,28 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ env.IMAGE_Z8RUN }}:latest
             ${{ env.IMAGE_Z8RUN }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
 
       - name: Build and push nginx image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./deploy/Dockerfile.nginx
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ env.IMAGE_NGINX }}:latest
             ${{ env.IMAGE_NGINX }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
 
   deploy:
     name: Deploy to Server

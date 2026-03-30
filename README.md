@@ -61,7 +61,7 @@ z8run is an open-source visual flow engine built from the ground up in **Rust** 
 
 ### From Source
 
-**Requirements:** [Rust](https://rustup.rs/) 1.91+, Node.js 20+ and `pnpm` (for frontend)
+**Requirements:** [Rust](https://rustup.rs/) 1.91+, Node.js 22+ and `npm` (for frontend)
 
 ```bash
 git clone https://github.com/z8run/z8run.git

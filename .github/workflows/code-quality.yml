@@ -30,7 +30,7 @@ jobs:
         run: jscpd --config .jscpd.json .
 
       - name: Upload duplication report
-        if: always()
+        if: always() && hashFiles('.jscpd-report/**') != ''
         uses: actions/upload-artifact@v7
         with:
           name: jscpd-report
