@@ -1,0 +1,16 @@
+# Default owner for everything
+* @poolcamacho
+
+# Rust crates
+/crates/ @poolcamacho
+/Cargo.toml @poolcamacho
+/Cargo.lock @poolcamacho
+
+# Frontend
+/frontend/ @poolcamacho
+
+# Infrastructure & CI
+/.github/ @poolcamacho
+/deploy/ @poolcamacho
+/docker-compose*.yml @poolcamacho
+/Dockerfile @poolcamacho

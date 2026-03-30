@@ -1,11 +1,10 @@
-<!-- <p align="center">
-  <img src="assets/z8run-logo.svg" alt="z8run" width="280" />
-</p> -->
+<h1 align="center">z8run</h1>
 
-<h3 align="center">Next Generation Visual Flow Engine</h3>
+<h3 align="center">Open-Source Visual Flow Engine</h3>
 
 <p align="center">
-  Build, connect, and automate anything - visually.
+  Build, connect, and automate anything — visually.<br/>
+  Self-hosted alternative to <b>n8n</b> and <b>Node-RED</b>, built with Rust + React.
 </p>
 
 <p align="center">
@@ -13,17 +12,28 @@
   <a href="https://github.com/z8run/z8run/releases"><img src="https://img.shields.io/github/v/release/z8run/z8run?style=flat-square&color=06B6D4" alt="Release" /></a>
   <a href="https://github.com/z8run/z8run/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0%20%2F%20MIT-blue?style=flat-square" alt="License" /></a>
   <a href="https://github.com/z8run/z8run/stargazers"><img src="https://img.shields.io/github/stars/z8run/z8run?style=flat-square" alt="Stars" /></a>
-  <a href="https://github.com/z8run/z8run/pkgs/container/z8run-api"><img src="https://img.shields.io/badge/ghcr.io-z8run--api-2496ED?style=flat-square&logo=docker" alt="Container Registry" /></a>
   <a href="https://crates.io/crates/z8run"><img src="https://img.shields.io/crates/v/z8run?style=flat-square&color=e6522c" alt="Crates.io" /></a>
-  <a href="https://github.com/z8run/z8run/issues"><img src="https://img.shields.io/github/issues/z8run/z8run?style=flat-square" alt="Issues" /></a>
-  <a href="https://github.com/z8run/z8run/graphs/contributors"><img src="https://img.shields.io/github/contributors/z8run/z8run?style=flat-square" alt="Contributors" /></a>
+  <a href="https://github.com/z8run/z8run/pkgs/container/z8run-api"><img src="https://img.shields.io/badge/ghcr.io-z8run--api-2496ED?style=flat-square&logo=docker" alt="Docker" /></a>
+</p>
+
+<p align="center">
+  <a href="https://app.z8run.org">Live Demo</a> &bull;
+  <a href="https://z8run.org">Website</a> &bull;
+  <a href="https://github.com/z8run/z8run/discussions">Community</a> &bull;
+  <a href="#quick-start">Quick Start</a>
+</p>
+
+<p align="center">
+  <img src="assets/demo.gif" alt="z8run flow editor demo" width="800" />
 </p>
 
 ---
 
-## What is z8run?
+## Why z8run?
 
-z8run is an open-source visual flow engine built from the ground up in **Rust** for performance, safety, and extensibility. Inspired by tools like Node-RED, z8run is designed for developers who need real-time automation with a modern stack.
+> Most workflow tools are either slow (Node.js), locked-in (SaaS), or hard to extend. z8run is none of those.
+
+z8run is an open-source visual flow engine built from the ground up in **Rust** for performance, safety, and extensibility. Inspired by tools like Node-RED and n8n, z8run is designed for developers who need real-time automation with a modern stack.
 
 **Key principles:**
 
@@ -32,6 +42,20 @@ z8run is an open-source visual flow engine built from the ground up in **Rust** 
 - **Extensible** — WebAssembly plugin sandbox (write plugins in any language that compiles to WASM)
 - **Lightweight** — Single binary, embedded SQLite, zero external dependencies to get started
 - **Secure** — AES-256-GCM credential vault, JWT auth, sandboxed plugin execution
+
+## Comparison
+
+| Feature | z8run | Node-RED | n8n |
+|---|:---:|:---:|:---:|
+| Language | Rust | Node.js | Node.js |
+| Visual editor | Yes | Yes | Yes |
+| Self-hosted | Yes | Yes | Yes |
+| WASM plugins | Yes | No | No |
+| AI nodes (LLM, embeddings, agents) | 10 built-in | Community | Limited |
+| Binary protocol (WebSocket) | Yes | JSON | JSON |
+| Credential vault (AES-256-GCM) | Built-in | Separate | Built-in |
+| Single binary deploy | Yes | No | No |
+| Open source | Apache-2.0 / MIT | Apache-2.0 | Sustainable Use |
 
 ## Quick Start
 
@@ -231,5 +255,6 @@ z8run is dual-licensed under [Apache 2.0](LICENSE-APACHE) and [MIT](LICENSE-MIT)
 ---
 
 <p align="center">
-  Built with Rust and a lot of coffee.
+  Built with Rust and a lot of coffee.<br/><br/>
+  If you find z8run useful, please consider giving it a <a href="https://github.com/z8run/z8run">star on GitHub</a> — it helps others discover the project.
 </p>
