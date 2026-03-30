@@ -1,6 +1,7 @@
 import { vaultApi } from "@/api/vault";
 import { generateRandomSecret } from "@/lib/crypto";
 import { useAuthStore } from "@/stores/authStore";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   AlertTriangle,
   Copy,
@@ -404,49 +405,18 @@ export function VaultPage() {
         )}
       </div>
 
-      {/* Delete confirmation modal */}
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-900/30 flex items-center justify-center">
-                <AlertTriangle size={20} className="text-red-400" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-200">
-                  Delete Credential
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  This action cannot be undone
-                </p>
-              </div>
-            </div>
-            <p className="text-sm text-slate-300 mb-6">
-              Are you sure you want to delete{" "}
-              <span className="font-medium text-white">"{deleteTarget}"</span>?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-sm text-slate-400 hover:bg-slate-800 rounded-md transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDelete(deleteTarget)}
-                disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 hover:bg-red-700
-                  disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-md transition-colors"
-              >
-                {saving && <Loader2 size={14} className="animate-spin" />}
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete Credential"
+        confirmLabel="Delete"
+        loading={saving}
+        variant="danger"
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      >
+        Are you sure you want to delete{" "}
+        <span className="font-medium text-white">"{deleteTarget}"</span>?
+      </ConfirmDialog>
     </div>
   );
 }

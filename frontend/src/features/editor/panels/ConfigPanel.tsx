@@ -8,6 +8,7 @@ import { useFlowStore } from "@/stores/flowStore";
 import { useUIStore } from "@/stores/uiStore";
 import type { NodeStatus, Z8NodeData } from "@/types/flow";
 import { CATEGORY_COLORS, PORT_COLORS } from "@/types/flow";
+import { lookupField, type FieldDescriptor } from "@/lib/fieldRegistry";
 import {
   AlertCircle,
   CheckCircle2,
@@ -73,6 +74,135 @@ const selectClass = `w-full bg-slate-800 border border-slate-700 rounded-md px-3
 const inputClass = `w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
   text-xs text-slate-200 font-mono focus:outline-none focus:border-z8-500 transition-colors`;
 
+/** Render a field based on a registry descriptor */
+function renderRegistryField(
+  desc: FieldDescriptor,
+  value: unknown,
+  onChange: (val: unknown) => void,
+): React.ReactNode {
+  switch (desc.type) {
+    case "select":
+      return (
+        <select
+          value={String(value ?? desc.defaultValue ?? "")}
+          onChange={(e) => {
+            const v = e.target.value;
+            // Preserve number type for numeric options
+            const opt = desc.options?.find((o) => String(o.value) === v);
+            onChange(opt && typeof opt.value === "number" ? Number(v) : v);
+          }}
+          className={selectClass}
+        >
+          {desc.options?.map((o) => (
+            <option key={String(o.value)} value={String(o.value)}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      );
+
+    case "number":
+      return (
+        <input
+          type="number"
+          value={Number(value ?? desc.defaultValue ?? 0)}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className={inputClass}
+          min={desc.min}
+          max={desc.max}
+          step={desc.step}
+        />
+      );
+
+    case "number-unit":
+      return (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            value={Number(value ?? desc.defaultValue ?? 0)}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className={`${inputClass} flex-1`}
+            min={desc.min}
+            max={desc.max}
+            step={desc.step}
+          />
+          {desc.unit && (
+            <span className="text-[10px] text-slate-500 shrink-0">{desc.unit}</span>
+          )}
+        </div>
+      );
+
+    case "textarea": {
+      const inner = (
+        <textarea
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={desc.placeholder}
+          rows={desc.rows ?? 3}
+          spellCheck={false}
+          className={`${inputClass} ${desc.resizable ? "resize-y" : "resize-none"}${desc.mono ? "" : ""}`}
+        />
+      );
+      if (desc.hint) {
+        return (
+          <div className="space-y-1">
+            {inner}
+            <div className="text-[9px] text-slate-500">{desc.hint}</div>
+          </div>
+        );
+      }
+      return inner;
+    }
+
+    case "checkbox":
+      return (
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={Boolean(value)}
+            onChange={(e) => onChange(e.target.checked)}
+            className="rounded border-slate-600 bg-slate-800 text-z8-500 focus:ring-z8-500"
+          />
+          {desc.checkboxLabel && (
+            <span className="text-xs text-slate-300">{desc.checkboxLabel}</span>
+          )}
+        </label>
+      );
+
+    case "vault":
+      return (
+        <VaultCredentialField
+          value={String(value ?? "")}
+          onChange={(v) => onChange(v)}
+          placeholder={desc.placeholder}
+          suggestedKeyName={desc.suggestedKeyName}
+        />
+      );
+
+    case "text":
+    default: {
+      const inner = (
+        <input
+          type="text"
+          value={String(value ?? desc.defaultValue ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={desc.placeholder}
+          className={desc.mono ? `${inputClass} font-mono` : inputClass}
+        />
+      );
+      if (desc.hint) {
+        return (
+          <div className="space-y-1">
+            {inner}
+            <div className="text-[9px] text-slate-500">{desc.hint}</div>
+          </div>
+        );
+      }
+      return inner;
+    }
+  }
+}
+
 /** Render a smart config field based on key name and node type */
 function SmartConfigField({
   fieldKey,
@@ -93,6 +223,36 @@ function SmartConfigField({
   onBatchConfigChange?: (updates: Record<string, unknown>) => void;
   nodeLabel?: string;
 }) {
+  // ── Registry-driven rendering (handles ~60% of simple fields) ──
+  // Skip fields that need complex custom logic
+  const COMPLEX_FIELDS = new Set([
+    "code", "provider", "model", "apiKey", "baseUrl", "systemPrompt",
+    "temperature", "maxTokens", "vision",
+    "tools", "schema",
+    "mappings", "patterns",
+    "value", "authToken",
+    "voice",
+    "statusCode",
+  ]);
+
+  if (!COMPLEX_FIELDS.has(fieldKey)) {
+    const desc = lookupField(nodeType, fieldKey);
+    if (desc) {
+      // For vault fields, resolve {provider} in suggestedKeyName
+      if (desc.type === "vault" && desc.suggestedKeyName) {
+        const resolvedDesc = {
+          ...desc,
+          suggestedKeyName: desc.suggestedKeyName.replace(
+            "{provider}",
+            String(allConfig?.provider ?? nodeType)
+          ),
+        };
+        return renderRegistryField(resolvedDesc, value, onChange);
+      }
+      return renderRegistryField(desc, value, onChange);
+    }
+  }
+
   // --- CODE EDITOR with language selector ---
   if (fieldKey === "code") {
     const codeValue = String(value ?? "");
@@ -1978,6 +2138,9 @@ function SmartConfigField({
 
 /** Check if a key has a smart field renderer */
 function hasSmartField(key: string, nodeType: string): boolean {
+  // Registry-driven fields
+  if (lookupField(nodeType, key)) return true;
+
   const AI_NODES = [
     "llm",
     "embeddings",

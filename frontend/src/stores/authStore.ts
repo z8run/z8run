@@ -1,4 +1,5 @@
 import { type UserInfo, authService } from "@/api/auth";
+import { extractErrorMessage } from "@/lib/extractError";
 import { create } from "zustand";
 
 interface AuthState {
@@ -31,16 +32,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem("z8_token", res.token);
       set({ token: res.token, user: res.user, loading: false });
     } catch (err: unknown) {
-      const resErr = err as { response?: Response };
-      const msg = resErr?.response
-        ? await resErr.response
-            .json()
-            .then(
-              (b: Record<string, { message?: string }>) =>
-                b.error?.message || "Login failed",
-            )
-            .catch(() => "Login failed")
-        : "Network error";
+      const msg = await extractErrorMessage(err, "Login failed");
       set({ error: msg, loading: false });
     }
   },
@@ -52,16 +44,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem("z8_token", res.token);
       set({ token: res.token, user: res.user, loading: false });
     } catch (err: unknown) {
-      const resErr = err as { response?: Response };
-      const msg = resErr?.response
-        ? await resErr.response
-            .json()
-            .then(
-              (b: Record<string, { message?: string }>) =>
-                b.error?.message || "Registration failed",
-            )
-            .catch(() => "Registration failed")
-        : "Network error";
+      const msg = await extractErrorMessage(err, "Registration failed");
       set({ error: msg, loading: false });
     }
   },
