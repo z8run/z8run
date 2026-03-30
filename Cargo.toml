@@ -13,7 +13,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.91"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/z8run/z8run"
 homepage = "https://z8run.org"

@@ -65,7 +65,7 @@ z8run/
 ### Requirements
 
 - [Rust](https://rustup.rs/) 1.91+ (see `rust-toolchain.toml` for the pinned version)
-- Node.js 20+ and `pnpm` (for frontend work)
+- Node.js 20+ and `npm` (for frontend work)
 - Optional: Docker and Docker Compose (for containerized development)
 - Optional: `wasm-pack` or a WASM target if working on plugins
 
@@ -98,8 +98,8 @@ cargo run --bin z8run -- serve
 
 ```bash
 cd frontend
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 ### With Docker (local build)
@@ -118,8 +118,8 @@ cargo fmt --all
 cargo clippy --workspace -- -D warnings
 
 # Frontend
-pnpm lint
-pnpm format
+npm run check
+npm run check:fix
 ```
 
 All CI checks must pass before a PR can be merged.

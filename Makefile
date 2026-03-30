@@ -1,4 +1,5 @@
-.PHONY: check fmt clippy build test frontend-check frontend-build ci clean
+.PHONY: check fmt clippy build test frontend-check frontend-build ci clean \
+       setup docker-build docker-up docker-down docker-logs
 
 # ─── Quick checks (run before committing) ───────────────────────────
 check: fmt clippy frontend-check
@@ -47,6 +48,25 @@ serve-release:
 # ─── Fix everything ─────────────────────────────────────────────────
 fix: fmt-fix frontend-check-fix
 	@echo "✓ All auto-fixes applied"
+
+# ─── Setup (first time) ─────────────────────────────────────────────
+setup:
+	@test -f .env || cp .env.example .env
+	cd frontend && npm install
+	@echo "✓ Setup complete. Run 'make serve' to start the server"
+
+# ─── Docker ─────────────────────────────────────────────────────────
+docker-build:
+	docker compose -f docker-compose.yml -f docker-compose.build.yml build
+
+docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
 
 # ─── Clean ───────────────────────────────────────────────────────────
 clean:

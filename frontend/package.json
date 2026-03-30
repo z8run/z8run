@@ -3,6 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "Visual flow editor for z8run",
+  "license": "Apache-2.0 OR MIT",
+  "homepage": "https://z8run.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/z8run/z8run.git",
+    "directory": "frontend"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -30,6 +30,12 @@ Thumbs.db
 /frontend/dist/
 /frontend/build/
 
+# Claude Code
+.claude/
+
+# Logs
+*.log
+
 # Code quality reports
 .jscpd-report/
 *_REPORT.md
