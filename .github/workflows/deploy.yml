@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_Z8RUN: ghcr.io/${{ github.repository }}-api
@@ -17,6 +21,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_tag: ${{ github.sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -60,10 +66,12 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: production
     env:
       DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
       DEPLOY_PATH: /opt/z8run
+      IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -74,29 +82,29 @@ jobs:
 
       - name: Setup SSH key
         run: |
-          mkdir -p ~/.ssh
+          install -m 600 -D /dev/null ~/.ssh/deploy_key
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
       - name: Deploy on server
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Sync only compose + nginx config (no source code needed)
+          # Sync only compose + nginx config
           rsync -avz \
             -e "ssh -i ~/.ssh/deploy_key" \
             docker-compose.yml deploy/nginx.conf \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
-          # Ensure nginx.conf directory exists and move file
-          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << EOF
-            mkdir -p ${{ env.DEPLOY_PATH }}/deploy
-            mv ${{ env.DEPLOY_PATH }}/nginx.conf ${{ env.DEPLOY_PATH }}/deploy/nginx.conf 2>/dev/null || true
+          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} << 'DEPLOY_EOF'
+            set -euo pipefail
             cd ${{ env.DEPLOY_PATH }}
 
-            # Login to GHCR (automatic, no manual setup needed)
-            echo "${GHCR_TOKEN}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            mkdir -p deploy
+            mv nginx.conf deploy/nginx.conf 2>/dev/null || true
+
+            # Login to GHCR
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             # Pull new images
             docker compose pull
@@ -104,11 +112,11 @@ jobs:
             # Restart with new images
             docker compose up -d --remove-orphans
 
-            # Clean up old images
-            docker image prune -f
+            # Clean up only z8run dangling images
+            docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/${{ github.repository }}"
 
-            echo "✓ z8run deployed successfully"
-          EOF
+            echo "✓ z8run deployed successfully (tag: ${{ env.IMAGE_TAG }})"
+          DEPLOY_EOF
 
       - name: Health check
         run: |
@@ -119,8 +127,14 @@ jobs:
               echo "✓ Health check passed (attempt $i)"
               exit 0
             fi
-            echo "Attempt $i failed, retrying..."
+            echo "⏳ Attempt $i/5 failed, retrying..."
           done
+
           echo "✗ Health check failed after 5 attempts"
-          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} "docker compose -f ${{ env.DEPLOY_PATH }}/docker-compose.yml logs --tail=30"
+          ssh -i ~/.ssh/deploy_key ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "docker compose -f ${{ env.DEPLOY_PATH }}/docker-compose.yml logs --tail=50"
           exit 1
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
