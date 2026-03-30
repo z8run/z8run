@@ -260,10 +260,7 @@ impl TtsNode {
             self.language.clone()
         };
 
-        let url = format!(
-            "https://texttospeech.googleapis.com/v1/text:synthesize?key={}",
-            self.api_key
-        );
+        let url = "https://texttospeech.googleapis.com/v1/text:synthesize";
 
         let body = serde_json::json!({
             "input": {
@@ -279,8 +276,9 @@ impl TtsNode {
         });
 
         let resp = client
-            .post(&url)
+            .post(url)
             .header("Content-Type", "application/json")
+            .header("X-Goog-Api-Key", &self.api_key)
             .timeout(timeout)
             .json(&body)
             .send()

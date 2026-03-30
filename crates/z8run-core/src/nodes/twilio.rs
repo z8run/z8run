@@ -117,7 +117,10 @@ impl TwilioNode {
             self.account_sid
         );
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .build()
+            .map_err(|e| crate::error::Z8Error::Internal(format!("HTTP client error: {}", e)))?;
         let params = [
             ("From", self.from_number.as_str()),
             ("To", &to),
@@ -213,7 +216,10 @@ impl TwilioNode {
             self.account_sid
         );
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .build()
+            .map_err(|e| crate::error::Z8Error::Internal(format!("HTTP client error: {}", e)))?;
         let params = [
             ("From", self.from_number.as_str()),
             ("To", &to),
@@ -300,7 +306,10 @@ impl TwilioNode {
 
         let url = format!("https://lookups.twilio.com/v1/PhoneNumbers/{}", number);
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .build()
+            .map_err(|e| crate::error::Z8Error::Internal(format!("HTTP client error: {}", e)))?;
 
         match client
             .get(&url)

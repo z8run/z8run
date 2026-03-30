@@ -41,14 +41,16 @@ pub struct VaultCrypto {
 
 impl VaultCrypto {
     /// Creates a new VaultCrypto from a 32-byte key.
-    /// If the provided key is shorter, it is padded with zeros.
-    /// If longer, it is truncated.
+    /// Panics if the key is not exactly 32 bytes. Use `from_secret` for
+    /// arbitrary-length passphrases (it hashes them to 32 bytes via SHA-256).
     pub fn new(key: &[u8]) -> Self {
-        let mut key_bytes = [0u8; 32];
-        let len = key.len().min(32);
-        key_bytes[..len].copy_from_slice(&key[..len]);
+        assert!(
+            key.len() == 32,
+            "AES-256-GCM key must be exactly 32 bytes, got {}",
+            key.len()
+        );
         let cipher =
-            Aes256Gcm::new_from_slice(&key_bytes).expect("AES-256-GCM key must be 32 bytes");
+            Aes256Gcm::new_from_slice(key).expect("AES-256-GCM key must be 32 bytes");
         Self { cipher }
     }
 

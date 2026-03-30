@@ -117,7 +117,10 @@ impl WhatsAppNode {
             }
         });
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .build()
+            .map_err(|e| crate::error::Z8Error::Internal(format!("HTTP client error: {}", e)))?;
 
         match client
             .post(&url)
@@ -221,7 +224,10 @@ impl WhatsAppNode {
             }
         });
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .build()
+            .map_err(|e| crate::error::Z8Error::Internal(format!("HTTP client error: {}", e)))?;
 
         match client
             .post(&url)
@@ -322,7 +328,10 @@ impl WhatsAppNode {
             }
         });
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .https_only(true)
+            .build()
+            .map_err(|e| crate::error::Z8Error::Internal(format!("HTTP client error: {}", e)))?;
 
         match client
             .post(&url)

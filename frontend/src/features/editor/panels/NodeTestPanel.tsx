@@ -370,13 +370,15 @@ const MOCK_EVALUATORS: Record<
       return cur;
     };
 
-    // Dot-notation set
+    // Dot-notation set (guards against prototype pollution)
+    const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
     const setPath = (
       obj: Record<string, unknown>,
       path: string,
       val: unknown,
     ) => {
       const parts = path.split(".");
+      if (parts.some((p) => UNSAFE_KEYS.has(p))) return;
       let cur = obj;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i] as string;

@@ -268,10 +268,7 @@ impl SttNode {
         language: &str,
         timeout: std::time::Duration,
     ) -> Result<serde_json::Value, String> {
-        let url = format!(
-            "https://speech.googleapis.com/v1/speech:recognize?key={}",
-            self.api_key
-        );
+        let url = "https://speech.googleapis.com/v1/speech:recognize";
 
         // Encode audio as base64
         let audio_base64 = base64_encode(audio_data);
@@ -288,8 +285,9 @@ impl SttNode {
         });
 
         let resp = client
-            .post(&url)
+            .post(url)
             .header("Content-Type", "application/json")
+            .header("X-Goog-Api-Key", &self.api_key)
             .timeout(timeout)
             .json(&body)
             .send()
