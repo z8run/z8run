@@ -72,7 +72,7 @@ regex = "1"
 
 # Crypto
 aes-gcm = "0.10"
-rand = "0.8"
+rand = "0.9"
 
 # Identifiers
 uuid = { version = "1.22", features = ["v4", "v5", "v7", "serde"] }
