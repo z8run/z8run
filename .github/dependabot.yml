@@ -1,21 +1,44 @@
 version: 2
 updates:
-  # Rust / Cargo dependencies
+  # ── Rust / Cargo ────────────────────────────────────────
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+      day: "monday"
+    open-pull-requests-limit: 5
+    # Group patch+minor into a single PR to reduce noise
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+    # Only auto-PR for patch and minor — major needs manual work
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
 
-  # npm / frontend dependencies
+  # ── npm / Frontend ─────────────────────────────────────
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 10
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: "chore(deps)"
 
-  # GitHub Actions
+  # ── GitHub Actions ─────────────────────────────────────
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci(deps)"
