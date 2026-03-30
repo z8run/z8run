@@ -4,11 +4,11 @@ import {
   detectLanguage,
 } from "@/components/ui/CodeEditor";
 import { VaultCredentialField } from "@/components/ui/VaultCredentialField";
+import { type FieldDescriptor, lookupField } from "@/lib/fieldRegistry";
 import { useFlowStore } from "@/stores/flowStore";
 import { useUIStore } from "@/stores/uiStore";
 import type { NodeStatus, Z8NodeData } from "@/types/flow";
 import { CATEGORY_COLORS, PORT_COLORS } from "@/types/flow";
-import { lookupField, type FieldDescriptor } from "@/lib/fieldRegistry";
 import {
   AlertCircle,
   CheckCircle2,
@@ -127,7 +127,9 @@ function renderRegistryField(
             step={desc.step}
           />
           {desc.unit && (
-            <span className="text-[10px] text-slate-500 shrink-0">{desc.unit}</span>
+            <span className="text-[10px] text-slate-500 shrink-0">
+              {desc.unit}
+            </span>
           )}
         </div>
       );
@@ -178,8 +180,6 @@ function renderRegistryField(
           suggestedKeyName={desc.suggestedKeyName}
         />
       );
-
-    case "text":
     default: {
       const inner = (
         <input
@@ -226,11 +226,21 @@ function SmartConfigField({
   // ── Registry-driven rendering (handles ~60% of simple fields) ──
   // Skip fields that need complex custom logic
   const COMPLEX_FIELDS = new Set([
-    "code", "provider", "model", "apiKey", "baseUrl", "systemPrompt",
-    "temperature", "maxTokens", "vision",
-    "tools", "schema",
-    "mappings", "patterns",
-    "value", "authToken",
+    "code",
+    "provider",
+    "model",
+    "apiKey",
+    "baseUrl",
+    "systemPrompt",
+    "temperature",
+    "maxTokens",
+    "vision",
+    "tools",
+    "schema",
+    "mappings",
+    "patterns",
+    "value",
+    "authToken",
     "voice",
     "statusCode",
   ]);
@@ -244,7 +254,7 @@ function SmartConfigField({
           ...desc,
           suggestedKeyName: desc.suggestedKeyName.replace(
             "{provider}",
-            String(allConfig?.provider ?? nodeType)
+            String(allConfig?.provider ?? nodeType),
           ),
         };
         return renderRegistryField(resolvedDesc, value, onChange);

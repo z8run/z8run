@@ -4,7 +4,7 @@
  */
 export async function extractErrorMessage(
   err: unknown,
-  fallback = "Something went wrong"
+  fallback = "Something went wrong",
 ): Promise<string> {
   // ky / fetch-style errors with a Response body
   const resErr = err as { response?: Response };

@@ -1,7 +1,7 @@
 import { vaultApi } from "@/api/vault";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { generateRandomSecret } from "@/lib/crypto";
 import { useAuthStore } from "@/stores/authStore";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   AlertTriangle,
   Copy,

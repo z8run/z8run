@@ -12,7 +12,15 @@ export interface SelectOption {
 }
 
 export interface FieldDescriptor {
-  type: "text" | "number" | "number-unit" | "select" | "textarea" | "checkbox" | "vault" | "code-editor";
+  type:
+    | "text"
+    | "number"
+    | "number-unit"
+    | "select"
+    | "textarea"
+    | "checkbox"
+    | "vault"
+    | "code-editor";
   /** Placeholder text */
   placeholder?: string;
   /** Default value if not set */
@@ -43,7 +51,12 @@ export interface FieldDescriptor {
 // ─── Shared option sets ──────────────────────────────────────────
 
 export const HTTP_METHODS: SelectOption[] = [
-  "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD",
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
 ].map((m) => ({ value: m, label: m }));
 
 export const HTTP_METHODS_WITH_ANY: SelectOption[] = [
@@ -82,22 +95,22 @@ type FieldKey = string; // "fieldKey" or "nodeType:fieldKey"
  */
 export const FIELD_REGISTRY: Record<FieldKey, FieldDescriptor> = {
   // ─── Global fields (any node type) ─────────────────────────────
-  "method": {
+  method: {
     type: "select",
     options: HTTP_METHODS,
     defaultValue: "GET",
   },
-  "statusCode": {
+  statusCode: {
     type: "select",
     options: HTTP_STATUS_CODES,
     defaultValue: 200,
   },
-  "url": {
+  url: {
     type: "text",
     placeholder: "https://api.example.com/endpoint",
     mono: true,
   },
-  "timeout": {
+  timeout: {
     type: "number-unit",
     defaultValue: 5000,
     min: 100,
@@ -259,13 +272,13 @@ export const FIELD_REGISTRY: Record<FieldKey, FieldDescriptor> = {
     type: "text",
     placeholder: '{"score": ".age * 2"}',
     mono: true,
-    hint: "Transform for Pass output. Use \".field\" refs + math operators",
+    hint: 'Transform for Pass output. Use ".field" refs + math operators',
   },
   "filter:rejectExpression": {
     type: "text",
     placeholder: '{"reason": "rejected"}',
     mono: true,
-    hint: "Transform for Reject output. Use \".field\" refs + math operators",
+    hint: 'Transform for Reject output. Use ".field" refs + math operators',
   },
 
   // ─── Text Splitter ─────────────────────────────────────────────
@@ -371,7 +384,8 @@ export const FIELD_REGISTRY: Record<FieldKey, FieldDescriptor> = {
   "ai-agent:tools": {
     type: "code-editor",
     language: "json",
-    placeholder: '[{"name":"search","description":"Search the web","parameters":{...}}]',
+    placeholder:
+      '[{"name":"search","description":"Search the web","parameters":{...}}]',
   },
   "ai-agent:maxIterations": {
     type: "number",
@@ -481,14 +495,14 @@ export const FIELD_REGISTRY: Record<FieldKey, FieldDescriptor> = {
   },
 
   // ─── Temperature/MaxTokens (shared across AI nodes) ────────────
-  "temperature": {
+  temperature: {
     type: "number",
     defaultValue: 0.7,
     min: 0,
     max: 2,
     step: 0.1,
   },
-  "maxTokens": {
+  maxTokens: {
     type: "number",
     defaultValue: 1024,
     min: 1,
@@ -826,7 +840,7 @@ export const FIELD_REGISTRY: Record<FieldKey, FieldDescriptor> = {
  */
 export function lookupField(
   nodeType: string,
-  fieldKey: string
+  fieldKey: string,
 ): FieldDescriptor | undefined {
   return FIELD_REGISTRY[`${nodeType}:${fieldKey}`] ?? FIELD_REGISTRY[fieldKey];
 }
