@@ -1,12 +1,14 @@
 [package]
 name = "z8run-cli"
-description = "Main CLI for z8run: serve, migrate, plugin install, etc."
+description = "CLI for z8run — visual flow engine for workflow automation, AI pipelines, and IoT. Install with: cargo install z8run-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+keywords = ["cli", "automation", "workflow", "flow-engine", "self-hosted"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "z8run"

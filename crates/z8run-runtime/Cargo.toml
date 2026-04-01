@@ -1,12 +1,14 @@
 [package]
 name = "z8run-runtime"
-description = "WASM runtime for z8run nodes/plugins (wasmtime)"
+description = "Sandboxed WebAssembly plugin runtime for z8run — extend flows with custom WASM nodes"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+keywords = ["wasm", "wasmtime", "plugin", "sandbox", "runtime"]
+categories = ["wasm", "development-tools"]
 
 [dependencies]
 z8run-core = { workspace = true }

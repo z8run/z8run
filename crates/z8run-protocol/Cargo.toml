@@ -1,12 +1,14 @@
 [package]
 name = "z8run-protocol"
-description = "Binary protocol for z8run frontend-backend communication"
+description = "Compact binary WebSocket protocol for real-time z8run editor-engine communication"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
+keywords = ["websocket", "binary-protocol", "real-time", "flow-engine", "bincode"]
+categories = ["network-programming", "encoding"]
 
 [dependencies]
 z8run-core = { workspace = true }
