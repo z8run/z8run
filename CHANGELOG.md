@@ -8,31 +8,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ## [Unreleased]
 
+---
+
+## [0.2.0] — 2026-04-01
+
 ### Added
-- Plugin install/remove via CLI (`z8run plugin install`, `z8run plugin remove`)
-- `Z8_JWT_SECRET` environment variable for secure JWT signing (required for PostgreSQL/MySQL)
-- GHCR-based CI/CD pipeline (`deploy.yml`) — builds in GitHub Actions, pushes to `ghcr.io/z8run`
-- Release workflow (`release.yml`) — Docker images, cross-compiled binaries, crates.io publish, GitHub Release on tag
-- `docker-compose.build.yml` for local Docker builds
-- Domain separation: `z8run.org` (landing page) + `app.z8run.org` (application)
-- Landing page at `deploy/landing/index.html`
-- Public `/api/v1/health` and `/api/v1/info` endpoints (no auth required)
+- Per-crate README.md files with documentation for crates.io
+- Crate metadata: keywords, categories, homepage, repository for all 6 crates
+- PR template, feature request template, and CODEOWNERS
+- `.editorconfig` and `.node-version` for cross-editor consistency
+- Docker targets in Makefile (`docker-build`, `docker-up`, `docker-down`, `setup`)
+- Demo GIF in README with comparison table vs Node-RED and n8n
+- Ko-fi sponsorship, GitHub Discussions welcome post
+- `LICENSE` root file (MIT full text) for GitHub license detection
 
 ### Fixed
-- JWT secret was hardcoded as `"z8run-dev-secret"` — now reads from `Z8_JWT_SECRET` env var
-- Plugin install and remove were stubs with TODO — now fully implemented
-- Docker health check pointed to auth-protected endpoint — now uses `/api/v1/health`
-- Dockerfile cargo cache not invalidated on source changes — added `find ... -exec touch`
+- All CodeQL security alerts: HTTPS-only clients, API keys in headers, prototype pollution guard
+- Security patches: `aws-lc-sys` 0.39.1, `rustls-webpki` 0.103.10
+- Biome lint/format errors across frontend
+- `rust-version` MSRV corrected from 1.75 to 1.91
+- All `pnpm` references changed to `npm`
+- Node.js updated from 20 to 22 LTS
+- Docker image `unknown/unknown` platform fixed with `provenance: false`
+- jscpd threshold raised from 5% to 15%
 
 ### Changed
-- Docker images moved from Docker Hub to GitHub Container Registry (GHCR)
-- CI/CD no longer compiles on the server — images are pre-built in GitHub Actions
-- Rust version bumped to 1.91 (required by wasmtime)
-- README badges updated to reflect GHCR, crates.io, issues, and contributors
+- Dependabot: groups patches/minor, ignores major versions, weekly on Monday
+- Deploy workflow: concurrency, environment protection, SSH cleanup, scoped image pruning
+- GitHub Actions updated to latest versions (setup-node v6, cache v5, etc.)
+- CI and Code Quality run only on PRs, not push to main
+- Branch protection: required checks, code owner reviews
+- crates.io publish: version check, skip-if-published, 3 retries
+- Repo topics optimized for discoverability (20 topics)
+
+### Removed
+- Redundant `LICENSE-MIT` (MIT text now in `LICENSE`)
+- Manual SHA-256 implementation (replaced by `sha2` crate)
+- 26 stale Dependabot PRs (merged safe ones, closed breaking ones)
 
 ---
 
-## [0.1.0] — 2025-03-06
+## [0.1.0] — 2026-03-06
 
 Initial release of z8run.
 
@@ -78,5 +94,6 @@ Initial release of z8run.
 
 ---
 
-[Unreleased]: https://github.com/z8run/z8run/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/z8run/z8run/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/z8run/z8run/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/z8run/z8run/releases/tag/v0.1.0

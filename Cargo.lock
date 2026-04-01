@@ -5190,7 +5190,7 @@ dependencies = [
 
 [[package]]
 name = "z8run-api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "argon2",
@@ -5220,7 +5220,7 @@ dependencies = [
 
 [[package]]
 name = "z8run-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -5241,7 +5241,7 @@ dependencies = [
 
 [[package]]
 name = "z8run-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5266,7 +5266,7 @@ dependencies = [
 
 [[package]]
 name = "z8run-protocol"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bincode",
  "chrono",
@@ -5280,7 +5280,7 @@ dependencies = [
 
 [[package]]
 name = "z8run-runtime"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5297,14 +5297,14 @@ dependencies = [
 
 [[package]]
 name = "z8run-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rust-embed",
 ]
 
 [[package]]
 name = "z8run-storage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
