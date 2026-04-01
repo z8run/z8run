@@ -132,7 +132,7 @@ jobs:
           for crate in z8run-core z8run-protocol z8run-storage z8run-runtime z8run-api z8run-cli; do
             echo "Publishing $crate..."
             cargo publish -p $crate 2>&1 || echo "⚠ $crate may already be published, continuing..."
-            sleep 20
+            sleep 60
           done
 
   # ── Create GitHub Release ──────────────────────────────

@@ -4,6 +4,9 @@ description = "Main CLI for z8run: serve, migrate, plugin install, etc."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
 
 [[bin]]
 name = "z8run"

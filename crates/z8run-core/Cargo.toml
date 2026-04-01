@@ -4,6 +4,9 @@ description = "Flow engine, scheduler, executor and data model for z8run"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
 
 [dependencies]
 tokio = { workspace = true }

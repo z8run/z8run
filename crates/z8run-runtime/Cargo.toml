@@ -4,6 +4,9 @@ description = "WASM runtime for z8run nodes/plugins (wasmtime)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
 
 [dependencies]
 z8run-core = { workspace = true }

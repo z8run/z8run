@@ -4,6 +4,9 @@ description = "HTTP/WebSocket server for z8run (Axum)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
 
 [dependencies]
 z8run-core = { workspace = true }
