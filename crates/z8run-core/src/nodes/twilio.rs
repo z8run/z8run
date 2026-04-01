@@ -117,6 +117,10 @@ impl TwilioNode {
             self.account_sid
         );
 
+        if !url.starts_with("https://") {
+            return Ok(error_output(&msg, "URL must use HTTPS"));
+        }
+
         let client = reqwest::Client::builder()
             .https_only(true)
             .build()
@@ -216,6 +220,10 @@ impl TwilioNode {
             self.account_sid
         );
 
+        if !url.starts_with("https://") {
+            return Ok(error_output(&msg, "URL must use HTTPS"));
+        }
+
         let client = reqwest::Client::builder()
             .https_only(true)
             .build()
@@ -305,6 +313,10 @@ impl TwilioNode {
         );
 
         let url = format!("https://lookups.twilio.com/v1/PhoneNumbers/{}", number);
+
+        if !url.starts_with("https://") {
+            return Ok(error_output(&msg, "URL must use HTTPS"));
+        }
 
         let client = reqwest::Client::builder()
             .https_only(true)

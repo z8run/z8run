@@ -117,6 +117,10 @@ impl WhatsAppNode {
             }
         });
 
+        if !url.starts_with("https://") {
+            return Ok(error_output(&msg, "URL must use HTTPS"));
+        }
+
         let client = reqwest::Client::builder()
             .https_only(true)
             .build()
@@ -224,6 +228,10 @@ impl WhatsAppNode {
             }
         });
 
+        if !url.starts_with("https://") {
+            return Ok(error_output(&msg, "URL must use HTTPS"));
+        }
+
         let client = reqwest::Client::builder()
             .https_only(true)
             .build()
@@ -327,6 +335,10 @@ impl WhatsAppNode {
                 "link": media_url
             }
         });
+
+        if !url.starts_with("https://") {
+            return Ok(error_output(&msg, "URL must use HTTPS"));
+        }
 
         let client = reqwest::Client::builder()
             .https_only(true)

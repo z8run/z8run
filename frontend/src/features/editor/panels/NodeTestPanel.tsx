@@ -372,22 +372,26 @@ const MOCK_EVALUATORS: Record<
 
     // Dot-notation set (guards against prototype pollution)
     const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+    const isSafeKey = (k: string) => !UNSAFE_KEYS.has(k);
     const setPath = (
       obj: Record<string, unknown>,
       path: string,
       val: unknown,
     ) => {
       const parts = path.split(".");
-      if (parts.some((p) => UNSAFE_KEYS.has(p))) return;
+      if (!parts.every(isSafeKey)) return;
       let cur = obj;
       for (let i = 0; i < parts.length - 1; i++) {
         const p = parts[i] as string;
+        if (!isSafeKey(p)) return;
         if (!(p in cur) || typeof cur[p] !== "object") {
           cur[p] = {};
         }
         cur = cur[p] as Record<string, unknown>;
       }
-      cur[parts[parts.length - 1] as string] = val;
+      const lastKey = parts[parts.length - 1] as string;
+      if (!isSafeKey(lastKey)) return;
+      cur[lastKey] = val;
     };
 
     const output: Record<string, unknown> = passThrough
