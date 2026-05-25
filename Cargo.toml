@@ -40,7 +40,7 @@ axum-extra = { version = "0.12", features = ["typed-header"] }
 tokio-tungstenite = "0.29"
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip"] }
-hyper = { version = "1.8", features = ["full"] }
+hyper = { version = "1.9", features = ["full"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
