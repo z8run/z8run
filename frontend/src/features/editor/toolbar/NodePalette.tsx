@@ -76,6 +76,8 @@ export function NodePalette() {
             className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"
           />
           <input
+            id="node-search"
+            name="node-search"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
