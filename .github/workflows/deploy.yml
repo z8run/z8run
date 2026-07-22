@@ -1,8 +1,11 @@
 name: Deploy z8run
 
 on:
-  push:
-    branches: [main]
+  # Automatic production deploys are DISABLED.
+  # Re-enable by uncommenting the push trigger below.
+  # push:
+  #   branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: deploy-production

@@ -1,8 +1,11 @@
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  # Automatic release/deploy on version tags is DISABLED.
+  # Re-enable by uncommenting the tags trigger below.
+  # push:
+  #   tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
