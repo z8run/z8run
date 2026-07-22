@@ -240,14 +240,20 @@ export function FlowListPage() {
         ) : (
           <div className="grid gap-3">
             {flows.map((flow) => (
-              <button
-                type="button"
+              // Card: a full-cover overlay button handles navigation so the
+              // Export/Delete buttons aren't nested inside another button.
+              <div
                 key={flow.id}
-                onClick={() => navigate(`/flow/${flow.id}`)}
-                className="bg-slate-900 border border-slate-800 hover:border-slate-700
-                  rounded-lg p-4 cursor-pointer transition-colors group text-left w-full"
+                className="relative bg-slate-900 border border-slate-800 hover:border-slate-700
+                  rounded-lg p-4 transition-colors group"
               >
-                <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/flow/${flow.id}`)}
+                  aria-label={`Open flow ${flow.name}`}
+                  className="absolute inset-0 z-0 rounded-lg cursor-pointer"
+                />
+                <div className="relative z-10 pointer-events-none flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-medium text-slate-200 group-hover:text-white">
                       {flow.name}
@@ -268,7 +274,7 @@ export function FlowListPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="pointer-events-auto flex items-center gap-2">
                     <span
                       className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusBadgeClass(
                         flow.status,
@@ -298,7 +304,7 @@ export function FlowListPage() {
                     </button>
                   </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         )}
