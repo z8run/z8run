@@ -4,8 +4,9 @@
 //! and orchestrates concurrent node execution using Tokio.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, Notify, RwLock};
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
@@ -95,12 +96,64 @@ pub trait NodeExecutor: Send + Sync {
     fn node_type(&self) -> &str;
 }
 
+/// Cooperative cancellation handle for a running flow.
+///
+/// Combines an atomic flag (for cheap polling and to cover subscribers that
+/// register after cancellation) with a [`Notify`] (to wake an awaiting driver
+/// immediately when cancellation fires). `tokio-util`'s `CancellationToken` is
+/// not a dependency of this crate, so we implement the equivalent semantics
+/// with the primitives already available in `tokio`.
+#[derive(Clone)]
+struct CancelHandle {
+    flag: Arc<AtomicBool>,
+    notify: Arc<Notify>,
+}
+
+impl CancelHandle {
+    fn new() -> Self {
+        Self {
+            flag: Arc::new(AtomicBool::new(false)),
+            notify: Arc::new(Notify::new()),
+        }
+    }
+
+    /// Requests cancellation and wakes any driver awaiting [`Self::cancelled`].
+    fn cancel(&self) {
+        self.flag.store(true, Ordering::SeqCst);
+        self.notify.notify_waiters();
+    }
+
+    /// Returns whether cancellation has been requested.
+    fn is_cancelled(&self) -> bool {
+        self.flag.load(Ordering::SeqCst)
+    }
+
+    /// Resolves as soon as cancellation has been requested.
+    async fn cancelled(&self) {
+        loop {
+            // Register interest BEFORE checking the flag so a `cancel()` that
+            // races between the check and the await cannot be missed
+            // (`notify_waiters` does not store a permit for future waiters).
+            let notified = self.notify.notified();
+            if self.is_cancelled() {
+                return;
+            }
+            notified.await;
+            if self.is_cancelled() {
+                return;
+            }
+        }
+    }
+}
+
 /// Execution state of an active flow.
 struct ActiveFlow {
     _flow: Flow,
     _plan: ExecutionPlan,
     status: FlowStatus,
     _trace_id: Uuid,
+    /// Handle used by [`FlowEngine::stop`] to cancel the running driver task.
+    cancel: CancelHandle,
 }
 
 /// z8run flow execution engine.
@@ -217,6 +270,10 @@ impl FlowEngine {
             "Execution plan compiled"
         );
 
+        // Cancellation handle shared between the registered flow and the driver
+        // task; `stop()` triggers it to cancel execution (FUNC-004).
+        let cancel = CancelHandle::new();
+
         // Register flow as active
         {
             let mut active = self.active_flows.write().await;
@@ -227,6 +284,7 @@ impl FlowEngine {
                     _plan: plan.clone(),
                     status: FlowStatus::Running,
                     _trace_id: trace_id,
+                    cancel: cancel.clone(),
                 },
             );
         }
@@ -243,30 +301,46 @@ impl FlowEngine {
         tokio::spawn(async move {
             let start = std::time::Instant::now();
 
-            match engine
-                .execute_plan(&flow_clone, &plan, trace_id, trigger_msg.as_ref())
-                .await
-            {
-                Ok(()) => {
-                    let duration_ms = start.elapsed().as_millis() as u64;
-                    info!(duration_ms, "Flow completed successfully");
-                    let _ = engine.event_tx.send(EngineEvent::FlowCompleted {
-                        flow_id,
-                        trace_id,
-                        duration_ms,
-                    });
-                    engine.set_flow_status(flow_id, FlowStatus::Completed).await;
-                }
-                Err(e) => {
-                    error!(error = %e, "Flow failed");
-                    let _ = engine.event_tx.send(EngineEvent::FlowError {
-                        flow_id,
-                        trace_id,
-                        error: e.to_string(),
-                    });
-                    engine.set_flow_status(flow_id, FlowStatus::Error).await;
+            let result = engine
+                .execute_plan(&flow_clone, &plan, trace_id, trigger_msg.as_ref(), &cancel)
+                .await;
+
+            if cancel.is_cancelled() {
+                // The flow was stopped by the user. `stop()` already set the
+                // status to `Stopped`; do NOT override it with Completed/Error
+                // and do NOT emit a terminal completion/error event. The entry
+                // is still removed below (FUNC-005).
+                info!(flow_id = %flow_id, "Flow execution cancelled by stop()");
+            } else {
+                match result {
+                    Ok(()) => {
+                        let duration_ms = start.elapsed().as_millis() as u64;
+                        info!(duration_ms, "Flow completed successfully");
+                        let _ = engine.event_tx.send(EngineEvent::FlowCompleted {
+                            flow_id,
+                            trace_id,
+                            duration_ms,
+                        });
+                        engine.set_flow_status(flow_id, FlowStatus::Completed).await;
+                    }
+                    Err(e) => {
+                        error!(error = %e, "Flow failed");
+                        let _ = engine.event_tx.send(EngineEvent::FlowError {
+                            flow_id,
+                            trace_id,
+                            error: e.to_string(),
+                        });
+                        engine.set_flow_status(flow_id, FlowStatus::Error).await;
+                    }
                 }
             }
+
+            // FUNC-005: the flow has reached a terminal state (completed,
+            // errored, or cancelled) and all terminal events have already been
+            // broadcast. Remove it from the active set so the map does not grow
+            // unbounded and `active_flow_ids()` reports only genuinely-active
+            // flows.
+            engine.remove_flow(flow_id).await;
         });
 
         Ok(trace_id)
@@ -279,6 +353,7 @@ impl FlowEngine {
         plan: &ExecutionPlan,
         trace_id: Uuid,
         trigger_msg: Option<&FlowMessage>,
+        cancel: &CancelHandle,
     ) -> Z8Result<()> {
         // Communication channels between nodes: node_id -> sender
         let mut channels: HashMap<Uuid, mpsc::Sender<FlowMessage>> = HashMap::new();
@@ -301,6 +376,19 @@ impl FlowEngine {
 
         // Execute each step of the plan
         for step in &plan.steps {
+            // FUNC-004: stop scheduling further nodes once cancellation is
+            // requested. Returning early leaves the flow un-completed; the
+            // driver task observes `cancel.is_cancelled()` and keeps the
+            // user-set `Stopped` status.
+            if cancel.is_cancelled() {
+                warn!(
+                    flow_id = %flow.id,
+                    step = step.step,
+                    "Flow cancelled; not scheduling further steps"
+                );
+                return Ok(());
+            }
+
             debug!(
                 step = step.step,
                 nodes = step.node_ids.len(),
@@ -434,12 +522,33 @@ impl FlowEngine {
                 handles.push(handle);
             }
 
-            // Wait for all nodes in the step to complete
-            for handle in handles {
-                match handle.await {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => return Err(e),
-                    Err(e) => {
+            // Wait for all nodes in the step to complete, honoring cancellation.
+            // If `stop()` cancels mid-step, abort the in-flight node tasks so
+            // their external calls / DB queries are not driven any further and
+            // return promptly without scheduling the remaining steps.
+            let mut idx = 0;
+            while idx < handles.len() {
+                let awaited = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => None,
+                    res = &mut handles[idx] => Some(res),
+                };
+                match awaited {
+                    // Cancellation requested: abort every node task in this step
+                    // (including any not yet awaited) and stop driving the flow.
+                    None => {
+                        for h in &handles {
+                            h.abort();
+                        }
+                        warn!(
+                            flow_id = %flow.id,
+                            "Flow cancelled; aborting in-flight node tasks"
+                        );
+                        return Ok(());
+                    }
+                    Some(Ok(Ok(()))) => idx += 1,
+                    Some(Ok(Err(e))) => return Err(e),
+                    Some(Err(e)) => {
                         return Err(Z8Error::Internal(format!("Task panicked: {}", e)));
                     }
                 }
@@ -464,7 +573,18 @@ impl FlowEngine {
     }
 
     /// Stops the execution of a flow.
+    ///
+    /// In addition to marking the flow `Stopped`, this triggers the flow's
+    /// cancellation handle so the running driver task stops scheduling new
+    /// nodes and aborts any in-flight ones (FUNC-004). The driver task then
+    /// removes the flow from the active set (FUNC-005).
     pub async fn stop(&self, flow_id: Uuid) -> Z8Result<()> {
+        // Trigger cancellation while holding only a read lock; `cancel()` just
+        // flips an atomic flag and notifies, so it cannot deadlock against the
+        // driver's removal (which takes a write lock afterwards).
+        if let Some(af) = self.active_flows.read().await.get(&flow_id) {
+            af.cancel.cancel();
+        }
         self.set_flow_status(flow_id, FlowStatus::Stopped).await;
         info!(flow_id = %flow_id, "Flow stopped");
         Ok(())
@@ -490,6 +610,13 @@ impl FlowEngine {
         }
     }
 
+    /// Removes a flow from the active set once it has reached a terminal state
+    /// (FUNC-005). Called by the driver task after all terminal events have
+    /// been emitted.
+    async fn remove_flow(&self, flow_id: Uuid) {
+        self.active_flows.write().await.remove(&flow_id);
+    }
+
     fn clone_refs(&self) -> Self {
         Self {
             active_flows: Arc::clone(&self.active_flows),
@@ -503,5 +630,97 @@ impl FlowEngine {
 impl Default for FlowEngine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node::{Node, PortType};
+    use std::time::Duration;
+
+    /// A trivial single-node flow whose root "debug" node runs to completion.
+    fn trivial_flow() -> Flow {
+        let mut flow = Flow::new("Cleanup Test Flow");
+        let debug = Node::new("Debug", "debug").with_input("input", PortType::Any);
+        flow.add_node(debug);
+        flow
+    }
+
+    /// FUNC-005: once a flow reaches a terminal state it must be removed from
+    /// the active set, so `active_flow_ids()` never reports historical runs.
+    #[tokio::test]
+    async fn completed_flow_is_removed_from_active_set() {
+        let engine = FlowEngine::new();
+        engine
+            .register_node_type(Arc::new(crate::nodes::debug::DebugNodeFactory))
+            .await;
+
+        let flow = trivial_flow();
+        let flow_id = flow.id;
+        let mut events = engine.subscribe_events();
+
+        engine.execute(flow).await.unwrap();
+
+        // Wait until the flow reaches a terminal event.
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                match events.recv().await {
+                    Ok(EngineEvent::FlowCompleted { flow_id: fid, .. })
+                    | Ok(EngineEvent::FlowError { flow_id: fid, .. })
+                        if fid == flow_id =>
+                    {
+                        break
+                    }
+                    _ => continue,
+                }
+            }
+        })
+        .await
+        .expect("flow did not reach a terminal state in time");
+
+        // The terminal event is emitted just before the entry is removed, so
+        // allow the driver task a brief moment to run the removal.
+        let removed = tokio::time::timeout(Duration::from_secs(5), async {
+            while engine.active_flow_ids().await.contains(&flow_id) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await;
+
+        assert!(
+            removed.is_ok(),
+            "completed flow was not removed from active_flows"
+        );
+        assert!(
+            !engine.active_flow_ids().await.contains(&flow_id),
+            "active_flow_ids still reports a completed flow"
+        );
+    }
+
+    /// FUNC-004: the cancellation primitive must wake a driver already awaiting
+    /// `cancelled()`, even when `cancel()` races with the awaiter registering.
+    /// (A deterministic test of the primitive; end-to-end cancellation of an
+    /// in-flight external call is timing-dependent and intentionally not
+    /// asserted here.)
+    #[tokio::test]
+    async fn cancel_handle_wakes_awaiter() {
+        let handle = CancelHandle::new();
+        assert!(!handle.is_cancelled());
+
+        let awaiter = {
+            let h = handle.clone();
+            tokio::spawn(async move { h.cancelled().await })
+        };
+
+        // Give the awaiter a chance to register, then request cancellation.
+        tokio::task::yield_now().await;
+        handle.cancel();
+        assert!(handle.is_cancelled());
+
+        tokio::time::timeout(Duration::from_secs(1), awaiter)
+            .await
+            .expect("cancelled() did not resolve after cancel()")
+            .expect("awaiter task panicked");
     }
 }
