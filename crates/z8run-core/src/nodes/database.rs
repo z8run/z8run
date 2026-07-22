@@ -119,7 +119,7 @@ impl DatabaseNode {
 #[async_trait::async_trait]
 impl NodeExecutor for DatabaseNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
-        debug!(node = %self.name, db_type = %self.db_type, query = %self.query, "Executing database query");
+        debug!(node = %self.name, db_type = %self.db_type, "Executing database query");
 
         let conn_str = self.build_connection_string();
 
@@ -240,8 +240,7 @@ impl DatabaseNode {
             Err(e) => {
                 error!(node = %self.name, error = %e, "PostgreSQL query failed");
                 let err = serde_json::json!({
-                    "error": format!("Query failed: {}", e),
-                    "query": self.query,
+                    "error": "Database query failed",
                 });
                 let out = msg.derive(msg.source_node, "error", err);
                 pool.close().await;
@@ -294,8 +293,7 @@ impl DatabaseNode {
             Err(e) => {
                 error!(node = %self.name, error = %e, "MySQL query failed");
                 let err = serde_json::json!({
-                    "error": format!("Query failed: {}", e),
-                    "query": self.query,
+                    "error": "Database query failed",
                 });
                 let out = msg.derive(msg.source_node, "error", err);
                 pool.close().await;
@@ -331,8 +329,7 @@ impl DatabaseNode {
             Err(e) => {
                 error!(node = %self.name, error = %e, "SQLite connection failed");
                 let err = serde_json::json!({
-                    "error": format!("SQLite connection failed: {}", e),
-                    "connection": conn_str,
+                    "error": "SQLite connection failed",
                 });
                 let out = msg.derive(msg.source_node, "error", err);
                 return Ok(vec![out]);
@@ -350,8 +347,7 @@ impl DatabaseNode {
             Err(e) => {
                 error!(node = %self.name, error = %e, "SQLite query failed");
                 let err = serde_json::json!({
-                    "error": format!("Query failed: {}", e),
-                    "query": self.query,
+                    "error": "Database query failed",
                 });
                 let out = msg.derive(msg.source_node, "error", err);
                 pool.close().await;

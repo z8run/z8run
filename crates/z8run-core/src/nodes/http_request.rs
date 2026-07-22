@@ -32,6 +32,31 @@ fn resolve_template(template: &str, data: &serde_json::Value) -> String {
     .to_string()
 }
 
+/// Returns a log-safe version of a URL for server-side logging: keeps only
+/// scheme + host + path, dropping the query string, fragment, and any
+/// `user:pass@` userinfo so tokens/credentials/PII don't leak into logs.
+fn sanitize_url(url: &str) -> String {
+    let without_query = url.split(['?', '#']).next().unwrap_or(url);
+    match without_query.split_once("://") {
+        Some((scheme, rest)) => {
+            let (authority, path) = match rest.split_once('/') {
+                Some((a, p)) => (a, Some(p)),
+                None => (rest, None),
+            };
+            // Strip `user:pass@` userinfo from the authority component.
+            let host = authority
+                .rsplit_once('@')
+                .map(|(_, h)| h)
+                .unwrap_or(authority);
+            match path {
+                Some(p) => format!("{scheme}://{host}/{p}"),
+                None => format!("{scheme}://{host}"),
+            }
+        }
+        None => without_query.to_string(),
+    }
+}
+
 pub struct HttpRequestNode {
     name: String,
     url: String,
@@ -50,7 +75,7 @@ impl NodeExecutor for HttpRequestNode {
         info!(
             node = %self.name,
             method = %self.method,
-            url = %resolved_url,
+            url = %sanitize_url(&resolved_url),
             "HTTP Request outbound"
         );
 
@@ -115,7 +140,7 @@ impl NodeExecutor for HttpRequestNode {
                 info!(
                     node = %self.name,
                     status = status,
-                    url = %resolved_url,
+                    url = %sanitize_url(&resolved_url),
                     "HTTP Request completed"
                 );
 
@@ -133,7 +158,7 @@ impl NodeExecutor for HttpRequestNode {
                 warn!(
                     node = %self.name,
                     error = %e,
-                    url = %resolved_url,
+                    url = %sanitize_url(&resolved_url),
                     "HTTP Request failed"
                 );
 
@@ -213,5 +238,23 @@ mod tests {
         let url = "https://api.example.com/static";
         let resolved = resolve_template(url, &data);
         assert_eq!(resolved, "https://api.example.com/static");
+    }
+
+    #[test]
+    fn test_sanitize_url_drops_query() {
+        let url = "https://api.example.com/users/42?token=secret&city=London";
+        assert_eq!(sanitize_url(url), "https://api.example.com/users/42");
+    }
+
+    #[test]
+    fn test_sanitize_url_drops_userinfo() {
+        let url = "https://user:pass@api.example.com/path?x=1";
+        assert_eq!(sanitize_url(url), "https://api.example.com/path");
+    }
+
+    #[test]
+    fn test_sanitize_url_no_path_or_query() {
+        let url = "https://api.example.com";
+        assert_eq!(sanitize_url(url), "https://api.example.com");
     }
 }

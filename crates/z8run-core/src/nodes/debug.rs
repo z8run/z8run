@@ -16,10 +16,13 @@ pub struct DebugNode {
 impl NodeExecutor for DebugNode {
     async fn process(&self, msg: FlowMessage) -> Z8Result<Vec<FlowMessage>> {
         if self.log_payload {
+            // Avoid writing the full payload into server logs; a size marker is
+            // enough for debugging without leaking PII/secrets. The full payload
+            // is still forwarded to the debug panel via the functional output below.
             info!(
                 node = %self.name,
                 source = %msg.source_node,
-                payload = %msg.payload,
+                payload_bytes = msg.payload.to_string().len(),
                 "[DEBUG] {}",
                 self.name
             );

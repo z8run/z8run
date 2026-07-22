@@ -53,7 +53,7 @@ impl NodeExecutor for HttpOutNode {
             node = %self.name,
             status = self.status_code,
             trace_id = %msg.trace_id,
-            payload = %msg.payload,
+            payload_bytes = msg.payload.to_string().len(),
             "HTTP Out response"
         );
 
