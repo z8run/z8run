@@ -6,10 +6,10 @@ WASM plugin runtime for [z8run](https://github.com/z8run/z8run), built on [wasmt
 
 `z8run-runtime` allows extending z8run with custom nodes compiled to WebAssembly. It provides:
 
-- **Sandboxed execution** — memory limits, fuel metering, and controlled capabilities
-- **Plugin registry** — discover, install, remove, and scan WASM plugins
-- **Manifest system** — TOML-based plugin metadata (ports, capabilities, author)
-- **NodeExecutor bridge** — WASM modules implement the same interface as built-in nodes
+- **Sandboxed execution** - memory limits, fuel metering, and controlled capabilities
+- **Plugin registry** - discover, install, remove, and scan WASM plugins
+- **Manifest system** - TOML-based plugin metadata (ports, capabilities, author)
+- **NodeExecutor bridge** - WASM modules implement the same interface as built-in nodes
 
 ## Plugin structure
 

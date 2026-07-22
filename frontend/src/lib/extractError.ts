@@ -16,7 +16,7 @@ export async function extractErrorMessage(
         (body as { message?: string })?.message;
       if (msg) return msg;
     } catch {
-      // response isn't JSON — fall through
+      // response isn't JSON - fall through
     }
   }
   if (err instanceof Error) return err.message;

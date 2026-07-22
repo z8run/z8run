@@ -1,6 +1,6 @@
 [package]
 name = "z8run-runtime"
-description = "Sandboxed WebAssembly plugin runtime for z8run — extend flows with custom WASM nodes"
+description = "Sandboxed WebAssembly plugin runtime for z8run - extend flows with custom WASM nodes"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ---
 
-## [0.2.0] — 2026-04-01
+## [0.2.0] - 2026-04-01
 
 ### Added
 - Per-crate README.md files with documentation for crates.io
@@ -48,7 +48,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/) and this 
 
 ---
 
-## [0.1.0] — 2026-03-06
+## [0.1.0] - 2026-03-06
 
 Initial release of z8run.
 

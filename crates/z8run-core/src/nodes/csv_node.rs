@@ -188,7 +188,7 @@ impl CsvNode {
         } else if let Some(obj) = items.first().and_then(|v| v.as_object()) {
             obj.keys().cloned().collect()
         } else {
-            // Array of arrays — no headers
+            // Array of arrays - no headers
             for item in &items {
                 if let Some(arr) = item.as_array() {
                     let record: Vec<String> = arr.iter().map(value_to_csv_field).collect();

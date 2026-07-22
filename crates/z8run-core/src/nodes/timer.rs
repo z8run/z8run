@@ -1,6 +1,6 @@
 //! Timer node: triggers flow execution on a configurable interval.
 //!
-//! This is an input node — it generates messages rather than processing them.
+//! This is an input node - it generates messages rather than processing them.
 //! When the flow engine processes it, the timer emits a tick message with
 //! the current timestamp and tick count.
 //!

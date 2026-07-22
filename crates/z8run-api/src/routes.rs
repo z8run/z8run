@@ -162,7 +162,7 @@ async fn create_flow(
     })))
 }
 
-/// PUT /api/v1/flows/:id — Update flow with canvas state (nodes, edges, metadata)
+/// PUT /api/v1/flows/:id - Update flow with canvas state (nodes, edges, metadata)
 async fn update_flow(
     State(state): State<Arc<AppState>>,
     axum::Extension(claims): axum::Extension<Claims>,
@@ -324,9 +324,9 @@ async fn start_flow(
         .collect();
 
     if has_input_nodes {
-        // Flow has input nodes (http-in, webhook, etc.) — don't execute now.
+        // Flow has input nodes (http-in, webhook, etc.) - don't execute now.
         // Just register the hook routes and wait for incoming requests.
-        info!(flow_id = %id, "Flow deployed — waiting for hook triggers");
+        info!(flow_id = %id, "Flow deployed - waiting for hook triggers");
         Ok(Json(serde_json::json!({
             "flow_id": id.to_string(),
             "status": "deployed",
@@ -334,7 +334,7 @@ async fn start_flow(
             "routes": registered_routes,
         })))
     } else {
-        // No input nodes — execute immediately (manual/cron flow).
+        // No input nodes - execute immediately (manual/cron flow).
         let trace_id = state
             .engine
             .execute(exec_flow)
@@ -351,7 +351,7 @@ async fn start_flow(
 
 /// Scans canvas_nodes for http-in nodes and returns their hook URLs.
 /// Each flow gets its own namespace: /hook/{flow_id}/{path}
-/// No conflict detection needed — namespaces prevent collisions.
+/// No conflict detection needed - namespaces prevent collisions.
 fn register_hook_routes(stored: &Flow, flow_id: Uuid) -> Vec<serde_json::Value> {
     let mut registered = Vec::new();
 
@@ -432,7 +432,7 @@ async fn resolve_vault_refs(
             }
             serde_json::Value::Array(resolved)
         }
-        // Numbers, bools, null — pass through
+        // Numbers, bools, null - pass through
         other => other,
     }
 }
@@ -640,7 +640,7 @@ async fn stop_flow(
 ///
 /// Unified hook handler for all input node types (http-in, webhook, etc.).
 /// Each flow gets its own namespace under /hook/{flow_id}, preventing
-/// route collisions between flows — ready for multi-tenant SaaS.
+/// route collisions between flows - ready for multi-tenant SaaS.
 ///
 /// Examples:
 ///   POST /hook/{flow_id}              → triggers the flow (root path)
@@ -946,7 +946,7 @@ async fn await_flow_response(
     }
 }
 
-/// GET /api/v1/flows/:id/export — Export a flow as a portable JSON document.
+/// GET /api/v1/flows/:id/export - Export a flow as a portable JSON document.
 ///
 /// The exported JSON includes flow metadata and the full canvas state
 /// (nodes, edges, viewport) but strips internal fields like user_id
@@ -998,7 +998,7 @@ async fn export_flow(
     Ok(Json(export))
 }
 
-/// POST /api/v1/flows/import — Import a flow from an exported JSON document.
+/// POST /api/v1/flows/import - Import a flow from an exported JSON document.
 ///
 /// Creates a brand-new flow (new UUID) owned by the authenticated user,
 /// populated with the canvas state from the export.
@@ -1018,7 +1018,7 @@ async fn import_flow(
     let description = flow_data["description"].as_str().unwrap_or("");
     let version = flow_data["version"].as_str().unwrap_or("0.1.0");
 
-    // Validate node types — reject unknown nodes before creating the flow
+    // Validate node types - reject unknown nodes before creating the flow
     const VALID_NODE_TYPES: &[&str] = &[
         "http-in",
         "http-out",

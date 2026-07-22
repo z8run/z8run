@@ -1,5 +1,5 @@
 # ════════════════════════════════════════
-# z8run — Server Configuration
+# z8run - Server Configuration
 # ════════════════════════════════════════
 # Copy this file as z8run.toml and adjust for your environment.
 # Environment variables with Z8_ prefix take priority.

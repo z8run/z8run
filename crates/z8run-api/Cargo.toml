@@ -1,6 +1,6 @@
 [package]
 name = "z8run-api"
-description = "REST API, WebSocket server, JWT auth, and webhook engine for z8run — built on Axum"
+description = "REST API, WebSocket server, JWT auth, and webhook engine for z8run - built on Axum"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -36,7 +36,7 @@ import {
   Zap,
 } from "lucide-react";
 
-/** Centralized icon registry — add new icons here only. */
+/** Centralized icon registry - add new icons here only. */
 export const NODE_ICON_MAP: Record<
   string,
   React.ComponentType<{ size?: number; className?: string }>

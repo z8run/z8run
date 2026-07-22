@@ -7,7 +7,7 @@ interface ConfirmDialogProps {
   title: string;
   /** Subtitle under the title */
   subtitle?: string;
-  /** Main message body — can include JSX */
+  /** Main message body - can include JSX */
   children: React.ReactNode;
   /** Label for the confirm button */
   confirmLabel?: string;

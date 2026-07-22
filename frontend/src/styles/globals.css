@@ -14,7 +14,7 @@
   }
 }
 
-/* React Flow overrides — OUTSIDE @layer so they beat xyflow's styles */
+/* React Flow overrides - OUTSIDE @layer so they beat xyflow's styles */
 .react-flow__background {
   background-color: #0b1120 !important;
 }

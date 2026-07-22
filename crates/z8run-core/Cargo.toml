@@ -1,6 +1,6 @@
 [package]
 name = "z8run-core"
-description = "Flow engine, DAG scheduler, and 35+ built-in nodes for z8run — visual workflow automation"
+description = "Flow engine, DAG scheduler, and 35+ built-in nodes for z8run - visual workflow automation"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

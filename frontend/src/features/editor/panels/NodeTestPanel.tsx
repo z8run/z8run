@@ -191,7 +191,7 @@ const MOCK_EVALUATORS: Record<
         status: 200,
         headers: { "content-type": "application/json" },
         body: { mock: true, url: config.url, method: config.method },
-        _note: "Mock response — real HTTP call requires execution",
+        _note: "Mock response - real HTTP call requires execution",
       },
     };
   },
@@ -238,7 +238,7 @@ const MOCK_EVALUATORS: Record<
         response: `[Mock LLM response for ${config.provider}/${config.model}]`,
         usage: { prompt_tokens: 42, completion_tokens: 18, total_tokens: 60 },
         model: config.model,
-        _note: "Mock — real call requires API key and execution",
+        _note: "Mock - real call requires API key and execution",
       },
     };
   },
@@ -674,7 +674,7 @@ export function NodeTestPanel({ nodeType, config }: NodeTestPanelProps) {
             ...parsed,
             _mock: true,
             _nodeType: nodeType,
-            _note: `No specific mock for "${nodeType}" — showing pass-through`,
+            _note: `No specific mock for "${nodeType}" - showing pass-through`,
           },
         });
       }

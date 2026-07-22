@@ -76,8 +76,8 @@ cp .env.example .env
 ```
 
 Edit `.env` and set at minimum:
-- `Z8_JWT_SECRET` — required for PostgreSQL (generate with `openssl rand -base64 32`)
-- `POSTGRES_PASSWORD` — if using Docker with PostgreSQL
+- `Z8_JWT_SECRET` - required for PostgreSQL (generate with `openssl rand -base64 32`)
+- `POSTGRES_PASSWORD` - if using Docker with PostgreSQL
 
 For local development with SQLite, the defaults work out of the box.
 

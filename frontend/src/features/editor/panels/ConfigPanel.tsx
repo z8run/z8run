@@ -58,15 +58,15 @@ const DB_TYPES = [
 
 /** Common HTTP status codes for dropdown */
 const HTTP_STATUS_CODES = [
-  { value: 200, label: "200 — OK" },
-  { value: 201, label: "201 — Created" },
-  { value: 204, label: "204 — No Content" },
-  { value: 301, label: "301 — Moved" },
-  { value: 400, label: "400 — Bad Request" },
-  { value: 401, label: "401 — Unauthorized" },
-  { value: 403, label: "403 — Forbidden" },
-  { value: 404, label: "404 — Not Found" },
-  { value: 500, label: "500 — Server Error" },
+  { value: 200, label: "200 - OK" },
+  { value: 201, label: "201 - Created" },
+  { value: 204, label: "204 - No Content" },
+  { value: 301, label: "301 - Moved" },
+  { value: 400, label: "400 - Bad Request" },
+  { value: 401, label: "401 - Unauthorized" },
+  { value: 403, label: "403 - Forbidden" },
+  { value: 404, label: "404 - Not Found" },
+  { value: 500, label: "500 - Server Error" },
 ];
 
 const selectClass = `w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5
@@ -549,7 +549,7 @@ function SmartConfigField({
     );
   }
 
-  // Query editor for database — uses CodeEditor with SQL locked in
+  // Query editor for database - uses CodeEditor with SQL locked in
   if (fieldKey === "query" && nodeType === "database") {
     return (
       <CodeEditor
@@ -653,7 +653,7 @@ function SmartConfigField({
     );
   }
 
-  // AI Model dropdown — models grouped by provider
+  // AI Model dropdown - models grouped by provider
   if (fieldKey === "model" && AI_NODE_TYPES.includes(nodeType)) {
     const provider = String(allConfig?.provider ?? "openai");
 
@@ -817,7 +817,7 @@ function SmartConfigField({
     );
   }
 
-  // System Prompt (textarea) — LLM, AI Agent
+  // System Prompt (textarea) - LLM, AI Agent
   if (fieldKey === "systemPrompt" && ["llm", "ai-agent"].includes(nodeType)) {
     return (
       <textarea
@@ -831,7 +831,7 @@ function SmartConfigField({
     );
   }
 
-  // Temperature — LLM, Classifier, AI Agent
+  // Temperature - LLM, Classifier, AI Agent
   if (
     fieldKey === "temperature" &&
     ["llm", "classifier", "ai-agent"].includes(nodeType)
@@ -849,7 +849,7 @@ function SmartConfigField({
     );
   }
 
-  // Max Tokens — LLM, Classifier
+  // Max Tokens - LLM, Classifier
   if (fieldKey === "maxTokens" && ["llm", "classifier"].includes(nodeType)) {
     return (
       <input
@@ -1206,9 +1206,9 @@ function SmartConfigField({
         onChange={(e) => onChange(Number(e.target.value))}
         className={selectClass}
       >
-        <option value={0}>0 — At most once</option>
-        <option value={1}>1 — At least once</option>
-        <option value={2}>2 — Exactly once</option>
+        <option value={0}>0 - At most once</option>
+        <option value={1}>1 - At least once</option>
+        <option value={2}>2 - Exactly once</option>
       </select>
     );
   }
@@ -2614,7 +2614,7 @@ export function ConfigPanel() {
                           try {
                             handleConfigChange(key, JSON.parse(e.target.value));
                           } catch {
-                            // Don't update if invalid JSON — user is still typing
+                            // Don't update if invalid JSON - user is still typing
                           }
                         }}
                         rows={4}

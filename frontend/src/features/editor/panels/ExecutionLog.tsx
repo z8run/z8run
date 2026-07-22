@@ -98,7 +98,7 @@ const EVENT_CONFIG: Record<string, EventDisplay> = {
       const info = e.node_id ? resolve(e.node_id) : undefined;
       const dur =
         e.duration_us != null
-          ? ` — ${(e.duration_us / 1000).toFixed(1)}ms`
+          ? ` - ${(e.duration_us / 1000).toFixed(1)}ms`
           : "";
       return info
         ? `"${info.label}" completed${dur}`
@@ -163,7 +163,7 @@ const DEFAULT_EVENT: EventDisplay = {
   detail: (e) => e.type,
 };
 
-/** A single log row — expandable if it has payload data. */
+/** A single log row - expandable if it has payload data. */
 function LogEntry({
   entry,
   resolve,

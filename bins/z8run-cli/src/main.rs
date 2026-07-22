@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use tracing_subscriber::EnvFilter;
 
-/// z8run — Next Generation Visual Flow Engine
+/// z8run - Next Generation Visual Flow Engine
 #[derive(Parser)]
 #[command(name = "z8run", version, about, long_about = None)]
 struct Cli {
@@ -173,7 +173,7 @@ async fn cmd_serve(
                 .map(|_| format!("{:02x}", rand::random::<u8>()))
                 .collect();
             tracing::warn!(
-                "No Z8_JWT_SECRET set — generated ephemeral secret (tokens won't survive restarts)"
+                "No Z8_JWT_SECRET set - generated ephemeral secret (tokens won't survive restarts)"
             );
             dev_secret
         }

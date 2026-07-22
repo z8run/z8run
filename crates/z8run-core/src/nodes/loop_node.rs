@@ -54,7 +54,7 @@ impl NodeExecutor for LoopNode {
                     field = %self.field,
                     "Field not found, passing through empty"
                 );
-                // No items — emit nothing on "item" port, signal done
+                // No items - emit nothing on "item" port, signal done
                 let done = msg.derive(
                     msg.source_node,
                     "done",

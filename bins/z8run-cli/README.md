@@ -49,8 +49,8 @@ z8run info                             # Show version and system info
 | `Z8_DATA_DIR` | `./data` | Data directory (database, plugins) |
 | `Z8_DB_URL` | SQLite auto | Database URL (`sqlite://` or `postgres://`) |
 | `Z8_LOG_LEVEL` | `info` | Log level (trace, debug, info, warn, error) |
-| `Z8_JWT_SECRET` | — | JWT signing secret (**required** for PostgreSQL) |
-| `Z8_VAULT_SECRET` | — | Encryption key for the credential vault |
+| `Z8_JWT_SECRET` | - | JWT signing secret (**required** for PostgreSQL) |
+| `Z8_VAULT_SECRET` | - | Encryption key for the credential vault |
 
 ## Quick start
 

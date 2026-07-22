@@ -27,7 +27,7 @@ impl NodeExecutor for DebugNode {
             info!(
                 node = %self.name,
                 source = %msg.source_node,
-                "[DEBUG] {} — message received",
+                "[DEBUG] {} - message received",
                 self.name
             );
         }

@@ -6,11 +6,11 @@ Dual SQLite/PostgreSQL persistence layer for [z8run](https://github.com/z8run/z8
 
 `z8run-storage` provides trait-based abstractions for persistence, making the database backend interchangeable:
 
-- **Flow storage** — save, load, list, search, delete flows (with multi-user support)
-- **User storage** — user accounts with email/username lookups
-- **Execution history** — record flow execution start/completion times
-- **Credential vault** — AES-256-GCM encrypted storage for API keys and secrets
-- **Automatic migrations** — schema setup for both SQLite and PostgreSQL
+- **Flow storage** - save, load, list, search, delete flows (with multi-user support)
+- **User storage** - user accounts with email/username lookups
+- **Execution history** - record flow execution start/completion times
+- **Credential vault** - AES-256-GCM encrypted storage for API keys and secrets
+- **Automatic migrations** - schema setup for both SQLite and PostgreSQL
 
 ## Architecture
 
@@ -35,7 +35,7 @@ CredentialVault trait ──► SqliteCredentialVault
 
 ## Credential vault
 
-The vault encrypts all stored credentials with AES-256-GCM. WASM plugins never receive raw credentials — they get short-lived temporary tokens instead.
+The vault encrypts all stored credentials with AES-256-GCM. WASM plugins never receive raw credentials - they get short-lived temporary tokens instead.
 
 ```rust
 use z8run_storage::credential_vault::VaultCrypto;

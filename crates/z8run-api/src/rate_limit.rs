@@ -7,10 +7,10 @@
 //!   - Webhooks:     `Z8_RATE_LIMIT_HOOK`  (default: 200 req/min)
 //!
 //! Responds with `429 Too Many Requests` and standard rate-limit headers:
-//!   - `X-RateLimit-Limit`     — max requests per window
-//!   - `X-RateLimit-Remaining` — requests remaining
-//!   - `X-RateLimit-Reset`     — seconds until window resets
-//!   - `Retry-After`           — seconds to wait (on 429)
+//!   - `X-RateLimit-Limit`     - max requests per window
+//!   - `X-RateLimit-Remaining` - requests remaining
+//!   - `X-RateLimit-Reset`     - seconds until window resets
+//!   - `Retry-After`           - seconds to wait (on 429)
 
 use axum::{
     body::Body,
@@ -259,19 +259,19 @@ pub fn init_rate_limiters() {
 fn api_limiter() -> &'static RateLimiter {
     API_LIMITER
         .get()
-        .expect("Rate limiters not initialized — call init_rate_limiters() first")
+        .expect("Rate limiters not initialized - call init_rate_limiters() first")
 }
 
 fn auth_limiter() -> &'static RateLimiter {
     AUTH_LIMITER
         .get()
-        .expect("Rate limiters not initialized — call init_rate_limiters() first")
+        .expect("Rate limiters not initialized - call init_rate_limiters() first")
 }
 
 fn hook_limiter() -> &'static RateLimiter {
     HOOK_LIMITER
         .get()
-        .expect("Rate limiters not initialized — call init_rate_limiters() first")
+        .expect("Rate limiters not initialized - call init_rate_limiters() first")
 }
 
 #[cfg(test)]

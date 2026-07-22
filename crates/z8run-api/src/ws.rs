@@ -153,7 +153,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                         debug!(text = %text, "Client message received");
                     }
                     Some(Ok(Message::Pong(_))) => {
-                        // Client responded to our ping — connection is alive
+                        // Client responded to our ping - connection is alive
                     }
                     Some(Ok(Message::Ping(data))) => {
                         let _ = socket.send(Message::Pong(data)).await;
@@ -185,7 +185,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                         warn!(lagged = n, "WebSocket client lagged, missed events");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                        // Broadcast sender dropped — engine was shut down.
+                        // Broadcast sender dropped - engine was shut down.
                         // Sleep to avoid busy-loop; ping/recv arms handle disconnect.
                         debug!("Broadcast channel closed, waiting...");
                         tokio::time::sleep(Duration::from_secs(5)).await;

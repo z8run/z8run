@@ -29,13 +29,13 @@ impl NodeExecutor for HttpInNode {
 
         // Check if the incoming message already has real HTTP data (from webhook)
         let payload = if msg.payload.get("method").is_some() {
-            // Real webhook trigger — payload has { method, path, headers, query, body }
+            // Real webhook trigger - payload has { method, path, headers, query, body }
             serde_json::json!({ "req": msg.payload })
         } else if msg.payload.get("req").is_some() {
-            // Already wrapped in "req" — pass through
+            // Already wrapped in "req" - pass through
             msg.payload.clone()
         } else {
-            // Default trigger (no real HTTP data) — generate stub
+            // Default trigger (no real HTTP data) - generate stub
             serde_json::json!({
                 "req": {
                     "method": self.method,

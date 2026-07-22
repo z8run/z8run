@@ -6,10 +6,10 @@ Flow engine, scheduler, executor, and data model for [z8run](https://github.com/
 
 `z8run-core` is the foundation crate of the z8run visual flow engine. It provides:
 
-- **Flow model** — directed acyclic graphs (DAGs) of nodes connected by typed ports
-- **Execution engine** — compiles flows into parallel execution plans using Kahn's algorithm
-- **35+ built-in nodes** — HTTP, AI/LLM, MQTT, database, webhook, and more
-- **Event system** — real-time broadcasting of execution events (node started, completed, error, etc.)
+- **Flow model** - directed acyclic graphs (DAGs) of nodes connected by typed ports
+- **Execution engine** - compiles flows into parallel execution plans using Kahn's algorithm
+- **35+ built-in nodes** - HTTP, AI/LLM, MQTT, database, webhook, and more
+- **Event system** - real-time broadcasting of execution events (node started, completed, error, etc.)
 
 ## Architecture
 

@@ -3,7 +3,7 @@
 <h3 align="center">Open-Source Visual Flow Engine</h3>
 
 <p align="center">
-  Build, connect, and automate anything — visually.<br/>
+  Build, connect, and automate anything - visually.<br/>
   Self-hosted alternative to <b>n8n</b> and <b>Node-RED</b>, built with Rust + React.
 </p>
 
@@ -37,11 +37,11 @@ z8run is an open-source visual flow engine built from the ground up in **Rust** 
 
 **Key principles:**
 
-- **Fast** — Rust + Tokio async runtime, compiled to native code
-- **Visual** — Drag-and-drop node editor with real-time WebSocket sync
-- **Extensible** — WebAssembly plugin sandbox (write plugins in any language that compiles to WASM)
-- **Lightweight** — Single binary, embedded SQLite, zero external dependencies to get started
-- **Secure** — AES-256-GCM credential vault, JWT auth, sandboxed plugin execution
+- **Fast** - Rust + Tokio async runtime, compiled to native code
+- **Visual** - Drag-and-drop node editor with real-time WebSocket sync
+- **Extensible** - WebAssembly plugin sandbox (write plugins in any language that compiles to WASM)
+- **Lightweight** - Single binary, embedded SQLite, zero external dependencies to get started
+- **Secure** - AES-256-GCM credential vault, JWT auth, sandboxed plugin execution
 
 ## Comparison
 
@@ -158,9 +158,9 @@ z8run info                             # Show system information
 | `Z8_DATA_DIR` | `./data` | Data directory (database, plugins) |
 | `Z8_DB_URL` | SQLite auto | Database URL (`sqlite://` or `postgres://`) |
 | `Z8_LOG_LEVEL` | `info` | Log level (trace, debug, info, warn, error) |
-| `Z8_JWT_SECRET` | — | JWT signing secret (**required** for PostgreSQL/MySQL, auto-generated for SQLite dev). Generate with `openssl rand -base64 32` |
-| `Z8_VAULT_SECRET` | — | Encryption key for the credential vault (**must** change in production) |
-| `POSTGRES_PASSWORD` | — | Password for the PostgreSQL user (Docker deployment) |
+| `Z8_JWT_SECRET` | - | JWT signing secret (**required** for PostgreSQL/MySQL, auto-generated for SQLite dev). Generate with `openssl rand -base64 32` |
+| `Z8_VAULT_SECRET` | - | Encryption key for the credential vault (**must** change in production) |
+| `POSTGRES_PASSWORD` | - | Password for the PostgreSQL user (Docker deployment) |
 
 ## API
 
@@ -256,5 +256,5 @@ z8run is dual-licensed under [Apache 2.0](LICENSE-APACHE) and [MIT](LICENSE-MIT)
 
 <p align="center">
   Built with Rust and a lot of coffee.<br/><br/>
-  If you find z8run useful, please consider giving it a <a href="https://github.com/z8run/z8run">star on GitHub</a> — it helps others discover the project.
+  If you find z8run useful, please consider giving it a <a href="https://github.com/z8run/z8run">star on GitHub</a> - it helps others discover the project.
 </p>

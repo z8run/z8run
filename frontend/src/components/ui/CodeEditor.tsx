@@ -63,7 +63,7 @@ export function detectLanguage(code: string): CodeLanguage {
     return "rust";
   }
 
-  // TypeScript detection (before JS — checks for type annotations)
+  // TypeScript detection (before JS - checks for type annotations)
   if (
     /:\s*(string|number|boolean|any|void|never|Record|Promise)\b/.test(
       trimmed,
@@ -154,7 +154,7 @@ const z8Theme = EditorView.theme(
   { dark: true },
 );
 
-/** Fullscreen theme — same palette but with larger font and no border-radius */
+/** Fullscreen theme - same palette but with larger font and no border-radius */
 const z8ThemeFullscreen = EditorView.theme(
   {
     "&": {
@@ -395,7 +395,7 @@ function FullscreenEditor({
               />
             </svg>
             <span className="text-sm font-medium text-slate-200">
-              {nodeLabel ? `${nodeLabel} — Code Editor` : "Code Editor"}
+              {nodeLabel ? `${nodeLabel} - Code Editor` : "Code Editor"}
             </span>
           </div>
         </div>
@@ -424,7 +424,7 @@ function FullscreenEditor({
         className="border-b border-slate-800 px-4"
       />
 
-      {/* Editor area — fills remaining space */}
+      {/* Editor area - fills remaining space */}
       <div className="flex-1 overflow-hidden">
         <CodeMirror
           value={code}

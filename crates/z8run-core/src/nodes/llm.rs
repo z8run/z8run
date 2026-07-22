@@ -637,7 +637,7 @@ fn build_user_message_openai(prompt: &str, image: Option<&str>) -> serde_json::V
             let image_url = if img.starts_with("http://") || img.starts_with("https://") {
                 serde_json::json!({"url": img})
             } else {
-                // Assume base64 — detect media type or default to jpeg
+                // Assume base64 - detect media type or default to jpeg
                 let media_type = if img.starts_with("/9j/") {
                     "image/jpeg"
                 } else if img.starts_with("iVBOR") {
@@ -693,7 +693,7 @@ fn build_user_message_ollama(prompt: &str, image: Option<&str>) -> serde_json::V
         Some(img) => {
             // Ollama expects images as base64 array in the message
             let img_data = if img.starts_with("http://") || img.starts_with("https://") {
-                // Ollama doesn't support URLs directly — pass as-is, model may handle it
+                // Ollama doesn't support URLs directly - pass as-is, model may handle it
                 img.to_string()
             } else {
                 img.to_string()

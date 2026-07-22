@@ -134,14 +134,14 @@ export const useEngineStore = create<EngineStore>((set, get) => ({
   },
 
   addLog: (event) => {
-    // Handle stream chunks separately — don't create a log entry for each chunk
+    // Handle stream chunks separately - don't create a log entry for each chunk
     if (event.type === "stream_chunk") {
       const { streamingNodes } = get();
       const nodeId = event.node_id;
 
       if (nodeId) {
         if (event.done) {
-          // Final chunk — clear the streaming state for this node
+          // Final chunk - clear the streaming state for this node
           const updated = { ...streamingNodes };
           delete updated[nodeId];
           set({ streamingNodes: updated });
@@ -189,10 +189,10 @@ export const useEngineStore = create<EngineStore>((set, get) => ({
     const { nodeMap } = get();
     if (event.node_id) {
       if (Object.keys(nodeMap).length > 0) {
-        // Map is ready — apply immediately
+        // Map is ready - apply immediately
         applyNodeEvent(event, nodeMap);
       } else {
-        // Map not ready yet (HTTP response still in flight) — queue for replay
+        // Map not ready yet (HTTP response still in flight) - queue for replay
         pendingNodeEvents.push(event);
       }
     }
@@ -222,7 +222,7 @@ function getWsUrl(): string {
 }
 
 function doConnect() {
-  // Already connected or connecting — nothing to do
+  // Already connected or connecting - nothing to do
   if (
     ws?.readyState === WebSocket.OPEN ||
     ws?.readyState === WebSocket.CONNECTING
@@ -230,7 +230,7 @@ function doConnect() {
     return;
   }
 
-  // Nobody wants the connection — don't connect
+  // Nobody wants the connection - don't connect
   if (refCount <= 0) return;
 
   const url = getWsUrl();
@@ -264,11 +264,11 @@ function doConnect() {
   };
 
   socket.onerror = () => {
-    // onclose will fire after onerror — no action needed
+    // onclose will fire after onerror - no action needed
   };
 }
 
-/** Debounced connect — waits 150ms so Strict Mode cleanup can cancel it. */
+/** Debounced connect - waits 150ms so Strict Mode cleanup can cancel it. */
 function scheduleConnect() {
   if (connectTimer) clearTimeout(connectTimer);
   connectTimer = setTimeout(() => {

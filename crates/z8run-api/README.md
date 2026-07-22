@@ -6,11 +6,11 @@ HTTP/WebSocket server for [z8run](https://github.com/z8run/z8run), built on [Axu
 
 `z8run-api` exposes the z8run engine as a web service with:
 
-- **REST API** — CRUD for flows, credential vault, import/export
-- **WebSocket** — real-time streaming of execution events
-- **Webhook endpoints** — trigger flows via HTTP with HMAC signature validation
-- **JWT authentication** — user registration, login, and protected routes
-- **Rate limiting** — configurable per-IP token bucket (API, auth, hooks)
+- **REST API** - CRUD for flows, credential vault, import/export
+- **WebSocket** - real-time streaming of execution events
+- **Webhook endpoints** - trigger flows via HTTP with HMAC signature validation
+- **JWT authentication** - user registration, login, and protected routes
+- **Rate limiting** - configurable per-IP token bucket (API, auth, hooks)
 
 ## REST API
 

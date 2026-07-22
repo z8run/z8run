@@ -11,7 +11,7 @@ updates:
     groups:
       cargo-minor-patch:
         update-types: ["minor", "patch"]
-    # Only auto-PR for patch and minor — major needs manual work
+    # Only auto-PR for patch and minor - major needs manual work
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]

@@ -345,7 +345,7 @@ impl FlowEngine {
                         // Receive a message from the channel
                         match receiver.recv().await {
                             Some(msg) => {
-                                // Node will process — emit NodeStarted
+                                // Node will process - emit NodeStarted
                                 let _ =
                                     event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
 
@@ -361,7 +361,7 @@ impl FlowEngine {
                                 executor.process(msg).await?
                             }
                             None => {
-                                // Channel closed — this node is on an inactive branch.
+                                // Channel closed - this node is on an inactive branch.
                                 // Emit NodeSkipped instead of NodeStarted + NodeCompleted.
                                 debug!(node_id = %node_id, "Node skipped (no message received)");
                                 let _ =

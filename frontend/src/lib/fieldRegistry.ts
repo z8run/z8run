@@ -72,15 +72,15 @@ export const DB_TYPES: SelectOption[] = [
 ];
 
 export const HTTP_STATUS_CODES: SelectOption[] = [
-  { value: 200, label: "200 — OK" },
-  { value: 201, label: "201 — Created" },
-  { value: 204, label: "204 — No Content" },
-  { value: 301, label: "301 — Moved" },
-  { value: 400, label: "400 — Bad Request" },
-  { value: 401, label: "401 — Unauthorized" },
-  { value: 403, label: "403 — Forbidden" },
-  { value: 404, label: "404 — Not Found" },
-  { value: 500, label: "500 — Server Error" },
+  { value: 200, label: "200 - OK" },
+  { value: 201, label: "201 - Created" },
+  { value: 204, label: "204 - No Content" },
+  { value: 301, label: "301 - Moved" },
+  { value: 400, label: "400 - Bad Request" },
+  { value: 401, label: "401 - Unauthorized" },
+  { value: 403, label: "403 - Forbidden" },
+  { value: 404, label: "404 - Not Found" },
+  { value: 500, label: "500 - Server Error" },
 ];
 
 // ─── Registry type ───────────────────────────────────────────────
@@ -450,9 +450,9 @@ export const FIELD_REGISTRY: Record<FieldKey, FieldDescriptor> = {
     type: "select",
     defaultValue: 0,
     options: [
-      { value: 0, label: "0 — At most once" },
-      { value: 1, label: "1 — At least once" },
-      { value: 2, label: "2 — Exactly once" },
+      { value: 0, label: "0 - At most once" },
+      { value: 1, label: "1 - At least once" },
+      { value: 2, label: "2 - Exactly once" },
     ],
   },
   "mqtt:clientId": {

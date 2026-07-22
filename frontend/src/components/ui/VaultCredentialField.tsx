@@ -15,7 +15,7 @@ import {
 import { useEffect, useState } from "react";
 
 interface VaultCredentialFieldProps {
-  /** Current value — either "vault:key-name" or a raw string */
+  /** Current value - either "vault:key-name" or a raw string */
   value: string;
   /** Called with "vault:key-name" or raw string */
   onChange: (value: string) => void;
@@ -73,7 +73,7 @@ export function VaultCredentialField({
       setNewKeyValue("");
       setShowNewForm(false);
     } catch {
-      // Error handled silently — user sees the key didn't appear
+      // Error handled silently - user sees the key didn't appear
     } finally {
       setSaving(false);
     }

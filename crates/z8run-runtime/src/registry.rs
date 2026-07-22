@@ -133,7 +133,7 @@ impl PluginRegistry {
         }
 
         if source.is_dir() {
-            // Source is a plugin directory — copy it into plugins_dir
+            // Source is a plugin directory - copy it into plugins_dir
             let dir_name = source
                 .file_name()
                 .ok_or_else(|| RuntimeError::Manifest("Invalid directory name".into()))?;
@@ -149,7 +149,7 @@ impl PluginRegistry {
             copy_dir_recursive(source, &dest)?;
             self.register_from_dir(&dest).await
         } else if source.extension().map(|e| e == "wasm").unwrap_or(false) {
-            // Source is a single .wasm file — create a plugin directory with auto-manifest
+            // Source is a single .wasm file - create a plugin directory with auto-manifest
             let stem = source
                 .file_stem()
                 .and_then(|s| s.to_str())
