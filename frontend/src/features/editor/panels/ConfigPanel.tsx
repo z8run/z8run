@@ -2554,10 +2554,17 @@ export function ConfigPanel() {
                   );
                 }
 
+                // Only associate the label with a control when this branch
+                // renders a native input carrying `id={`config-${key}`}`.
+                // SmartConfigField and the boolean toggle don't, so pointing a
+                // `for` at them would be an invalid label reference.
+                const usesNativeInput =
+                  !hasSmartField(key, nodeType) && typeof value !== "boolean";
+
                 return (
                   <div key={key}>
                     <label
-                      htmlFor={`config-${key}`}
+                      htmlFor={usesNativeInput ? `config-${key}` : undefined}
                       className="text-[10px] font-medium text-slate-400 block mb-1"
                     >
                       {humanizeKey(key)}
