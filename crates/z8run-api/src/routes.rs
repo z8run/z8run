@@ -163,6 +163,71 @@ async fn create_flow(
     })))
 }
 
+/// Validates the structural shape of a canvas payload before it is stored.
+///
+/// Catches malformed data early with actionable errors instead of letting it
+/// degrade silently at execution time (nodes defaulting to `function`, edges
+/// being dropped). Structure only — node *types* are validated against the
+/// registry on import/execute, not here.
+fn validate_canvas(payload: &serde_json::Value) -> Result<(), ApiError> {
+    if let Some(nodes) = payload.get("canvas_nodes") {
+        let arr = nodes
+            .as_array()
+            .ok_or_else(|| ApiError::bad_request("'canvas_nodes' must be an array"))?;
+        for (i, node) in arr.iter().enumerate() {
+            if !node.is_object() {
+                return Err(ApiError::bad_request(format!(
+                    "canvas node at index {i} must be an object"
+                )));
+            }
+            let id_ok = node
+                .get("id")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| !s.is_empty());
+            if !id_ok {
+                return Err(ApiError::bad_request(format!(
+                    "canvas node at index {i} is missing a non-empty string 'id'"
+                )));
+            }
+            let data = &node["data"];
+            let type_ok = data
+                .get("type")
+                .or_else(|| data.get("nodeType"))
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| !s.is_empty());
+            if !type_ok {
+                return Err(ApiError::bad_request(format!(
+                    "canvas node '{}' is missing a string 'data.type'",
+                    node["id"].as_str().unwrap_or("?")
+                )));
+            }
+        }
+    }
+
+    if let Some(edges) = payload.get("canvas_edges") {
+        let arr = edges
+            .as_array()
+            .ok_or_else(|| ApiError::bad_request("'canvas_edges' must be an array"))?;
+        for (i, edge) in arr.iter().enumerate() {
+            let src_ok = edge
+                .get("source")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| !s.is_empty());
+            let tgt_ok = edge
+                .get("target")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| !s.is_empty());
+            if !src_ok || !tgt_ok {
+                return Err(ApiError::bad_request(format!(
+                    "canvas edge at index {i} must have string 'source' and 'target'"
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// PUT /api/v1/flows/:id - Update flow with canvas state (nodes, edges, metadata)
 async fn update_flow(
     State(state): State<Arc<AppState>>,
@@ -170,6 +235,9 @@ async fn update_flow(
     Path(id): Path<Uuid>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Reject structurally malformed canvas data with actionable errors (FUNC-009)
+    validate_canvas(&payload)?;
+
     // Load existing flow (only if owned by user)
     let mut flow = state
         .storage
@@ -1210,4 +1278,41 @@ async fn import_flow(
         "status": "idle",
         "created_at": flow.created_at.to_rfc3339(),
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn validate_canvas_accepts_wellformed_and_empty_payloads() {
+        // Empty payload (no canvas fields) is fine.
+        assert!(validate_canvas(&json!({})).is_ok());
+        // Well-formed nodes + edges.
+        let ok = json!({
+            "canvas_nodes": [
+                {"id": "n1", "data": {"type": "http-in"}},
+                {"id": "n2", "data": {"nodeType": "http-out"}}
+            ],
+            "canvas_edges": [{"source": "n1", "target": "n2"}]
+        });
+        assert!(validate_canvas(&ok).is_ok());
+    }
+
+    #[test]
+    fn validate_canvas_rejects_malformed_shapes() {
+        // canvas_nodes must be an array.
+        assert!(validate_canvas(&json!({"canvas_nodes": {}})).is_err());
+        // node missing id.
+        assert!(validate_canvas(&json!({"canvas_nodes": [{"data": {"type": "debug"}}]})).is_err());
+        // node missing data.type / data.nodeType.
+        assert!(validate_canvas(&json!({"canvas_nodes": [{"id": "n1", "data": {}}]})).is_err());
+        // edge missing target.
+        assert!(validate_canvas(&json!({
+            "canvas_nodes": [{"id": "n1", "data": {"type": "debug"}}],
+            "canvas_edges": [{"source": "n1"}]
+        }))
+        .is_err());
+    }
 }
