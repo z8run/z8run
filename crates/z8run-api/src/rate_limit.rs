@@ -73,15 +73,28 @@ pub struct RateLimiter {
     buckets: Arc<RwLock<HashMap<String, TokenBucket>>>,
     max_requests: u64,
     window_secs: u64,
+    /// When `true`, the limiter is disabled and every request is allowed.
+    /// Set when `max_requests == 0` (see `.env.example`: "Set 0 to disable").
+    disabled: bool,
 }
 
 impl RateLimiter {
     pub fn new(max_requests: u64, window_secs: u64) -> Self {
+        // A configured capacity of 0 means "unlimited / disabled" rather than
+        // "block everything". Short-circuit checks and skip the cleanup task.
+        let disabled = max_requests == 0;
+
         let limiter = Self {
             buckets: Arc::new(RwLock::new(HashMap::new())),
             max_requests,
             window_secs,
+            disabled,
         };
+
+        if disabled {
+            tracing::info!("Rate limiter disabled (max_requests = 0); all requests allowed");
+            return limiter;
+        }
 
         // Spawn cleanup task to evict stale entries every 5 minutes
         let buckets = Arc::clone(&limiter.buckets);
@@ -102,6 +115,11 @@ impl RateLimiter {
 
     /// Check rate limit for a given key. Returns (allowed, remaining, reset_secs).
     async fn check(&self, key: &str) -> (bool, u64, u64) {
+        // Disabled limiter (max_requests == 0): always allow, never touch state.
+        if self.disabled {
+            return (true, 0, 0);
+        }
+
         let mut buckets = self.buckets.write().await;
         let max = self.max_requests as f64;
         let window = self.window_secs as f64;
@@ -317,6 +335,19 @@ mod tests {
         assert!(ok3);
         assert!(!ok4);
         assert!(ok5);
+    }
+
+    #[tokio::test]
+    async fn zero_max_requests_disables_limiter() {
+        // Per .env.example, Z8_RATE_LIMIT_* = 0 disables rate limiting.
+        // The limiter must allow every request instead of blocking all of them.
+        let limiter = RateLimiter::new(0, 60);
+
+        for _ in 0..1000 {
+            let (allowed, _, reset) = limiter.check("ip-a").await;
+            assert!(allowed, "disabled limiter must always allow requests");
+            assert_eq!(reset, 0, "disabled limiter must not emit retry-after");
+        }
     }
 
     #[test]
