@@ -41,5 +41,9 @@ export const authService = {
   // Auth is carried by the session cookie; no token argument needed.
   me: () => authApi.get("me").json<UserInfo>(),
 
+  // Session probe used on load: always 200 with { user } (null if not signed
+  // in), so the browser console stays clean.
+  session: () => authApi.get("session").json<{ user: UserInfo | null }>(),
+
   logout: () => authApi.post("logout").json<{ status: string }>(),
 };

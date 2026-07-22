@@ -315,6 +315,37 @@ async fn me(axum::Extension(claims): axum::Extension<Claims>) -> Result<Json<Use
     }))
 }
 
+/// Public session probe used on app load.
+/// GET /auth/session
+///
+/// Unlike `/me`, this never returns 401: it responds `200` with `{ user }`
+/// (the current user, or `null` when there is no valid session). Browsers log
+/// every 401 response as a console error, so using a 200-with-null probe keeps
+/// the console clean on initial load when the user is not signed in.
+async fn session(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Json<serde_json::Value> {
+    let token = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(str::to_string)
+        .or_else(|| token_from_cookies(&headers));
+
+    let user = token
+        .and_then(|t| decode_jwt(&t, &state.jwt_secret).ok())
+        .filter(|c| !c.is_expired())
+        .map(|c| UserInfo {
+            id: c.sub.to_string(),
+            email: c.email,
+            username: c.name,
+            roles: c.roles,
+        });
+
+    Json(serde_json::json!({ "user": user }))
+}
+
 /// Clears the session cookie.
 /// POST /auth/logout
 async fn logout() -> Result<(HeaderMap, Json<serde_json::Value>), ApiError> {
@@ -364,6 +395,7 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
         .route("/register", post(register))
         .route("/login", post(login))
         .route("/logout", post(logout))
+        .route("/session", get(session))
 }
 
 /// Mounts protected authentication routes (requires JWT).

@@ -61,10 +61,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   checkAuth: async () => {
     try {
-      const user = await authService.me();
+      // 200 with { user } (null if no session) — no 401, so no console error.
+      const { user } = await authService.session();
       set({ user, initialized: true });
     } catch {
-      // No valid session cookie.
+      // Network error only.
       set({ user: null, initialized: true });
     }
   },
