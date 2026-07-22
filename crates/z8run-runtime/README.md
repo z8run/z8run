@@ -46,16 +46,23 @@ memory_limit_mb = 64
 
 ## WASM ABI
 
+> The ABI is defined by the sandbox in [`crates/z8run-runtime/src/`](src/) (see `sandbox.rs`) — that source is the source of truth.
+
 Plugins must export these functions:
 
 | Export | Signature | Description |
 |--------|-----------|-------------|
-| `z8_alloc` | `(size: i32) -> i32` | Allocate memory for input |
-| `z8_dealloc` | `(ptr: i32, size: i32)` | Free memory (optional) |
-| `z8_process` | `(ptr: i32, len: i32) -> i64` | Process a message (returns ptr+len packed) |
-| `z8_node_type` | `(ptr: i32, len: i32) -> i64` | Return node type string |
-| `z8_configure` | `(ptr: i32, len: i32) -> i32` | Apply configuration (return 0 = ok) |
-| `z8_validate` | `(ptr: i32, len: i32) -> i32` | Validate configuration (return 0 = ok) |
+| `z8_alloc` | `(size: i32) -> i32` | Allocate `size` bytes and return a pointer |
+| `z8_dealloc` | `(ptr: i32, size: i32) -> ()` | Free memory (optional; called if exported) |
+| `z8_process` | `(ptr: i32, len: i32) -> i32` | Process a message; returns a pointer to a result buffer |
+| `z8_node_type` | `() -> i32` | Return a pointer to the node type string |
+| `z8_configure` | `(ptr: i32, len: i32) -> i32` | Apply configuration (return 0 = ok, non-zero = error) |
+| `z8_validate` | `() -> i32` | Validate the current configuration (return 0 = ok, non-zero = error) |
+
+Buffers returned by `z8_process` and `z8_node_type` must be laid out as a
+4-byte little-endian length prefix followed by that many bytes of UTF-8 data.
+Input passed to `z8_process`/`z8_configure` is the raw UTF-8 payload written at
+`ptr` with length `len` (no prefix).
 
 ## Usage
 

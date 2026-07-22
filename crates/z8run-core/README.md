@@ -8,7 +8,7 @@ Flow engine, scheduler, executor, and data model for [z8run](https://github.com/
 
 - **Flow model** - directed acyclic graphs (DAGs) of nodes connected by typed ports
 - **Execution engine** - compiles flows into parallel execution plans using Kahn's algorithm
-- **35+ built-in nodes** - HTTP, AI/LLM, MQTT, database, webhook, and more
+- **39 built-in nodes** - HTTP, AI/LLM, MQTT, database, webhook, and more (source of truth: [`src/nodes/mod.rs`](src/nodes/mod.rs))
 - **Event system** - real-time broadcasting of execution events (node started, completed, error, etc.)
 
 ## Architecture
@@ -37,12 +37,20 @@ FlowEngine
 
 ## Built-in nodes
 
+z8run-core registers 39 built-in nodes (the authoritative list is the
+`register_node_type(...)` calls in [`src/nodes/mod.rs`](src/nodes/mod.rs)):
+
 | Category | Nodes |
 |----------|-------|
-| **Input** | HTTP In, Timer, Webhook, Webhook Trigger, Cron Trigger |
-| **Process** | Function, JSON Transform, CSV, Filter, If/Else, Loop, Mapper, Sanitize, Aggregator, Batch |
+| **Input / Trigger** | HTTP In, Timer, Webhook, Webhook Trigger, Cron Trigger |
+| **Process** | Function, JSON Transform, HTTP Request, Filter |
 | **Output** | Debug, HTTP Response |
+| **Logic** | Switch, Delay |
+| **Control flow** | If/Else, Loop |
 | **Data** | Database (PostgreSQL/MySQL/SQLite), MQTT |
+| **Data engineering** | CSV, Aggregator, Batch |
+| **Data shaping** | Mapper |
+| **Security** | Sanitize |
 | **AI** | LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen, STT, TTS |
 | **Integration** | Twilio (SMS/Call/Lookup), WhatsApp, CRM (HubSpot/Salesforce), Conversation Memory, Human Handoff |
 
@@ -56,9 +64,10 @@ z8run-core = "0.1"
 ```rust
 use z8run_core::{Flow, Node, FlowEngine};
 
-// Create a flow
-let mut flow = Flow::new("my-flow", "My Flow");
-let node = Node::new("debug-1", "debug", "Debug")
+// Create a flow (Flow::new takes a single name argument)
+let mut flow = Flow::new("My Flow");
+// Node::new(name, node_type) — the node_type must match a registered node
+let node = Node::new("Debug", "debug")
     .with_input("in", z8run_core::PortType::Any)
     .with_output("out", z8run_core::PortType::Any);
 flow.add_node(node);

@@ -51,7 +51,7 @@ z8run is an open-source visual flow engine built from the ground up in **Rust** 
 | Visual editor | Yes | Yes | Yes |
 | Self-hosted | Yes | Yes | Yes |
 | WASM plugins | Yes | No | No |
-| AI nodes (LLM, embeddings, agents) | 10 built-in | Community | Limited |
+| AI nodes (LLM, embeddings, agents) | 12 built-in | Community | Limited |
 | Binary protocol (WebSocket) | Yes | JSON | JSON |
 | Credential vault (AES-256-GCM) | Built-in | Separate | Built-in |
 | Single binary deploy | Yes | No | No |
@@ -89,6 +89,15 @@ docker pull ghcr.io/z8run/z8run-nginx:latest
 
 The server starts on `http://localhost:7700`.
 
+> **TLS / production deployment:** the bundled Nginx config (`deploy/nginx.conf`)
+> listens on plain HTTP (port 80) and assumes TLS is terminated **upstream**
+> (Cloudflare, a load balancer, or an ingress). It ships a baseline
+> Content-Security-Policy (tune it per deployment) and a **commented-out**
+> `Strict-Transport-Security` (HSTS) header — enable HSTS only once TLS is
+> served end-to-end. To terminate TLS in Nginx itself, add a `443 ssl` server
+> block with your certs and redirect `80 -> 443`; see the header comments in
+> `deploy/nginx.conf`.
+
 ### Test the API
 
 ```bash
@@ -111,7 +120,7 @@ z8run is organized as a Rust workspace with focused crates:
 ```
 z8run/
 ├── crates/
-│   ├── z8run-core       # Flow engine, DAG validation, scheduler, 23 built-in nodes
+│   ├── z8run-core       # Flow engine, DAG validation, scheduler, 39 built-in nodes
 │   ├── z8run-protocol   # Binary WebSocket protocol (11-byte header)
 │   ├── z8run-storage    # SQLite / PostgreSQL persistence layer
 │   ├── z8run-runtime    # WASM plugin sandbox (wasmtime)
@@ -183,16 +192,21 @@ Connect to `ws://localhost:7700/ws/engine` for real-time communication using the
 
 ## Built-in Nodes
 
-z8run ships with 23 native nodes across 6 categories:
+z8run ships with 39 built-in nodes (the authoritative list is the `register_node_type(...)` calls in `crates/z8run-core/src/nodes/mod.rs`):
 
 | Category | Nodes |
 |---|---|
-| **Input** | HTTP In, Timer, Webhook (HMAC-SHA256 signature validation) |
+| **Input / Trigger** | HTTP In, Timer, Webhook (HMAC-SHA256 signature validation), Webhook Trigger, Cron Trigger |
 | **Process** | Function, JSON Transform (parse/stringify/extract), HTTP Request (outbound), Filter |
 | **Output** | Debug, HTTP Response |
 | **Logic** | Switch (multi-rule routing), Delay |
+| **Control flow** | If/Else, Loop |
 | **Data** | Database (PostgreSQL, MySQL, SQLite), MQTT (publish/subscribe) |
-| **AI** | LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen |
+| **Data engineering** | CSV, Aggregator, Batch |
+| **Data shaping** | Mapper |
+| **Security** | Sanitize |
+| **AI** | LLM, Embeddings, Classifier, Prompt Template, Text Splitter, Vector Store, Structured Output, Summarizer, AI Agent, Image Gen, STT, TTS |
+| **Integration** | Twilio (SMS/Call/Lookup), WhatsApp, CRM (HubSpot/Salesforce), Conversation Memory, Human Handoff |
 
 ## Roadmap
 
@@ -201,7 +215,7 @@ z8run ships with 23 native nodes across 6 categories:
 - [x] REST API (Axum 0.8)
 - [x] SQLite / PostgreSQL persistence
 - [x] Visual node editor (React Flow + Zustand + Tailwind)
-- [x] 23 built-in nodes (HTTP In/Out/Request, Debug, Function, Switch, Filter, Delay, Timer, Webhook, JSON Transform, Database, MQTT + 10 AI nodes)
+- [x] 39 built-in nodes (HTTP In/Out/Request, Debug, Function, Switch, Filter, Delay, Timer, Webhook, JSON Transform, Database, MQTT, CSV, Aggregator, Batch, Mapper, Sanitize, If/Else, Loop, triggers + 12 AI nodes)
 - [x] Real-time WebSocket execution events
 - [x] Namespaced hook routes (`/hook/{flow_id}/{path}`)
 - [x] Smart config UI (dropdowns, password fields, code editors)
