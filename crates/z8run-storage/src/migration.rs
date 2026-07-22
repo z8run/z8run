@@ -102,6 +102,26 @@ CREATE TABLE credentials (
 );
 "#;
 
+/// Migration SQL for PostgreSQL V4 (persisted hook routes).
+///
+/// Records the exact `(method, path)` each deployed flow exposes under
+/// `/hook/{flow_id}`, together with its owner. The public hook handler matches
+/// against this table so an attacker cannot trigger an arbitrary flow by
+/// guessing its id, use the wrong method/path, or hit an undeployed flow.
+pub const PG_MIGRATION_V4: &str = r#"
+CREATE TABLE IF NOT EXISTS hook_routes (
+    flow_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    method TEXT NOT NULL,
+    path TEXT NOT NULL,
+    node_type TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (flow_id, method, path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hook_routes_flow ON hook_routes(flow_id);
+"#;
+
 /// Migration SQL for SQLite.
 pub const SQLITE_MIGRATION_V1: &str = r#"
 CREATE TABLE IF NOT EXISTS flows (
@@ -197,6 +217,21 @@ CREATE TABLE credentials (
     updated_at TEXT NOT NULL,
     PRIMARY KEY (user_id, key)
 );
+"#;
+
+/// Migration SQL for SQLite V4 (persisted hook routes). See `PG_MIGRATION_V4`.
+pub const SQLITE_MIGRATION_V4: &str = r#"
+CREATE TABLE IF NOT EXISTS hook_routes (
+    flow_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    method TEXT NOT NULL,
+    path TEXT NOT NULL,
+    node_type TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (flow_id, method, path)
+);
+
+CREATE INDEX IF NOT EXISTS idx_hook_routes_flow ON hook_routes(flow_id);
 "#;
 
 /// Helper: split SQL into individual statements, strip comments.
@@ -299,6 +334,30 @@ pub async fn run_pg_migrations(pool: &sqlx::PgPool) -> Result<(), StorageError> 
         tracing::debug!("PostgreSQL migration V3 already applied");
     }
 
+    let applied_v4: Option<(i32,)> =
+        sqlx::query_as("SELECT version FROM schema_migrations WHERE version = 4")
+            .fetch_optional(pool)
+            .await?;
+
+    if applied_v4.is_none() {
+        tracing::info!("Applying PostgreSQL migration V4...");
+
+        for stmt in &split_statements(PG_MIGRATION_V4) {
+            sqlx::query(stmt)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Migration(format!("Failed to execute: {}", e)))?;
+        }
+
+        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (4, NOW())")
+            .execute(pool)
+            .await?;
+
+        tracing::info!("PostgreSQL migration V4 applied successfully");
+    } else {
+        tracing::debug!("PostgreSQL migration V4 already applied");
+    }
+
     Ok(())
 }
 
@@ -395,6 +454,32 @@ pub async fn run_sqlite_migrations(pool: &sqlx::SqlitePool) -> Result<(), Storag
         tracing::info!("SQLite migration V3 applied successfully");
     } else {
         tracing::debug!("SQLite migration V3 already applied");
+    }
+
+    let applied_v4: Option<(i64,)> =
+        sqlx::query_as("SELECT version FROM schema_migrations WHERE version = 4")
+            .fetch_optional(pool)
+            .await?;
+
+    if applied_v4.is_none() {
+        tracing::info!("Applying SQLite migration V4...");
+
+        for stmt in &split_statements(SQLITE_MIGRATION_V4) {
+            sqlx::query(stmt)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Migration(format!("Failed to execute: {}", e)))?;
+        }
+
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (4, ?1)")
+            .bind(&now)
+            .execute(pool)
+            .await?;
+
+        tracing::info!("SQLite migration V4 applied successfully");
+    } else {
+        tracing::debug!("SQLite migration V4 already applied");
     }
 
     Ok(())

@@ -19,6 +19,7 @@ use z8run_core::flow::{Edge, Flow};
 use z8run_core::message::FlowMessage;
 use z8run_core::node::{Node, PortType};
 use z8run_storage::credential_vault::CredentialVault;
+use z8run_storage::repository::HookRoute;
 
 /// Mounts the REST API routes (protected by JWT).
 pub fn api_routes() -> Router<Arc<AppState>> {
@@ -313,9 +314,9 @@ async fn start_flow(
         "Starting flow execution"
     );
 
-    // Resolve hook URLs for http-in nodes
-    let registered_routes = register_hook_routes(&stored_flow, id);
-    let has_input_nodes = !registered_routes.is_empty();
+    // Determine the HTTP entry points this flow exposes.
+    let hook_routes = collect_hook_routes(&stored_flow);
+    let has_input_nodes = !hook_routes.is_empty();
 
     // Return canvas_id → core UUID mapping so the frontend can
     // correlate engine events back to canvas nodes for visual feedback.
@@ -326,8 +327,16 @@ async fn start_flow(
 
     if has_input_nodes {
         // Flow has input nodes (http-in, webhook, etc.) - don't execute now.
-        // Just register the hook routes and wait for incoming requests.
-        info!(flow_id = %id, "Flow deployed - waiting for hook triggers");
+        // Persist the exact routes so the public hook handler can authorize
+        // incoming requests by flow + method + path, then wait for triggers.
+        state
+            .storage
+            .replace_hook_routes(id, claims.sub, &hook_routes)
+            .await
+            .map_err(ApiError::from)?;
+
+        let registered_routes = hook_route_urls(&hook_routes, id);
+        info!(flow_id = %id, routes = hook_routes.len(), "Flow deployed - waiting for hook triggers");
         Ok(Json(serde_json::json!({
             "flow_id": id.to_string(),
             "status": "deployed",
@@ -350,11 +359,26 @@ async fn start_flow(
     }
 }
 
-/// Scans canvas_nodes for http-in nodes and returns their hook URLs.
-/// Each flow gets its own namespace: /hook/{flow_id}/{path}
-/// No conflict detection needed - namespaces prevent collisions.
-fn register_hook_routes(stored: &Flow, flow_id: Uuid) -> Vec<serde_json::Value> {
-    let mut registered = Vec::new();
+/// Canvas node types that expose an HTTP hook entry point.
+const HOOK_NODE_TYPES: [&str; 3] = ["http-in", "webhook", "webhook-trigger"];
+
+/// Normalizes a configured hook path to the sub-path form used for matching:
+/// empty or `"/"` becomes `"/"`, otherwise a single leading slash is ensured
+/// (e.g. `"branch"` → `"/branch"`). This must mirror how `hook_handler`
+/// derives the incoming sub-path so persisted routes and requests compare equal.
+fn normalize_hook_path(path: &str) -> String {
+    let trimmed = path.trim();
+    if trimmed.is_empty() || trimmed == "/" {
+        "/".to_string()
+    } else {
+        format!("/{}", trimmed.trim_start_matches('/'))
+    }
+}
+
+/// Scans canvas_nodes for HTTP-trigger nodes and returns their exact routes.
+/// Each flow gets its own namespace: /hook/{flow_id}/{path}.
+fn collect_hook_routes(stored: &Flow) -> Vec<HookRoute> {
+    let mut routes = Vec::new();
 
     let canvas_nodes = match stored
         .metadata
@@ -363,41 +387,42 @@ fn register_hook_routes(stored: &Flow, flow_id: Uuid) -> Vec<serde_json::Value> 
         .and_then(|v| v.as_array())
     {
         Some(nodes) => nodes,
-        None => return registered,
+        None => return routes,
     };
 
     for node in canvas_nodes {
         let data = &node["data"];
         let node_type = data["type"].as_str().unwrap_or("");
 
-        if node_type == "http-in" {
+        if HOOK_NODE_TYPES.contains(&node_type) {
             let config = &data["config"];
             let method = config["method"].as_str().unwrap_or("POST").to_uppercase();
-            let path = config["path"].as_str().unwrap_or("/").to_string();
+            let path = normalize_hook_path(config["path"].as_str().unwrap_or("/"));
 
-            // Build the full hook URL path: /hook/{flow_id}/{sub_path}
-            let hook_path = if path == "/" || path.is_empty() {
-                format!("/hook/{}", flow_id)
-            } else {
-                let clean = path.trim_start_matches('/');
-                format!("/hook/{}/{}", flow_id, clean)
-            };
-
-            info!(
-                flow_id = %flow_id,
-                method = %method,
-                hook_path = %hook_path,
-                "Hook route registered"
-            );
-
-            registered.push(serde_json::json!({
-                "method": method,
-                "path": hook_path,
-            }));
+            routes.push(HookRoute {
+                method,
+                path,
+                node_type: node_type.to_string(),
+            });
         }
     }
 
-    registered
+    routes
+}
+
+/// Builds the user-facing hook URLs (`/hook/{flow_id}{path}`) for display.
+fn hook_route_urls(routes: &[HookRoute], flow_id: Uuid) -> Vec<serde_json::Value> {
+    routes
+        .iter()
+        .map(|r| {
+            let hook_path = if r.path == "/" {
+                format!("/hook/{}", flow_id)
+            } else {
+                format!("/hook/{}{}", flow_id, r.path)
+            };
+            serde_json::json!({ "method": r.method, "path": hook_path })
+        })
+        .collect()
 }
 
 /// Recursively resolves `"vault:key-name"` references in a JSON value.
@@ -693,7 +718,37 @@ async fn hook_handler(
         "Hook triggered"
     );
 
-    // Load the flow
+    // Authorize against the persisted hook routes BEFORE loading or running
+    // anything: the flow must be deployed AND expose this exact method + path.
+    // This blocks triggering an arbitrary flow by id, using the wrong HTTP
+    // method, or hitting a path the flow never configured. The matched route
+    // also yields the owner, which scopes credential resolution to their vault.
+    let owner_id = match state
+        .storage
+        .find_hook_route(flow_id, &method_str, &sub_path)
+        .await
+    {
+        Ok(Some(uid)) => uid,
+        Ok(None) => {
+            warn!(flow_id = %flow_id, method = %method_str, path = %sub_path,
+                "Hook rejected: no matching deployed route");
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": "No matching hook route for this flow, method, and path"
+                })),
+            );
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to look up hook route");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": "Internal error"})),
+            );
+        }
+    };
+
+    // Load the flow (authorized above)
     let stored_flow = match state.storage.get_flow(flow_id).await {
         Ok(f) => f,
         Err(e) => {
@@ -701,26 +756,6 @@ async fn hook_handler(
             return (
                 StatusCode::NOT_FOUND,
                 Json(serde_json::json!({"error": format!("Flow not found: {}", e)})),
-            );
-        }
-    };
-
-    // Resolve the flow owner. Credential resolution for this public hook must be
-    // scoped to the owner's vault, so an unowned flow cannot be triggered.
-    let owner_id = match state.storage.get_flow_owner(flow_id).await {
-        Ok(Some(uid)) => uid,
-        Ok(None) => {
-            warn!(flow_id = %flow_id, "Hook rejected: flow has no owner");
-            return (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "Flow not found"})),
-            );
-        }
-        Err(e) => {
-            error!(error = %e, "Failed to resolve flow owner");
-            return (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({"error": "Flow not found"})),
             );
         }
     };

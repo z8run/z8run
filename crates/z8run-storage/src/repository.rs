@@ -42,6 +42,43 @@ pub trait FlowRepository: Send + Sync {
     /// rows); `Err(FlowNotFound)` means it does not exist. Used by the public
     /// hook path to scope credential resolution to the flow's owner.
     async fn get_flow_owner(&self, id: Uuid) -> Result<Option<Uuid>, StorageError>;
+
+    /// Replaces the persisted hook routes for a flow (used on deploy).
+    ///
+    /// All existing routes for `flow_id` are removed and the provided set is
+    /// inserted, so a re-deploy always reflects the current canvas.
+    async fn replace_hook_routes(
+        &self,
+        flow_id: Uuid,
+        user_id: Uuid,
+        routes: &[HookRoute],
+    ) -> Result<(), StorageError>;
+
+    /// Finds a deployed hook route matching `flow_id` + `method` + `path`.
+    ///
+    /// Returns the owner `user_id` when a matching route exists, or `None`
+    /// when the flow is not deployed for that method/path. The public hook
+    /// handler uses this to reject unauthorized or mismatched requests.
+    async fn find_hook_route(
+        &self,
+        flow_id: Uuid,
+        method: &str,
+        path: &str,
+    ) -> Result<Option<Uuid>, StorageError>;
+
+    /// Removes all hook routes for a flow (used on undeploy/delete).
+    async fn delete_hook_routes(&self, flow_id: Uuid) -> Result<(), StorageError>;
+}
+
+/// A single HTTP entry point a deployed flow exposes under `/hook/{flow_id}`.
+#[derive(Debug, Clone)]
+pub struct HookRoute {
+    /// Uppercase HTTP method (e.g. `POST`).
+    pub method: String,
+    /// Normalized sub-path (e.g. `/` or `/branch`).
+    pub path: String,
+    /// Canvas node type that declared this route (e.g. `http-in`).
+    pub node_type: String,
 }
 
 /// User record.

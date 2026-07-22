@@ -6,7 +6,7 @@ use uuid::Uuid;
 use z8run_core::flow::Flow;
 
 use crate::repository::{
-    ExecutionRecord, ExecutionRepository, FlowRepository, UserRecord, UserRepository,
+    ExecutionRecord, ExecutionRepository, FlowRepository, HookRoute, UserRecord, UserRepository,
 };
 use crate::StorageError;
 
@@ -120,6 +120,8 @@ impl FlowRepository for PgStorage {
             return Err(StorageError::FlowNotFound(id));
         }
 
+        self.delete_hook_routes(id).await?;
+
         tracing::debug!(flow_id = %id, "Flow deleted from PostgreSQL");
         Ok(())
     }
@@ -229,6 +231,8 @@ impl FlowRepository for PgStorage {
             return Err(StorageError::FlowNotFound(id));
         }
 
+        self.delete_hook_routes(id).await?;
+
         tracing::debug!(flow_id = %id, user_id = %user_id, "Flow deleted");
         Ok(())
     }
@@ -248,6 +252,73 @@ impl FlowRepository for PgStorage {
             )),
             None => Ok(None),
         }
+    }
+
+    async fn replace_hook_routes(
+        &self,
+        flow_id: Uuid,
+        user_id: Uuid,
+        routes: &[HookRoute],
+    ) -> Result<(), StorageError> {
+        let flow_id_str = flow_id.to_string();
+        let user_id_str = user_id.to_string();
+
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query("DELETE FROM hook_routes WHERE flow_id = $1")
+            .bind(&flow_id_str)
+            .execute(&mut *tx)
+            .await?;
+
+        for route in routes {
+            sqlx::query(
+                r#"INSERT INTO hook_routes (flow_id, user_id, method, path, node_type, created_at)
+                   VALUES ($1, $2, $3, $4, $5, NOW())"#,
+            )
+            .bind(&flow_id_str)
+            .bind(&user_id_str)
+            .bind(&route.method)
+            .bind(&route.path)
+            .bind(&route.node_type)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn find_hook_route(
+        &self,
+        flow_id: Uuid,
+        method: &str,
+        path: &str,
+    ) -> Result<Option<Uuid>, StorageError> {
+        let flow_id_str = flow_id.to_string();
+
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT user_id FROM hook_routes WHERE flow_id = $1 AND method = $2 AND path = $3",
+        )
+        .bind(&flow_id_str)
+        .bind(method)
+        .bind(path)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some((uid,)) => Ok(Some(
+                Uuid::parse_str(&uid).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    async fn delete_hook_routes(&self, flow_id: Uuid) -> Result<(), StorageError> {
+        sqlx::query("DELETE FROM hook_routes WHERE flow_id = $1")
+            .bind(flow_id.to_string())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 }
 

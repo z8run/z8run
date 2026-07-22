@@ -6,7 +6,7 @@ use uuid::Uuid;
 use z8run_core::flow::Flow;
 
 use crate::repository::{
-    ExecutionRecord, ExecutionRepository, FlowRepository, UserRecord, UserRepository,
+    ExecutionRecord, ExecutionRepository, FlowRepository, HookRoute, UserRecord, UserRepository,
 };
 use crate::StorageError;
 
@@ -27,6 +27,11 @@ impl SqliteStorage {
             .map_err(|e| StorageError::Database(format!("Failed to connect: {}", e)))?;
 
         Ok(Self { pool })
+    }
+
+    /// Builds storage from an existing pool (used for embedding and tests).
+    pub fn from_pool(pool: SqlitePool) -> Self {
+        Self { pool }
     }
 
     /// Returns a reference to the underlying connection pool.
@@ -120,6 +125,8 @@ impl FlowRepository for SqliteStorage {
         if result.rows_affected() == 0 {
             return Err(StorageError::FlowNotFound(id));
         }
+
+        self.delete_hook_routes(id).await?;
 
         tracing::debug!(flow_id = %id, "Flow deleted");
         Ok(())
@@ -232,6 +239,8 @@ impl FlowRepository for SqliteStorage {
             return Err(StorageError::FlowNotFound(id));
         }
 
+        self.delete_hook_routes(id).await?;
+
         Ok(())
     }
 
@@ -250,6 +259,75 @@ impl FlowRepository for SqliteStorage {
             )),
             None => Ok(None),
         }
+    }
+
+    async fn replace_hook_routes(
+        &self,
+        flow_id: Uuid,
+        user_id: Uuid,
+        routes: &[HookRoute],
+    ) -> Result<(), StorageError> {
+        let flow_id_str = flow_id.to_string();
+        let user_id_str = user_id.to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+
+        let mut tx = self.pool.begin().await?;
+
+        sqlx::query("DELETE FROM hook_routes WHERE flow_id = ?1")
+            .bind(&flow_id_str)
+            .execute(&mut *tx)
+            .await?;
+
+        for route in routes {
+            sqlx::query(
+                r#"INSERT INTO hook_routes (flow_id, user_id, method, path, node_type, created_at)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6)"#,
+            )
+            .bind(&flow_id_str)
+            .bind(&user_id_str)
+            .bind(&route.method)
+            .bind(&route.path)
+            .bind(&route.node_type)
+            .bind(&now)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn find_hook_route(
+        &self,
+        flow_id: Uuid,
+        method: &str,
+        path: &str,
+    ) -> Result<Option<Uuid>, StorageError> {
+        let flow_id_str = flow_id.to_string();
+
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT user_id FROM hook_routes WHERE flow_id = ?1 AND method = ?2 AND path = ?3",
+        )
+        .bind(&flow_id_str)
+        .bind(method)
+        .bind(path)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        match row {
+            Some((uid,)) => Ok(Some(
+                Uuid::parse_str(&uid).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            )),
+            None => Ok(None),
+        }
+    }
+
+    async fn delete_hook_routes(&self, flow_id: Uuid) -> Result<(), StorageError> {
+        sqlx::query("DELETE FROM hook_routes WHERE flow_id = ?1")
+            .bind(flow_id.to_string())
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 }
 
@@ -465,5 +543,116 @@ impl UserRepository for SqliteStorage {
                 .map_err(|e| StorageError::Serialization(e.to_string()))?
                 .with_timezone(&chrono::Utc),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// In-memory SQLite storage with a single shared connection so the
+    /// database survives across queries.
+    async fn memory_storage() -> SqliteStorage {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("connect in-memory sqlite");
+        crate::migration::run_sqlite_migrations(&pool)
+            .await
+            .expect("run migrations");
+        SqliteStorage::from_pool(pool)
+    }
+
+    fn route(method: &str, path: &str) -> HookRoute {
+        HookRoute {
+            method: method.to_string(),
+            path: path.to_string(),
+            node_type: "http-in".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_hook_route_matches_method_and_path() {
+        let storage = memory_storage().await;
+        let flow = Uuid::now_v7();
+        let owner = Uuid::now_v7();
+
+        storage
+            .replace_hook_routes(flow, owner, &[route("POST", "/branch"), route("GET", "/")])
+            .await
+            .unwrap();
+
+        // Exact matches resolve to the owner.
+        assert_eq!(
+            storage
+                .find_hook_route(flow, "POST", "/branch")
+                .await
+                .unwrap(),
+            Some(owner)
+        );
+        assert_eq!(
+            storage.find_hook_route(flow, "GET", "/").await.unwrap(),
+            Some(owner)
+        );
+
+        // Wrong method, wrong path, and unknown flow are all rejected.
+        assert_eq!(
+            storage
+                .find_hook_route(flow, "GET", "/branch")
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            storage
+                .find_hook_route(flow, "POST", "/other")
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            storage
+                .find_hook_route(Uuid::now_v7(), "POST", "/branch")
+                .await
+                .unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn test_replace_hook_routes_is_idempotent_replacement() {
+        let storage = memory_storage().await;
+        let flow = Uuid::now_v7();
+        let owner = Uuid::now_v7();
+
+        storage
+            .replace_hook_routes(flow, owner, &[route("POST", "/branch")])
+            .await
+            .unwrap();
+        // Re-deploy with a different route set: the old route must disappear.
+        storage
+            .replace_hook_routes(flow, owner, &[route("POST", "/")])
+            .await
+            .unwrap();
+
+        assert_eq!(
+            storage
+                .find_hook_route(flow, "POST", "/branch")
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            storage.find_hook_route(flow, "POST", "/").await.unwrap(),
+            Some(owner)
+        );
+
+        // Deleting the flow's routes clears the remaining match.
+        storage.delete_hook_routes(flow).await.unwrap();
+        assert_eq!(
+            storage.find_hook_route(flow, "POST", "/").await.unwrap(),
+            None
+        );
     }
 }
