@@ -51,7 +51,10 @@ export interface FlowSummary {
   id: string;
   name: string;
   description: string;
+  /** Derived from the last execution when the flow has run, else the stored status. */
   status: string;
+  /** ISO timestamp of the last execution, or null if it has never run. */
+  last_run_at: string | null;
   nodes: number;
   edges: number;
   created_at: string;

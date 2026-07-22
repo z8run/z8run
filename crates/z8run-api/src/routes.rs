@@ -95,37 +95,49 @@ async fn list_flows(
         .await
         .map_err(ApiError::from)?;
 
-    let flow_summaries: Vec<serde_json::Value> = flows
-        .iter()
-        .map(|f| {
-            // Count canvas nodes/edges from metadata (where the frontend stores them)
-            let canvas_node_count = f
-                .metadata
-                .positions
-                .get("canvas_nodes")
-                .and_then(|v| v.as_array())
-                .map(|a| a.len())
-                .unwrap_or(f.nodes.len());
-            let canvas_edge_count = f
-                .metadata
-                .positions
-                .get("canvas_edges")
-                .and_then(|v| v.as_array())
-                .map(|a| a.len())
-                .unwrap_or(f.edges.len());
+    let mut flow_summaries: Vec<serde_json::Value> = Vec::with_capacity(flows.len());
+    for f in &flows {
+        // Count canvas nodes/edges from metadata (where the frontend stores them)
+        let canvas_node_count = f
+            .metadata
+            .positions
+            .get("canvas_nodes")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(f.nodes.len());
+        let canvas_edge_count = f
+            .metadata
+            .positions
+            .get("canvas_edges")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(f.edges.len());
 
-            serde_json::json!({
-                "id": f.id.to_string(),
-                "name": f.name,
-                "description": f.description,
-                "status": f.status.to_string(),
-                "nodes": canvas_node_count,
-                "edges": canvas_edge_count,
-                "created_at": f.created_at.to_rfc3339(),
-                "updated_at": f.updated_at.to_rfc3339(),
-            })
-        })
-        .collect();
+        // Derive the shown status from the last persisted execution (FUNC-008),
+        // falling back to the flow's stored status when it has never run.
+        let last_run = state
+            .executions
+            .get_history(f.id, 1)
+            .await
+            .ok()
+            .and_then(|v| v.into_iter().next());
+        let (status, last_run_at) = match last_run {
+            Some(rec) => (rec.status, Some(rec.started_at.to_rfc3339())),
+            None => (f.status.to_string(), None),
+        };
+
+        flow_summaries.push(serde_json::json!({
+            "id": f.id.to_string(),
+            "name": f.name,
+            "description": f.description,
+            "status": status,
+            "last_run_at": last_run_at,
+            "nodes": canvas_node_count,
+            "edges": canvas_edge_count,
+            "created_at": f.created_at.to_rfc3339(),
+            "updated_at": f.updated_at.to_rfc3339(),
+        }));
+    }
 
     Ok(Json(serde_json::json!({
         "flows": flow_summaries,

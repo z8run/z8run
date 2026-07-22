@@ -15,6 +15,18 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+/** Badge colors per (last-execution) status. */
+const STATUS_BADGE: Record<string, string> = {
+  running: "bg-blue-900/50 text-blue-400",
+  completed: "bg-green-900/50 text-green-400",
+  error: "bg-red-900/50 text-red-400",
+  stopped: "bg-amber-900/50 text-amber-400",
+};
+
+function statusBadgeClass(status: string): string {
+  return STATUS_BADGE[status] ?? "bg-slate-800 text-slate-500";
+}
+
 export function FlowListPage() {
   const { flows, loading, fetchFlows, createFlow, deleteFlow } =
     useFlowListStore();
@@ -248,15 +260,19 @@ export function FlowListPage() {
                         <Clock size={10} />
                         {new Date(flow.updated_at).toLocaleDateString()}
                       </span>
+                      {flow.last_run_at && (
+                        <span className="flex items-center gap-1 text-xs text-slate-600">
+                          <Play size={10} />
+                          ran {new Date(flow.last_run_at).toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                        flow.status === "running"
-                          ? "bg-green-900/50 text-green-400"
-                          : "bg-slate-800 text-slate-500"
-                      }`}
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusBadgeClass(
+                        flow.status,
+                      )}`}
                     >
                       {flow.status}
                     </span>
