@@ -1,3 +1,4 @@
+import { assertAuthResponse } from "@/lib/validation";
 import ky from "ky";
 
 const authApi = ky.create({
@@ -26,10 +27,14 @@ export const authService = {
   register: (email: string, username: string, password: string) =>
     authApi
       .post("register", { json: { email, username, password } })
-      .json<AuthResponse>(),
+      .json<unknown>()
+      .then(assertAuthResponse),
 
   login: (email: string, password: string) =>
-    authApi.post("login", { json: { email, password } }).json<AuthResponse>(),
+    authApi
+      .post("login", { json: { email, password } })
+      .json<unknown>()
+      .then(assertAuthResponse),
 
   me: (token: string) =>
     authApi

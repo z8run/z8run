@@ -20,6 +20,7 @@ export function Header() {
   const saving = useFlowStore((s) => s.saving);
   const dirty = useFlowStore((s) => s.dirty);
   const saveError = useFlowStore((s) => s.saveError);
+  const loadError = useFlowStore((s) => s.loadError);
   const saveFlow = useFlowStore((s) => s.saveFlow);
   const setFlowName = useFlowStore((s) => s.setFlowName);
   const running = useEngineStore((s) => s.running);
@@ -111,6 +112,21 @@ export function Header() {
 
       {/* Right: actions */}
       <div className="flex items-center gap-2">
+        {loadError && (
+          <div
+            role="alert"
+            className="flex items-center gap-1.5 max-w-xs px-2 py-1 text-xs text-red-300
+              bg-red-900/20 border border-red-700 rounded-md"
+            title={loadError}
+          >
+            <AlertTriangle
+              size={14}
+              className="text-red-400 flex-shrink-0"
+              aria-hidden="true"
+            />
+            <span className="truncate">Load failed: {loadError}</span>
+          </div>
+        )}
         {saveError && (
           <div
             role="alert"

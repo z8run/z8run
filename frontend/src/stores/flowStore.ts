@@ -20,6 +20,7 @@ interface FlowState {
   saving: boolean;
   dirty: boolean;
   saveError: string | null;
+  loadError: string | null;
 
   // React Flow state
   nodes: Node<Z8NodeData>[];
@@ -40,6 +41,7 @@ interface FlowState {
   setNodeStatus: (id: string, status: NodeStatus) => void;
   resetAllNodeStatus: () => void;
   setFlowName: (name: string) => void;
+  setLoadError: (message: string | null) => void;
   removeSelected: () => void;
   clear: () => void;
   saveFlow: (viewport: { x: number; y: number; zoom: number }) => Promise<void>;
@@ -53,6 +55,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   saving: false,
   dirty: false,
   saveError: null,
+  loadError: null,
   nodes: [],
   edges: [],
 
@@ -64,6 +67,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges,
       dirty: false,
       saveError: null,
+      loadError: null,
     }),
 
   onNodesChange: (changes) =>
@@ -91,6 +95,8 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   },
 
   setFlowName: (name) => set({ flowName: name, dirty: true }),
+
+  setLoadError: (message) => set({ loadError: message }),
 
   updateNodeData: (id, data) =>
     set({
@@ -130,6 +136,7 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       edges: [],
       dirty: false,
       saveError: null,
+      loadError: null,
     }),
 
   saveFlow: async (viewport) => {

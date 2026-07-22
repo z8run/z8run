@@ -1,7 +1,7 @@
+import { assertFlowDetail } from "@/lib/validation";
 import type {
   CreateFlowRequest,
   CreateFlowResponse,
-  FlowDetail,
   FlowListResponse,
 } from "@/types/flow";
 import { api } from "./client";
@@ -17,7 +17,10 @@ export interface SaveFlowRequest {
 export const flowsApi = {
   list: () => api.get("flows").json<FlowListResponse>(),
 
-  get: (id: string) => api.get(`flows/${id}`).json<FlowDetail>(),
+  // Validate at the boundary: the editor casts canvas_nodes/canvas_edges to
+  // arrays and maps over them, so a malformed shape must fail fast here.
+  get: (id: string) =>
+    api.get(`flows/${id}`).json<unknown>().then(assertFlowDetail),
 
   create: (data: CreateFlowRequest) =>
     api.post("flows", { json: data }).json<CreateFlowResponse>(),
