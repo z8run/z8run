@@ -309,7 +309,14 @@ async fn cmd_serve(
     tracing::info!(address = %addr, "Server ready");
     tracing::info!("Editor: http://{}:{}", bind, port);
 
-    axum::serve(listener, app).await?;
+    // Serve with connection info so per-IP rate limiting can read the real TCP
+    // peer address (see z8run_api::rate_limit) instead of trusting spoofable
+    // forwarded headers.
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
 
     Ok(())
 }

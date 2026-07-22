@@ -15,7 +15,7 @@
 use axum::{
     body::Body,
     extract::ConnectInfo,
-    http::{Request, Response, StatusCode},
+    http::{HeaderMap, Request, Response, StatusCode},
     middleware::Next,
 };
 use std::collections::HashMap;
@@ -132,28 +132,59 @@ impl RateLimiter {
     }
 }
 
-/// Extract client IP from request (supports X-Forwarded-For for proxies).
-fn extract_client_ip(req: &Request<Body>) -> String {
-    // Check X-Forwarded-For header first (for reverse proxy / Cloudflare)
-    if let Some(forwarded) = req.headers().get("x-forwarded-for") {
-        if let Ok(val) = forwarded.to_str() {
-            // Take the first IP in the chain (original client)
-            if let Some(ip) = val.split(',').next() {
-                return ip.trim().to_string();
+/// Whether forwarded IP headers (`X-Forwarded-For` / `X-Real-IP`) may be trusted.
+///
+/// These headers are trivially spoofable by any client that can reach the
+/// backend directly, so honoring them unconditionally lets an attacker rotate
+/// `X-Forwarded-For` to evade per-IP rate limiting. They are only meaningful
+/// when the backend is guaranteed to sit behind a trusted reverse proxy
+/// (e.g. nginx) that overwrites them.
+///
+/// Controlled by `Z8_TRUST_PROXY`: truthy values ("1", "true", "yes",
+/// case-insensitive) enable trust; anything else (including unset) disables it.
+fn trust_proxy_enabled() -> bool {
+    std::env::var("Z8_TRUST_PROXY")
+        .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
+        .unwrap_or(false)
+}
+
+/// Extract the client IP used as the rate-limit bucket key.
+///
+/// When `trust_proxy` is `true`, forwarded headers are preferred (original
+/// client behind a trusted reverse proxy), falling back to the TCP peer address.
+/// When `trust_proxy` is `false`, forwarded headers are ignored entirely and the
+/// actual TCP peer address is always used, so a client cannot spoof its identity.
+///
+/// Falls back to `"unknown"` only when no peer address is available and no
+/// trusted header applies, rather than panicking.
+fn extract_client_ip(headers: &HeaderMap, peer: Option<SocketAddr>, trust_proxy: bool) -> String {
+    if trust_proxy {
+        // Trusted proxy: prefer X-Forwarded-For (first / original client in chain).
+        if let Some(forwarded) = headers.get("x-forwarded-for") {
+            if let Ok(val) = forwarded.to_str() {
+                if let Some(ip) = val.split(',').next() {
+                    let ip = ip.trim();
+                    if !ip.is_empty() {
+                        return ip.to_string();
+                    }
+                }
+            }
+        }
+
+        // Then X-Real-IP.
+        if let Some(real_ip) = headers.get("x-real-ip") {
+            if let Ok(val) = real_ip.to_str() {
+                let val = val.trim();
+                if !val.is_empty() {
+                    return val.to_string();
+                }
             }
         }
     }
 
-    // Check X-Real-IP header
-    if let Some(real_ip) = req.headers().get("x-real-ip") {
-        if let Ok(val) = real_ip.to_str() {
-            return val.trim().to_string();
-        }
-    }
-
-    // Fallback to socket address
-    if let Some(addr) = req.extensions().get::<ConnectInfo<SocketAddr>>() {
-        return addr.0.ip().to_string();
+    // Untrusted (default), or trusted but no usable header: use the TCP peer addr.
+    if let Some(addr) = peer {
+        return addr.ip().to_string();
     }
 
     "unknown".to_string()
@@ -213,7 +244,13 @@ pub async fn hook_rate_limit(req: Request<Body>, next: Next) -> Response<Body> {
 }
 
 async fn rate_limit_inner(req: Request<Body>, next: Next, limiter: &RateLimiter) -> Response<Body> {
-    let client_ip = extract_client_ip(&req);
+    // Peer address is injected as a `ConnectInfo` extension when the server is
+    // started with `into_make_service_with_connect_info::<SocketAddr>()`.
+    let peer = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ci| ci.0);
+    let client_ip = extract_client_ip(req.headers(), peer, trust_proxy_enabled());
     let (allowed, remaining, reset_secs) = limiter.check(&client_ip).await;
 
     if !allowed {
@@ -348,6 +385,51 @@ mod tests {
             assert!(allowed, "disabled limiter must always allow requests");
             assert_eq!(reset, 0, "disabled limiter must not emit retry-after");
         }
+    }
+
+    #[test]
+    fn untrusted_proxy_ignores_spoofed_forwarded_headers() {
+        // With Z8_TRUST_PROXY off, a client-supplied X-Forwarded-For / X-Real-IP
+        // must be ignored in favor of the real TCP peer address, so it can't be
+        // rotated to evade per-IP rate limiting.
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", "9.9.9.9".parse().unwrap());
+        headers.insert("x-real-ip", "8.8.8.8".parse().unwrap());
+        let peer: SocketAddr = "203.0.113.7:5555".parse().unwrap();
+
+        let ip = extract_client_ip(&headers, Some(peer), false);
+        assert_eq!(ip, "203.0.113.7");
+    }
+
+    #[test]
+    fn trusted_proxy_prefers_forwarded_header() {
+        // With trust enabled, the first hop in X-Forwarded-For wins.
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", "9.9.9.9, 10.0.0.1".parse().unwrap());
+        let peer: SocketAddr = "203.0.113.7:5555".parse().unwrap();
+
+        let ip = extract_client_ip(&headers, Some(peer), true);
+        assert_eq!(ip, "9.9.9.9");
+    }
+
+    #[test]
+    fn trusted_proxy_falls_back_to_peer_without_headers() {
+        // Trust enabled but no forwarded headers present: use the peer addr.
+        let headers = HeaderMap::new();
+        let peer: SocketAddr = "203.0.113.7:5555".parse().unwrap();
+
+        let ip = extract_client_ip(&headers, Some(peer), true);
+        assert_eq!(ip, "203.0.113.7");
+    }
+
+    #[test]
+    fn missing_peer_falls_back_to_unknown() {
+        // No peer address and untrusted headers => stable "unknown", no panic.
+        let mut headers = HeaderMap::new();
+        headers.insert("x-forwarded-for", "9.9.9.9".parse().unwrap());
+
+        let ip = extract_client_ip(&headers, None, false);
+        assert_eq!(ip, "unknown");
     }
 
     #[test]
