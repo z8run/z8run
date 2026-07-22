@@ -19,6 +19,7 @@ interface FlowState {
   flowName: string;
   saving: boolean;
   dirty: boolean;
+  saveError: string | null;
 
   // React Flow state
   nodes: Node<Z8NodeData>[];
@@ -51,11 +52,19 @@ export const useFlowStore = create<FlowState>((set, get) => ({
   flowName: "Untitled Flow",
   saving: false,
   dirty: false,
+  saveError: null,
   nodes: [],
   edges: [],
 
   setFlow: (id, name, nodes, edges) =>
-    set({ flowId: id, flowName: name, nodes, edges, dirty: false }),
+    set({
+      flowId: id,
+      flowName: name,
+      nodes,
+      edges,
+      dirty: false,
+      saveError: null,
+    }),
 
   onNodesChange: (changes) =>
     set({ nodes: applyNodeChanges(changes, get().nodes), dirty: true }),
@@ -120,13 +129,14 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       nodes: [],
       edges: [],
       dirty: false,
+      saveError: null,
     }),
 
   saveFlow: async (viewport) => {
     const { flowId, flowName, nodes, edges } = get();
     if (!flowId) return;
 
-    set({ saving: true });
+    set({ saving: true, saveError: null });
     try {
       const payload: SaveFlowRequest = {
         name: flowName,
@@ -136,6 +146,13 @@ export const useFlowStore = create<FlowState>((set, get) => ({
       };
       await flowsApi.update(flowId, payload);
       set({ dirty: false });
+    } catch (err) {
+      // Keep the flow marked dirty so the user knows it is not saved,
+      // and surface the failure via saveError for the UI to display.
+      console.error("Save failed:", err);
+      const message =
+        err instanceof Error ? err.message : "Failed to save flow";
+      set({ dirty: true, saveError: message });
     } finally {
       set({ saving: false });
     }

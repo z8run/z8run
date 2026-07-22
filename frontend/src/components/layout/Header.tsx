@@ -2,7 +2,15 @@ import { flowsApi } from "@/api/flows";
 import { useEngineStore } from "@/hooks/useEngineSocket";
 import { useFlowStore } from "@/stores/flowStore";
 import { useReactFlow } from "@xyflow/react";
-import { Check, ChevronLeft, Loader2, Play, Save, Square } from "lucide-react";
+import {
+  AlertTriangle,
+  Check,
+  ChevronLeft,
+  Loader2,
+  Play,
+  Save,
+  Square,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -11,6 +19,7 @@ export function Header() {
   const flowId = useFlowStore((s) => s.flowId);
   const saving = useFlowStore((s) => s.saving);
   const dirty = useFlowStore((s) => s.dirty);
+  const saveError = useFlowStore((s) => s.saveError);
   const saveFlow = useFlowStore((s) => s.saveFlow);
   const setFlowName = useFlowStore((s) => s.setFlowName);
   const running = useEngineStore((s) => s.running);
@@ -102,6 +111,21 @@ export function Header() {
 
       {/* Right: actions */}
       <div className="flex items-center gap-2">
+        {saveError && (
+          <div
+            role="alert"
+            className="flex items-center gap-1.5 max-w-xs px-2 py-1 text-xs text-red-300
+              bg-red-900/20 border border-red-700 rounded-md"
+            title={saveError}
+          >
+            <AlertTriangle
+              size={14}
+              className="text-red-400 flex-shrink-0"
+              aria-hidden="true"
+            />
+            <span className="truncate">Save failed: {saveError}</span>
+          </div>
+        )}
         <button
           type="button"
           onClick={handleSave}
