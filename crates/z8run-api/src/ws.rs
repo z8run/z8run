@@ -45,22 +45,25 @@ fn token_from_protocols(headers: &HeaderMap) -> Option<String> {
 
 /// WebSocket upgrade handler.
 ///
-/// Requires authentication. Browsers cannot set an `Authorization` header on a
-/// WebSocket handshake, so the JWT is passed via the `Sec-WebSocket-Protocol`
-/// header and validated before the connection is upgraded. Unauthenticated
-/// clients are rejected with `401` instead of receiving the engine event stream.
+/// Requires authentication, validated before the connection is upgraded. The
+/// JWT is taken from the HttpOnly `z8_session` cookie (browsers, sent
+/// automatically on a same-origin handshake) or, as a fallback, the
+/// `Sec-WebSocket-Protocol` header (non-browser clients using a bearer token).
+/// Unauthenticated clients get `401` instead of the engine event stream.
 async fn ws_handler(
     ws: WebSocketUpgrade,
     headers: HeaderMap,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    let token = match token_from_protocols(&headers) {
-        Some(t) => t,
-        None => {
-            warn!("WebSocket rejected: missing token");
-            return (StatusCode::UNAUTHORIZED, "Missing authentication token").into_response();
-        }
-    };
+    let subprotocol_token = token_from_protocols(&headers);
+    let token =
+        match crate::auth::token_from_cookies(&headers).or_else(|| subprotocol_token.clone()) {
+            Some(t) => t,
+            None => {
+                warn!("WebSocket rejected: missing token");
+                return (StatusCode::UNAUTHORIZED, "Missing authentication token").into_response();
+            }
+        };
 
     let claims = match decode_jwt(&token, &state.jwt_secret) {
         Ok(c) if !c.is_expired() => c,
@@ -71,9 +74,14 @@ async fn ws_handler(
     };
 
     let user_id = claims.sub;
-    // Echo back the accepted subprotocol so the browser completes the handshake.
-    ws.protocols([AUTH_PROTOCOL])
-        .on_upgrade(move |socket| handle_socket(socket, state, user_id))
+    // When the client authenticated via subprotocol, echo it back so the
+    // handshake completes; cookie-authenticated clients need no subprotocol.
+    if subprotocol_token.is_some() {
+        ws.protocols([AUTH_PROTOCOL])
+            .on_upgrade(move |socket| handle_socket(socket, state, user_id))
+    } else {
+        ws.on_upgrade(move |socket| handle_socket(socket, state, user_id))
+    }
 }
 
 /// Converts an EngineEvent to a JSON value for the frontend.

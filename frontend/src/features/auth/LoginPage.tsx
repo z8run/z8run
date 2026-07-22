@@ -6,14 +6,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function LoginPage() {
-  const { login, loading, error, token, clearError } = useAuthStore();
+  const { login, loading, error, user, clearError } = useAuthStore();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (token) navigate("/");
-  }, [token, navigate]);
+    if (user) navigate("/");
+  }, [user, navigate]);
 
   useEffect(() => {
     clearError();

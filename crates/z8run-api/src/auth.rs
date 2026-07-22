@@ -4,7 +4,8 @@ use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::Request;
+use axum::http::header::SET_COOKIE;
+use axum::http::{HeaderMap, HeaderValue, Request};
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -87,6 +88,62 @@ pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, ApiError> {
     Ok(data.claims)
 }
 
+/// Name of the HttpOnly session cookie that carries the JWT (SEC-009).
+pub(crate) const SESSION_COOKIE: &str = "z8_session";
+
+/// Session lifetime in hours (matches the JWT expiry).
+const SESSION_TTL_HOURS: i64 = 24;
+
+/// Whether to mark the session cookie `Secure` (HTTPS only).
+///
+/// Enable in production via `Z8_COOKIE_SECURE=true`. Off by default so local
+/// http dev keeps working (a `Secure` cookie is not sent over plain http).
+fn cookie_secure() -> bool {
+    matches!(
+        std::env::var("Z8_COOKIE_SECURE").ok().as_deref(),
+        Some("1") | Some("true") | Some("TRUE") | Some("yes")
+    )
+}
+
+/// Builds the `Set-Cookie` value that stores the session token.
+fn session_cookie(token: &str) -> String {
+    let max_age = SESSION_TTL_HOURS * 3600;
+    let secure = if cookie_secure() { "; Secure" } else { "" };
+    format!("{SESSION_COOKIE}={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age={max_age}{secure}")
+}
+
+/// Builds the `Set-Cookie` value that clears the session token.
+fn clear_session_cookie() -> String {
+    let secure = if cookie_secure() { "; Secure" } else { "" };
+    format!("{SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0{secure}")
+}
+
+/// Extracts the session token from the `Cookie` request header, if present.
+pub(crate) fn token_from_cookies(headers: &HeaderMap) -> Option<String> {
+    let raw = headers.get(axum::http::header::COOKIE)?.to_str().ok()?;
+    raw.split(';').find_map(|part| {
+        part.trim()
+            .strip_prefix(SESSION_COOKIE)
+            .and_then(|rest| rest.strip_prefix('='))
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    })
+}
+
+/// Wraps a JSON auth response with a `Set-Cookie` header for the session.
+fn auth_response_with_cookie(
+    token: &str,
+    body: AuthResponse,
+) -> Result<(HeaderMap, Json<AuthResponse>), ApiError> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        SET_COOKIE,
+        HeaderValue::from_str(&session_cookie(token))
+            .map_err(|e| ApiError::internal(format!("Invalid session cookie: {}", e)))?,
+    );
+    Ok((headers, Json(body)))
+}
+
 /// Request payload for user registration.
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
@@ -123,7 +180,7 @@ pub struct UserInfo {
 async fn register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RegisterRequest>,
-) -> Result<Json<AuthResponse>, ApiError> {
+) -> Result<(HeaderMap, Json<AuthResponse>), ApiError> {
     // Validate inputs
     if payload.email.is_empty() {
         return Err(ApiError::bad_request("Email cannot be empty"));
@@ -181,19 +238,20 @@ async fn register(
         payload.username.clone(),
         payload.email.clone(),
         vec!["user".to_string()],
-        24, // 24-hour expiration
+        SESSION_TTL_HOURS,
     );
     let token = encode_jwt(&claims, &state.jwt_secret)?;
 
-    Ok(Json(AuthResponse {
-        token,
+    let body = AuthResponse {
+        token: token.clone(),
         user: UserInfo {
             id: user_id.to_string(),
             email: payload.email,
             username: payload.username,
             roles: vec!["user".to_string()],
         },
-    }))
+    };
+    auth_response_with_cookie(&token, body)
 }
 
 /// Authenticates a user and returns a JWT token.
@@ -201,7 +259,7 @@ async fn register(
 async fn login(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<LoginRequest>,
-) -> Result<Json<AuthResponse>, ApiError> {
+) -> Result<(HeaderMap, Json<AuthResponse>), ApiError> {
     // Validate inputs
     if payload.email.is_empty() {
         return Err(ApiError::bad_request("Email cannot be empty"));
@@ -230,19 +288,20 @@ async fn login(
         user.username.clone(),
         user.email.clone(),
         user.roles.clone(),
-        24, // 24-hour expiration
+        SESSION_TTL_HOURS,
     );
     let token = encode_jwt(&claims, &state.jwt_secret)?;
 
-    Ok(Json(AuthResponse {
-        token,
+    let body = AuthResponse {
+        token: token.clone(),
         user: UserInfo {
             id: user.id.to_string(),
             email: user.email,
             username: user.username,
             roles: user.roles,
         },
-    }))
+    };
+    auth_response_with_cookie(&token, body)
 }
 
 /// Returns the authenticated user's information.
@@ -256,21 +315,39 @@ async fn me(axum::Extension(claims): axum::Extension<Claims>) -> Result<Json<Use
     }))
 }
 
+/// Clears the session cookie.
+/// POST /auth/logout
+async fn logout() -> Result<(HeaderMap, Json<serde_json::Value>), ApiError> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        SET_COOKIE,
+        HeaderValue::from_str(&clear_session_cookie())
+            .map_err(|e| ApiError::internal(format!("Invalid session cookie: {}", e)))?,
+    );
+    Ok((headers, Json(serde_json::json!({ "status": "logged_out" }))))
+}
+
 /// JWT middleware that validates tokens and inserts Claims into request extensions.
+///
+/// The token is taken from the `Authorization: Bearer` header (for CLI/API
+/// clients) or, failing that, the HttpOnly `z8_session` cookie (browsers).
 pub async fn jwt_middleware(
     State(state): State<Arc<AppState>>,
     mut req: Request<Body>,
     next: Next,
 ) -> Result<Response, ApiError> {
-    let auth_header = req
+    let bearer = req
         .headers()
         .get("authorization")
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(str::to_string);
 
-    let token =
-        auth_header.ok_or_else(|| ApiError::unauthorized("Missing authorization header"))?;
-    let claims = decode_jwt(token, &state.jwt_secret)?;
+    let token = bearer
+        .or_else(|| token_from_cookies(req.headers()))
+        .ok_or_else(|| ApiError::unauthorized("Missing authentication"))?;
+
+    let claims = decode_jwt(&token, &state.jwt_secret)?;
 
     // Check if token is expired
     if claims.is_expired() {
@@ -286,6 +363,7 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
+        .route("/logout", post(logout))
 }
 
 /// Mounts protected authentication routes (requires JWT).

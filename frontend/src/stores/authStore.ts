@@ -3,10 +3,11 @@ import { extractErrorMessage } from "@/lib/extractError";
 import { create } from "zustand";
 
 interface AuthState {
-  token: string | null;
   user: UserInfo | null;
   loading: boolean;
   error: string | null;
+  /** True once the initial session check (/auth/me) has completed. */
+  initialized: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   register: (
@@ -14,23 +15,24 @@ interface AuthState {
     username: string,
     password: string,
   ) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  token: localStorage.getItem("z8_token"),
+// The session lives in an HttpOnly cookie set by the server (SEC-009); the
+// token is never stored in JS. Auth state is derived from /auth/me instead.
+export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   loading: false,
   error: null,
+  initialized: false,
 
   login: async (email, password) => {
     set({ loading: true, error: null });
     try {
       const res = await authService.login(email, password);
-      localStorage.setItem("z8_token", res.token);
-      set({ token: res.token, user: res.user, loading: false });
+      set({ user: res.user, loading: false, initialized: true });
     } catch (err: unknown) {
       const msg = await extractErrorMessage(err, "Login failed");
       set({ error: msg, loading: false });
@@ -41,29 +43,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const res = await authService.register(email, username, password);
-      localStorage.setItem("z8_token", res.token);
-      set({ token: res.token, user: res.user, loading: false });
+      set({ user: res.user, loading: false, initialized: true });
     } catch (err: unknown) {
       const msg = await extractErrorMessage(err, "Registration failed");
       set({ error: msg, loading: false });
     }
   },
 
-  logout: () => {
-    localStorage.removeItem("z8_token");
-    set({ token: null, user: null });
+  logout: async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Clear local state even if the network call fails.
+    }
+    set({ user: null });
   },
 
   checkAuth: async () => {
-    const token = get().token;
-    if (!token) return;
     try {
-      const user = await authService.me(token);
-      set({ user });
+      const user = await authService.me();
+      set({ user, initialized: true });
     } catch {
-      // Token expired or invalid
-      localStorage.removeItem("z8_token");
-      set({ token: null, user: null });
+      // No valid session cookie.
+      set({ user: null, initialized: true });
     }
   },
 

@@ -6,15 +6,15 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function RegisterPage() {
-  const { register, loading, error, token, clearError } = useAuthStore();
+  const { register, loading, error, user, clearError } = useAuthStore();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   useEffect(() => {
-    if (token) navigate("/");
-  }, [token, navigate]);
+    if (user) navigate("/");
+  }, [user, navigate]);
 
   useEffect(() => {
     clearError();

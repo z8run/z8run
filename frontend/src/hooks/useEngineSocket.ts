@@ -213,15 +213,11 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let connectTimer: ReturnType<typeof setTimeout> | null = null;
 let refCount = 0;
 
-/** Subprotocol marker the server expects before the JWT. */
-const AUTH_PROTOCOL = "z8.jwt";
-
 function getWsUrl(): string {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const backendHost = import.meta.env.DEV
-    ? "localhost:7700"
-    : window.location.host;
-  return `${protocol}//${backendHost}/ws/engine`;
+  // Always same-origin so the HttpOnly session cookie is sent on the handshake
+  // (SEC-009). In dev the vite server proxies /ws to the backend.
+  return `${protocol}//${window.location.host}/ws/engine`;
 }
 
 function doConnect() {
@@ -236,14 +232,9 @@ function doConnect() {
   // Nobody wants the connection - don't connect
   if (refCount <= 0) return;
 
-  const url = getWsUrl();
-  // Authenticate via the Sec-WebSocket-Protocol header (browsers can't set an
-  // Authorization header on a WS handshake). Passing it here — rather than in
-  // the URL — keeps the token out of access and proxy logs.
-  const token = localStorage.getItem("z8_token") ?? "";
-  const socket = token
-    ? new WebSocket(url, [AUTH_PROTOCOL, token])
-    : new WebSocket(url);
+  // The server authenticates the WS from the session cookie, which the browser
+  // sends automatically on this same-origin handshake — no token in JS.
+  const socket = new WebSocket(getWsUrl());
   ws = socket;
 
   socket.onopen = () => {
