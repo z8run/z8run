@@ -231,6 +231,35 @@ fn truncate_payload(value: &serde_json::Value) -> serde_json::Value {
     }
 }
 
+/// Routes a node's output messages to its downstream channels, emitting a
+/// `MessageSent` event per delivery. A message goes to a target when its
+/// `source_port` matches the edge's port, or when the node has a single
+/// outgoing channel (the common pass-through case).
+async fn dispatch_outputs(
+    messages: &[FlowMessage],
+    out_channels: &[(String, Uuid, mpsc::Sender<FlowMessage>)],
+    event_tx: &broadcast::Sender<EngineEvent>,
+    flow_id: Uuid,
+    node_id: Uuid,
+) {
+    for msg in messages {
+        for (port, to_node, tx) in out_channels {
+            if msg.source_port == *port || out_channels.len() == 1 {
+                let _ = event_tx.send(EngineEvent::MessageSent {
+                    flow_id,
+                    from_node: node_id,
+                    to_node: *to_node,
+                    message_id: msg.id,
+                    payload_preview: Some(truncate_payload(&msg.payload)),
+                });
+                if tx.send(msg.clone()).await.is_err() {
+                    warn!("Channel closed when sending to node {}", to_node);
+                }
+            }
+        }
+    }
+}
+
 impl FlowEngine {
     /// Creates a new flow engine.
     pub fn new() -> Self {
@@ -448,37 +477,49 @@ impl FlowEngine {
                 let handle = tokio::spawn(async move {
                     let start = std::time::Instant::now();
 
-                    // If it is a root node (no receiver), generate an initial message
-                    let messages = if let Some(ref mut receiver) = rx {
-                        // Receive a message from the channel
-                        match receiver.recv().await {
-                            Some(msg) => {
-                                // Node will process - emit NodeStarted
-                                let _ =
-                                    event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
+                    // First output payload, captured for the UI preview.
+                    let mut output_preview = None;
 
-                                let reg = registry.read().await;
-                                let factory = reg.get(&node_type_str).ok_or_else(|| {
-                                    Z8Error::Internal(format!(
-                                        "No executor registered for type '{}'",
-                                        node_type_str
-                                    ))
-                                })?;
-                                let mut executor = factory.create(node_config).await?;
-                                executor.set_event_emitter(event_tx.clone());
-                                executor.process(msg).await?
+                    if let Some(ref mut receiver) = rx {
+                        // FUNC-007: process EVERY message this node received, not
+                        // just the first. Because nodes run in topological steps,
+                        // all upstream senders are already dropped by the time this
+                        // node runs, so the channel drains and closes without
+                        // blocking. A node with several incoming edges therefore
+                        // fires once per message instead of silently discarding all
+                        // but the first.
+                        let Some(first_msg) = receiver.recv().await else {
+                            // Channel closed with no message: inactive branch.
+                            debug!(node_id = %node_id, "Node skipped (no message received)");
+                            let _ = event_tx.send(EngineEvent::NodeSkipped { flow_id, node_id });
+                            return Ok(());
+                        };
+
+                        let _ = event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
+
+                        let reg = registry.read().await;
+                        let factory = reg.get(&node_type_str).ok_or_else(|| {
+                            Z8Error::Internal(format!(
+                                "No executor registered for type '{}'",
+                                node_type_str
+                            ))
+                        })?;
+                        let mut executor = factory.create(node_config).await?;
+                        executor.set_event_emitter(event_tx.clone());
+
+                        let mut next = Some(first_msg);
+                        while let Some(msg) = next {
+                            let outputs = executor.process(msg).await?;
+                            if output_preview.is_none() {
+                                output_preview =
+                                    outputs.first().map(|m| truncate_payload(&m.payload));
                             }
-                            None => {
-                                // Channel closed - this node is on an inactive branch.
-                                // Emit NodeSkipped instead of NodeStarted + NodeCompleted.
-                                debug!(node_id = %node_id, "Node skipped (no message received)");
-                                let _ =
-                                    event_tx.send(EngineEvent::NodeSkipped { flow_id, node_id });
-                                return Ok(());
-                            }
+                            dispatch_outputs(&outputs, &out_channels, &event_tx, flow_id, node_id)
+                                .await;
+                            next = receiver.recv().await;
                         }
                     } else {
-                        // Root node: always processes
+                        // Root node: always processes a single trigger message.
                         let _ = event_tx.send(EngineEvent::NodeStarted { flow_id, node_id });
 
                         let reg = registry.read().await;
@@ -503,29 +544,10 @@ impl FlowEngine {
                                 trace_id,
                             )
                         };
-                        executor.process(root_msg).await?
-                    };
-
-                    // Capture the first output payload for UI preview
-                    let output_preview = messages.first().map(|m| truncate_payload(&m.payload));
-
-                    // Send messages to target nodes
-                    for msg in &messages {
-                        for (port, to_node, tx) in &out_channels {
-                            if msg.source_port == *port || out_channels.len() == 1 {
-                                let preview = truncate_payload(&msg.payload);
-                                let _ = event_tx.send(EngineEvent::MessageSent {
-                                    flow_id,
-                                    from_node: node_id,
-                                    to_node: *to_node,
-                                    message_id: msg.id,
-                                    payload_preview: Some(preview),
-                                });
-                                if tx.send(msg.clone()).await.is_err() {
-                                    warn!("Channel closed when sending to node {}", to_node);
-                                }
-                            }
-                        }
+                        let outputs = executor.process(root_msg).await?;
+                        output_preview = outputs.first().map(|m| truncate_payload(&m.payload));
+                        dispatch_outputs(&outputs, &out_channels, &event_tx, flow_id, node_id)
+                            .await;
                     }
 
                     let duration_us = start.elapsed().as_micros() as u64;
@@ -742,5 +764,65 @@ mod tests {
             .await
             .expect("cancelled() did not resolve after cancel()")
             .expect("awaiter task panicked");
+    }
+
+    /// FUNC-007: a node with several incoming edges must process EVERY message,
+    /// not just the first. Two root nodes fan into `C`, which forwards to `D`;
+    /// `C` must therefore emit two outgoing messages (one per input), proving
+    /// both inputs were consumed rather than one silently dropped.
+    #[tokio::test]
+    async fn multi_input_node_processes_every_message() {
+        use crate::flow::Edge;
+
+        let engine = FlowEngine::new();
+        engine
+            .register_node_type(Arc::new(crate::nodes::debug::DebugNodeFactory))
+            .await;
+
+        let mut flow = Flow::new("Fan-in Flow");
+        let a = Node::new("A", "debug").with_output("output", PortType::Any);
+        let b = Node::new("B", "debug").with_output("output", PortType::Any);
+        let c = Node::new("C", "debug")
+            .with_input("input", PortType::Any)
+            .with_output("output", PortType::Any);
+        let d = Node::new("D", "debug").with_input("input", PortType::Any);
+        let (a_id, b_id, c_id, d_id) = (a.id, b.id, c.id, d.id);
+        flow.add_node(a);
+        flow.add_node(b);
+        flow.add_node(c);
+        flow.add_node(d);
+        flow.edges.push(Edge::new(a_id, "output", c_id, "input"));
+        flow.edges.push(Edge::new(b_id, "output", c_id, "input"));
+        flow.edges.push(Edge::new(c_id, "output", d_id, "input"));
+
+        let flow_id = flow.id;
+        let mut events = engine.subscribe_events();
+        engine.execute(flow).await.unwrap();
+
+        // Count the messages C forwarded to D, up to flow completion.
+        let from_c = tokio::time::timeout(Duration::from_secs(5), async {
+            let mut count = 0;
+            loop {
+                match events.recv().await {
+                    Ok(EngineEvent::MessageSent { from_node, .. }) if from_node == c_id => {
+                        count += 1;
+                    }
+                    Ok(EngineEvent::FlowCompleted { flow_id: fid, .. })
+                    | Ok(EngineEvent::FlowError { flow_id: fid, .. })
+                        if fid == flow_id =>
+                    {
+                        break count;
+                    }
+                    _ => continue,
+                }
+            }
+        })
+        .await
+        .expect("flow did not complete in time");
+
+        assert_eq!(
+            from_c, 2,
+            "fan-in node forwarded {from_c} of 2 inputs (must process every message)"
+        );
     }
 }
