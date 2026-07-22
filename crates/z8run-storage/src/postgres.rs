@@ -232,6 +232,23 @@ impl FlowRepository for PgStorage {
         tracing::debug!(flow_id = %id, user_id = %user_id, "Flow deleted");
         Ok(())
     }
+
+    async fn get_flow_owner(&self, id: Uuid) -> Result<Option<Uuid>, StorageError> {
+        let id_str = id.to_string();
+
+        let row: (Option<String>,) = sqlx::query_as("SELECT user_id FROM flows WHERE id = $1")
+            .bind(&id_str)
+            .fetch_optional(&self.pool)
+            .await?
+            .ok_or(StorageError::FlowNotFound(id))?;
+
+        match row.0 {
+            Some(uid) => Ok(Some(
+                Uuid::parse_str(&uid).map_err(|e| StorageError::Serialization(e.to_string()))?,
+            )),
+            None => Ok(None),
+        }
+    }
 }
 
 #[async_trait::async_trait]

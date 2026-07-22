@@ -81,6 +81,27 @@ ALTER TABLE flows ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id);
 CREATE INDEX IF NOT EXISTS idx_flows_user_id ON flows(user_id);
 "#;
 
+/// Migration SQL for PostgreSQL V3 (per-user credential vault).
+///
+/// The old `credentials` table keyed secrets by `key` alone, so any
+/// authenticated user could read or overwrite another user's credentials.
+/// This migration rebuilds the table scoped to `(user_id, key)`. Existing
+/// rows had no owner and were globally accessible, so they are dropped: they
+/// must be re-added by their rightful owner after upgrade.
+pub const PG_MIGRATION_V3: &str = r#"
+DROP TABLE IF EXISTS credentials;
+
+CREATE TABLE credentials (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key TEXT NOT NULL,
+    encrypted_value BYTEA NOT NULL,
+    nonce BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (user_id, key)
+);
+"#;
+
 /// Migration SQL for SQLite.
 pub const SQLITE_MIGRATION_V1: &str = r#"
 CREATE TABLE IF NOT EXISTS flows (
@@ -159,6 +180,25 @@ ALTER TABLE flows ADD COLUMN user_id TEXT REFERENCES users(id);
 CREATE INDEX IF NOT EXISTS idx_flows_user_id ON flows(user_id);
 "#;
 
+/// Migration SQL for SQLite V3 (per-user credential vault).
+///
+/// See `PG_MIGRATION_V3`. The `credentials` table is rebuilt with a composite
+/// `(user_id, key)` primary key so secrets are isolated per user. Pre-existing
+/// rows had no owner and are dropped.
+pub const SQLITE_MIGRATION_V3: &str = r#"
+DROP TABLE IF EXISTS credentials;
+
+CREATE TABLE credentials (
+    user_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    encrypted_value BLOB NOT NULL,
+    nonce BLOB NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, key)
+);
+"#;
+
 /// Helper: split SQL into individual statements, strip comments.
 fn split_statements(sql: &str) -> Vec<String> {
     sql.split(';')
@@ -235,6 +275,30 @@ pub async fn run_pg_migrations(pool: &sqlx::PgPool) -> Result<(), StorageError> 
         tracing::debug!("PostgreSQL migration V2 already applied");
     }
 
+    let applied_v3: Option<(i32,)> =
+        sqlx::query_as("SELECT version FROM schema_migrations WHERE version = 3")
+            .fetch_optional(pool)
+            .await?;
+
+    if applied_v3.is_none() {
+        tracing::info!("Applying PostgreSQL migration V3...");
+
+        for stmt in &split_statements(PG_MIGRATION_V3) {
+            sqlx::query(stmt)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Migration(format!("Failed to execute: {}", e)))?;
+        }
+
+        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (3, NOW())")
+            .execute(pool)
+            .await?;
+
+        tracing::info!("PostgreSQL migration V3 applied successfully");
+    } else {
+        tracing::debug!("PostgreSQL migration V3 already applied");
+    }
+
     Ok(())
 }
 
@@ -305,6 +369,32 @@ pub async fn run_sqlite_migrations(pool: &sqlx::SqlitePool) -> Result<(), Storag
         tracing::info!("SQLite migration V2 applied successfully");
     } else {
         tracing::debug!("SQLite migration V2 already applied");
+    }
+
+    let applied_v3: Option<(i64,)> =
+        sqlx::query_as("SELECT version FROM schema_migrations WHERE version = 3")
+            .fetch_optional(pool)
+            .await?;
+
+    if applied_v3.is_none() {
+        tracing::info!("Applying SQLite migration V3...");
+
+        for stmt in &split_statements(SQLITE_MIGRATION_V3) {
+            sqlx::query(stmt)
+                .execute(pool)
+                .await
+                .map_err(|e| StorageError::Migration(format!("Failed to execute: {}", e)))?;
+        }
+
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query("INSERT INTO schema_migrations (version, applied_at) VALUES (3, ?1)")
+            .bind(&now)
+            .execute(pool)
+            .await?;
+
+        tracing::info!("SQLite migration V3 applied successfully");
+    } else {
+        tracing::debug!("SQLite migration V3 already applied");
     }
 
     Ok(())

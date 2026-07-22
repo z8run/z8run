@@ -303,7 +303,8 @@ async fn start_flow(
         .map_err(ApiError::from)?;
 
     // Build an executable Flow from canvas state (returns id_map for frontend feedback)
-    let (exec_flow, id_map) = canvas_to_flow(&stored_flow, state.vault.as_ref()).await?;
+    let (exec_flow, id_map) =
+        canvas_to_flow(&stored_flow, claims.sub, state.vault.as_ref()).await?;
 
     info!(
         flow_id = %id,
@@ -404,12 +405,13 @@ fn register_hook_routes(stored: &Flow, flow_id: Uuid) -> Vec<serde_json::Value> 
 /// from the credential vault. Other values pass through unchanged.
 async fn resolve_vault_refs(
     value: serde_json::Value,
+    user_id: Uuid,
     vault: &dyn CredentialVault,
 ) -> serde_json::Value {
     match value {
         serde_json::Value::String(ref s) if s.starts_with("vault:") => {
             let key = &s[6..]; // strip "vault:" prefix
-            match vault.retrieve(key).await {
+            match vault.retrieve(user_id, key).await {
                 Ok(secret) => serde_json::Value::String(secret),
                 Err(e) => {
                     warn!(vault_key = key, error = %e, "Failed to resolve vault reference");
@@ -421,14 +423,14 @@ async fn resolve_vault_refs(
         serde_json::Value::Object(map) => {
             let mut resolved = serde_json::Map::new();
             for (k, v) in map {
-                resolved.insert(k, Box::pin(resolve_vault_refs(v, vault)).await);
+                resolved.insert(k, Box::pin(resolve_vault_refs(v, user_id, vault)).await);
             }
             serde_json::Value::Object(resolved)
         }
         serde_json::Value::Array(arr) => {
             let mut resolved = Vec::with_capacity(arr.len());
             for v in arr {
-                resolved.push(Box::pin(resolve_vault_refs(v, vault)).await);
+                resolved.push(Box::pin(resolve_vault_refs(v, user_id, vault)).await);
             }
             serde_json::Value::Array(resolved)
         }
@@ -441,6 +443,7 @@ async fn resolve_vault_refs(
 /// an executable core Flow with proper Nodes and Edges.
 async fn canvas_to_flow(
     stored: &Flow,
+    user_id: Uuid,
     vault: &dyn CredentialVault,
 ) -> Result<(Flow, std::collections::HashMap<String, Uuid>), ApiError> {
     let canvas_nodes = stored
@@ -511,9 +514,9 @@ async fn canvas_to_flow(
             core_node = core_node.with_output("output", PortType::Any);
         }
 
-        // Pass the node config (resolve vault references)
+        // Pass the node config (resolve vault references under the flow owner)
         if let Some(config) = data.get("config") {
-            let resolved = resolve_vault_refs(config.clone(), vault).await;
+            let resolved = resolve_vault_refs(config.clone(), user_id, vault).await;
             core_node = core_node.with_config(resolved);
         }
 
@@ -559,11 +562,11 @@ fn parse_port_type(s: &str) -> PortType {
 /// List all credential keys (not values!)
 async fn list_credentials(
     State(state): State<Arc<AppState>>,
-    axum::Extension(_claims): axum::Extension<Claims>,
+    axum::Extension(claims): axum::Extension<Claims>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let keys = state
         .vault
-        .list_keys()
+        .list_keys(claims.sub)
         .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
     Ok(Json(serde_json::json!({ "keys": keys })))
@@ -574,7 +577,7 @@ async fn list_credentials(
 /// Body: { "key": "openai_api_key", "value": "sk-..." }
 async fn store_credential(
     State(state): State<Arc<AppState>>,
-    axum::Extension(_claims): axum::Extension<Claims>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let key = body["key"]
@@ -586,7 +589,7 @@ async fn store_credential(
 
     state
         .vault
-        .store(key, value)
+        .store(claims.sub, key, value)
         .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
 
@@ -597,12 +600,12 @@ async fn store_credential(
 /// Retrieve a credential value
 async fn get_credential(
     State(state): State<Arc<AppState>>,
-    axum::Extension(_claims): axum::Extension<Claims>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Path(key): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let value = state
         .vault
-        .retrieve(&key)
+        .retrieve(claims.sub, &key)
         .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
     Ok(Json(serde_json::json!({ "key": key, "value": value })))
@@ -612,12 +615,12 @@ async fn get_credential(
 /// Delete a credential
 async fn delete_credential(
     State(state): State<Arc<AppState>>,
-    axum::Extension(_claims): axum::Extension<Claims>,
+    axum::Extension(claims): axum::Extension<Claims>,
     Path(key): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
         .vault
-        .delete(&key)
+        .delete(claims.sub, &key)
         .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
     Ok(Json(serde_json::json!({ "status": "deleted", "key": key })))
@@ -702,6 +705,26 @@ async fn hook_handler(
         }
     };
 
+    // Resolve the flow owner. Credential resolution for this public hook must be
+    // scoped to the owner's vault, so an unowned flow cannot be triggered.
+    let owner_id = match state.storage.get_flow_owner(flow_id).await {
+        Ok(Some(uid)) => uid,
+        Ok(None) => {
+            warn!(flow_id = %flow_id, "Hook rejected: flow has no owner");
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Flow not found"})),
+            );
+        }
+        Err(e) => {
+            error!(error = %e, "Failed to resolve flow owner");
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error": "Flow not found"})),
+            );
+        }
+    };
+
     // ── Webhook auth validation ─────────────────────────────────────
     // Extract auth config from the webhook-trigger / webhook node in canvas
     if let Some(canvas_nodes) = stored_flow
@@ -720,7 +743,7 @@ async fn hook_handler(
                     // Resolve the token (may be a vault reference like "vault:my-key")
                     let raw_token = config["authToken"].as_str().unwrap_or("");
                     let expected_token = if let Some(key) = raw_token.strip_prefix("vault:") {
-                        match state.vault.retrieve(key).await {
+                        match state.vault.retrieve(owner_id, key).await {
                             Ok(secret) => secret,
                             Err(e) => {
                                 warn!(error = %e, key = key, "Failed to resolve vault ref for webhook auth");
@@ -837,8 +860,10 @@ async fn hook_handler(
         }
     }
 
-    // Build executable flow
-    let (exec_flow, _id_map) = match canvas_to_flow(&stored_flow, state.vault.as_ref()).await {
+    // Build executable flow (vault refs resolved under the flow owner)
+    let (exec_flow, _id_map) = match canvas_to_flow(&stored_flow, owner_id, state.vault.as_ref())
+        .await
+    {
         Ok(result) => result,
         Err(e) => {
             return (

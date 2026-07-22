@@ -35,6 +35,13 @@ pub trait FlowRepository: Send + Sync {
 
     /// Deletes a flow only if it belongs to the given user.
     async fn delete_flow_for_user(&self, id: Uuid, user_id: Uuid) -> Result<(), StorageError>;
+
+    /// Returns the owner `user_id` of a flow.
+    ///
+    /// `Ok(None)` means the flow exists but has no recorded owner (legacy
+    /// rows); `Err(FlowNotFound)` means it does not exist. Used by the public
+    /// hook path to scope credential resolution to the flow's owner.
+    async fn get_flow_owner(&self, id: Uuid) -> Result<Option<Uuid>, StorageError>;
 }
 
 /// User record.
