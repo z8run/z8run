@@ -5,6 +5,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     routing::get,
     Router,
@@ -12,18 +13,66 @@ use axum::{
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
+use crate::auth::decode_jwt;
 use crate::state::AppState;
 use z8run_core::engine::EngineEvent;
+
+/// WebSocket subprotocol used to carry the auth token.
+const AUTH_PROTOCOL: &str = "z8.jwt";
 
 /// Mounts the WebSocket routes.
 pub fn ws_routes() -> Router<Arc<AppState>> {
     Router::new().route("/engine", get(ws_handler))
 }
 
+/// Extracts the JWT from the `Sec-WebSocket-Protocol` header.
+///
+/// The client offers two subprotocols: our marker (`z8.jwt`) and the token
+/// itself. We read the token from the header rather than the query string so
+/// it never lands in access logs or proxy logs.
+fn token_from_protocols(headers: &HeaderMap) -> Option<String> {
+    let raw = headers.get("sec-websocket-protocol")?.to_str().ok()?;
+    let mut parts = raw.split(',').map(|p| p.trim());
+    // First entry must be our marker; the second is the token.
+    if parts.next() != Some(AUTH_PROTOCOL) {
+        return None;
+    }
+    parts.next().filter(|t| !t.is_empty()).map(str::to_string)
+}
+
 /// WebSocket upgrade handler.
-async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, state))
+///
+/// Requires authentication. Browsers cannot set an `Authorization` header on a
+/// WebSocket handshake, so the JWT is passed via the `Sec-WebSocket-Protocol`
+/// header and validated before the connection is upgraded. Unauthenticated
+/// clients are rejected with `401` instead of receiving the engine event stream.
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    headers: HeaderMap,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    let token = match token_from_protocols(&headers) {
+        Some(t) => t,
+        None => {
+            warn!("WebSocket rejected: missing token");
+            return (StatusCode::UNAUTHORIZED, "Missing authentication token").into_response();
+        }
+    };
+
+    let claims = match decode_jwt(&token, &state.jwt_secret) {
+        Ok(c) if !c.is_expired() => c,
+        _ => {
+            warn!("WebSocket rejected: invalid or expired token");
+            return (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response();
+        }
+    };
+
+    let user_id = claims.sub;
+    // Echo back the accepted subprotocol so the browser completes the handshake.
+    ws.protocols([AUTH_PROTOCOL])
+        .on_upgrade(move |socket| handle_socket(socket, state, user_id))
 }
 
 /// Converts an EngineEvent to a JSON value for the frontend.
@@ -126,8 +175,12 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
 }
 
 /// Handles an active WebSocket connection with keepalive pings.
-async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
-    info!("New WebSocket connection established");
+///
+/// `user_id` identifies the authenticated client. Engine events are not yet
+/// filtered per user (that requires threading the owner through the engine's
+/// event model); for now authentication gates who may receive the stream.
+async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>, user_id: Uuid) {
+    info!(user_id = %user_id, "New WebSocket connection established");
 
     // Subscribe to engine events
     let mut event_rx = state.engine.subscribe_events();

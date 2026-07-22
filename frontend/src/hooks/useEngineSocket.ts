@@ -213,6 +213,9 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let connectTimer: ReturnType<typeof setTimeout> | null = null;
 let refCount = 0;
 
+/** Subprotocol marker the server expects before the JWT. */
+const AUTH_PROTOCOL = "z8.jwt";
+
 function getWsUrl(): string {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const backendHost = import.meta.env.DEV
@@ -234,7 +237,13 @@ function doConnect() {
   if (refCount <= 0) return;
 
   const url = getWsUrl();
-  const socket = new WebSocket(url);
+  // Authenticate via the Sec-WebSocket-Protocol header (browsers can't set an
+  // Authorization header on a WS handshake). Passing it here — rather than in
+  // the URL — keeps the token out of access and proxy logs.
+  const token = localStorage.getItem("z8_token") ?? "";
+  const socket = token
+    ? new WebSocket(url, [AUTH_PROTOCOL, token])
+    : new WebSocket(url);
   ws = socket;
 
   socket.onopen = () => {
