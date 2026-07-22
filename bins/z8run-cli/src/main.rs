@@ -172,6 +172,14 @@ fn mask_db_url(url: &str) -> String {
     format!("{}{}{}", &url[..after_scheme], masked_userinfo, &url[at..])
 }
 
+/// The storage and vault backends selected by the database URL.
+type Backends = (
+    Arc<dyn z8run_storage::repository::FlowRepository>,
+    Arc<dyn z8run_storage::repository::UserRepository>,
+    Arc<dyn z8run_storage::repository::ExecutionRepository>,
+    Arc<dyn z8run_storage::credential_vault::CredentialVault>,
+);
+
 /// Start the z8run server.
 async fn cmd_serve(
     port: u16,
@@ -250,11 +258,7 @@ async fn cmd_serve(
         }
     }
 
-    let (storage, user_storage, vault): (
-        Arc<dyn z8run_storage::repository::FlowRepository>,
-        Arc<dyn z8run_storage::repository::UserRepository>,
-        Arc<dyn z8run_storage::credential_vault::CredentialVault>,
-    ) = if url.starts_with("postgres") {
+    let (storage, user_storage, executions, vault): Backends = if url.starts_with("postgres") {
         tracing::info!(url = %mask_db_url(&url), "Connecting to PostgreSQL");
         let pg = z8run_storage::postgres::PgStorage::new(&url).await?;
         pg.migrate().await?;
@@ -266,7 +270,8 @@ async fn cmd_serve(
         ));
         (
             pg_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
-            pg_arc as Arc<dyn z8run_storage::repository::UserRepository>,
+            pg_arc.clone() as Arc<dyn z8run_storage::repository::UserRepository>,
+            pg_arc as Arc<dyn z8run_storage::repository::ExecutionRepository>,
             vault_pg as Arc<dyn z8run_storage::credential_vault::CredentialVault>,
         )
     } else {
@@ -281,7 +286,8 @@ async fn cmd_serve(
         ));
         (
             sqlite_arc.clone() as Arc<dyn z8run_storage::repository::FlowRepository>,
-            sqlite_arc as Arc<dyn z8run_storage::repository::UserRepository>,
+            sqlite_arc.clone() as Arc<dyn z8run_storage::repository::UserRepository>,
+            sqlite_arc as Arc<dyn z8run_storage::repository::ExecutionRepository>,
             vault_sqlite as Arc<dyn z8run_storage::credential_vault::CredentialVault>,
         )
     };
@@ -291,6 +297,7 @@ async fn cmd_serve(
     let state = Arc::new(z8run_api::state::AppState::new(
         storage,
         user_storage,
+        executions,
         vault,
         jwt_secret,
         port,

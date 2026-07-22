@@ -33,6 +33,7 @@ pub fn api_routes() -> Router<Arc<AppState>> {
         .route("/flows/{id}/start", post(start_flow))
         .route("/flows/{id}/stop", post(stop_flow))
         .route("/flows/{id}/export", get(export_flow))
+        .route("/flows/{id}/executions", get(get_executions))
         .route("/flows/import", post(import_flow))
         // Vault
         .route("/vault", get(list_credentials).post(store_credential))
@@ -717,6 +718,32 @@ async fn delete_credential(
         .await
         .map_err(|e| ApiError::internal(format!("Vault error: {}", e)))?;
     Ok(Json(serde_json::json!({ "status": "deleted", "key": key })))
+}
+
+/// GET /api/v1/flows/:id/executions
+/// Returns the persisted execution history for a flow (owner only).
+async fn get_executions(
+    State(state): State<Arc<AppState>>,
+    axum::Extension(claims): axum::Extension<Claims>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    // Authorize: the flow must belong to the caller.
+    state
+        .storage
+        .get_flow_for_user(id, claims.sub)
+        .await
+        .map_err(ApiError::from)?;
+
+    let history = state
+        .executions
+        .get_history(id, 50)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(Json(serde_json::json!({
+        "flow_id": id.to_string(),
+        "executions": history,
+    })))
 }
 
 /// POST /api/v1/flows/:id/stop
