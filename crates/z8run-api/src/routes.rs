@@ -874,8 +874,12 @@ async fn hook_handler(
                                 }
                             };
                             mac.update(body.as_bytes());
-                            let expected_sig = hex::encode(mac.finalize().into_bytes());
-                            if provided_sig != expected_sig {
+                            // Decode the provided hex signature to raw bytes and let
+                            // `Mac::verify_slice` perform a constant-time comparison
+                            // (SEC-008). A malformed hex signature simply fails to
+                            // decode and is rejected, matching the previous behavior.
+                            let provided_bytes = hex::decode(provided_sig).unwrap_or_default();
+                            if mac.verify_slice(&provided_bytes).is_err() {
                                 info!(flow_id = %flow_id, "Webhook auth failed: HMAC signature mismatch");
                                 return (
                                     StatusCode::UNAUTHORIZED,
