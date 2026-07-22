@@ -150,6 +150,28 @@ fn validate_production_secret(name: &str, value: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Masks the password in a database URL so it is safe to log.
+///
+/// `scheme://user:pass@host/db` becomes `scheme://user:***@host/db`. URLs
+/// without userinfo (e.g. SQLite file paths) are returned unchanged.
+fn mask_db_url(url: &str) -> String {
+    let Some(scheme_end) = url.find("://") else {
+        return url.to_string();
+    };
+    let after_scheme = scheme_end + 3;
+    // The userinfo ends at the first '@' after the scheme.
+    let Some(at_rel) = url[after_scheme..].find('@') else {
+        return url.to_string();
+    };
+    let at = after_scheme + at_rel;
+    let userinfo = &url[after_scheme..at];
+    let masked_userinfo = match userinfo.find(':') {
+        Some(colon) => format!("{}:***", &userinfo[..colon]),
+        None => userinfo.to_string(),
+    };
+    format!("{}{}{}", &url[..after_scheme], masked_userinfo, &url[at..])
+}
+
 /// Start the z8run server.
 async fn cmd_serve(
     port: u16,
@@ -233,7 +255,7 @@ async fn cmd_serve(
         Arc<dyn z8run_storage::repository::UserRepository>,
         Arc<dyn z8run_storage::credential_vault::CredentialVault>,
     ) = if url.starts_with("postgres") {
-        tracing::info!(url = %url, "Connecting to PostgreSQL");
+        tracing::info!(url = %mask_db_url(&url), "Connecting to PostgreSQL");
         let pg = z8run_storage::postgres::PgStorage::new(&url).await?;
         pg.migrate().await?;
         tracing::info!("PostgreSQL ready");
@@ -248,7 +270,7 @@ async fn cmd_serve(
             vault_pg as Arc<dyn z8run_storage::credential_vault::CredentialVault>,
         )
     } else {
-        tracing::info!(url = %url, "Connecting to SQLite");
+        tracing::info!(url = %mask_db_url(&url), "Connecting to SQLite");
         let sqlite = z8run_storage::sqlite::SqliteStorage::new(&url).await?;
         sqlite.migrate().await?;
         tracing::info!("SQLite ready");
@@ -296,7 +318,7 @@ async fn cmd_serve(
 async fn cmd_migrate(db_url: Option<String>, data_dir: &str) -> anyhow::Result<()> {
     std::fs::create_dir_all(data_dir)?;
     let url = db_url.unwrap_or_else(|| format!("sqlite://{}/z8run.db?mode=rwc", data_dir));
-    tracing::info!(url = %url, "Running migrations...");
+    tracing::info!(url = %mask_db_url(&url), "Running migrations...");
 
     if url.starts_with("postgres") {
         let pg = z8run_storage::postgres::PgStorage::new(&url).await?;
@@ -403,4 +425,42 @@ async fn cmd_validate(file: &str) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mask_db_url_masks_password() {
+        assert_eq!(
+            mask_db_url("postgres://user:secret@localhost:5432/z8run"),
+            "postgres://user:***@localhost:5432/z8run"
+        );
+        assert_eq!(
+            mask_db_url("mysql://root:p%40ss@db:3306/app"),
+            "mysql://root:***@db:3306/app"
+        );
+    }
+
+    #[test]
+    fn mask_db_url_leaves_credential_free_urls_unchanged() {
+        // No userinfo -> unchanged.
+        assert_eq!(
+            mask_db_url("postgres://localhost:5432/z8run"),
+            "postgres://localhost:5432/z8run"
+        );
+        // SQLite file paths have no "://" userinfo and are returned as-is.
+        assert_eq!(
+            mask_db_url("sqlite://./data/z8run.db?mode=rwc"),
+            "sqlite://./data/z8run.db?mode=rwc"
+        );
+    }
+
+    #[test]
+    fn is_weak_secret_flags_placeholder_and_short_values() {
+        assert!(is_weak_secret("change-me-in-production"));
+        assert!(is_weak_secret("short"));
+        assert!(!is_weak_secret("a-sufficiently-long-strong-secret-value"));
+    }
 }
