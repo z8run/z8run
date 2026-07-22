@@ -16,6 +16,7 @@ Thumbs.db
 
 # z8run data
 /data/
+/docs/
 *.db
 *.db-journal
 *.db-wal
@@ -29,6 +30,7 @@ Thumbs.db
 /frontend/node_modules/
 /frontend/dist/
 /frontend/build/
+*.tsbuildinfo
 
 # Claude Code
 .claude/
