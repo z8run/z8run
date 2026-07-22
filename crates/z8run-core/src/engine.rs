@@ -69,6 +69,26 @@ pub enum EngineEvent {
     },
 }
 
+impl EngineEvent {
+    /// Returns the id of the flow this event belongs to.
+    ///
+    /// Used to route events to the right client (e.g. per-user WebSocket
+    /// filtering) without matching every variant at the call site.
+    pub fn flow_id(&self) -> Uuid {
+        match self {
+            EngineEvent::FlowStarted { flow_id, .. }
+            | EngineEvent::NodeStarted { flow_id, .. }
+            | EngineEvent::NodeCompleted { flow_id, .. }
+            | EngineEvent::NodeSkipped { flow_id, .. }
+            | EngineEvent::NodeError { flow_id, .. }
+            | EngineEvent::MessageSent { flow_id, .. }
+            | EngineEvent::StreamChunk { flow_id, .. }
+            | EngineEvent::FlowCompleted { flow_id, .. }
+            | EngineEvent::FlowError { flow_id, .. } => *flow_id,
+        }
+    }
+}
+
 /// Trait implemented by all executable nodes.
 /// Native nodes implement it directly;
 /// WASM nodes implement it via the z8run-runtime.

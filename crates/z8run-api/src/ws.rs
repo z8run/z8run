@@ -10,6 +10,7 @@ use axum::{
     routing::get,
     Router,
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
 use tracing::{debug, info, warn};
@@ -176,14 +177,20 @@ fn event_to_json(event: &EngineEvent) -> serde_json::Value {
 
 /// Handles an active WebSocket connection with keepalive pings.
 ///
-/// `user_id` identifies the authenticated client. Engine events are not yet
-/// filtered per user (that requires threading the owner through the engine's
-/// event model); for now authentication gates who may receive the stream.
+/// `user_id` identifies the authenticated client. Engine events are filtered so
+/// a client only receives events for flows it owns (SEC-003): each event's
+/// `flow_id` is resolved to its owner via a small per-connection cache, so one
+/// user's execution previews/errors are never streamed to another user.
 async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>, user_id: Uuid) {
     info!(user_id = %user_id, "New WebSocket connection established");
 
     // Subscribe to engine events
     let mut event_rx = state.engine.subscribe_events();
+
+    // Per-connection cache of flow_id -> "owned by this user". A flow's owner
+    // never changes, so caching avoids a DB lookup on every event. Flows whose
+    // owner cannot be resolved are treated as not-owned (fail closed).
+    let mut ownership: HashMap<Uuid, bool> = HashMap::new();
 
     // Ping interval to keep the connection alive
     let mut ping_interval = interval(Duration::from_secs(30));
@@ -223,10 +230,26 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>, user_id: Uui
                 }
             }
 
-            // Engine events -> forward to client as JSON
+            // Engine events -> forward to client as JSON (only for owned flows)
             event = event_rx.recv() => {
                 match event {
                     Ok(engine_event) => {
+                        let flow_id = engine_event.flow_id();
+                        // Resolve ownership (cached per connection; fail closed).
+                        let owned = match ownership.get(&flow_id) {
+                            Some(&owned) => owned,
+                            None => {
+                                let owned = matches!(
+                                    state.storage.get_flow_owner(flow_id).await,
+                                    Ok(Some(owner)) if owner == user_id
+                                );
+                                ownership.insert(flow_id, owned);
+                                owned
+                            }
+                        };
+                        if !owned {
+                            continue;
+                        }
                         let json = event_to_json(&engine_event);
                         let text = serde_json::to_string(&json).unwrap_or_default();
                         if socket.send(Message::Text(text.into())).await.is_err() {
