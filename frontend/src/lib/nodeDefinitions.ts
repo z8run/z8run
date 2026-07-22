@@ -157,10 +157,11 @@ export const NODE_DEFINITIONS: NodeDefinition[] = [
     label: "Function",
     category: "process",
     icon: "Code",
-    description: "Run custom JavaScript",
+    description:
+      "Transform or pass through the message using a template / output value (not executed as JavaScript)",
     inputs: [{ id: "input", name: "Input", type: "any" }],
     outputs: [{ id: "output", name: "Output", type: "any" }],
-    defaultConfig: { code: "return msg;", language: "javascript" },
+    defaultConfig: { code: "msg", language: "text" },
   },
   {
     type: "json",

@@ -268,20 +268,33 @@ function SmartConfigField({
     const codeValue = String(value ?? "");
     const currentLang =
       (allConfig?.language as CodeLanguage) || detectLanguage(codeValue);
+    const isFunctionNode = nodeType === "function";
 
     return (
-      <CodeEditor
-        code={codeValue}
-        language={currentLang}
-        onCodeChange={(newCode) => onChange(newCode)}
-        onLanguageChange={(lang) => {
-          if (onConfigChange) {
-            onConfigChange("language", lang);
+      <div className="space-y-1">
+        <CodeEditor
+          code={codeValue}
+          language={currentLang}
+          onCodeChange={(newCode) => onChange(newCode)}
+          onLanguageChange={(lang) => {
+            if (onConfigChange) {
+              onConfigChange("language", lang);
+            }
+          }}
+          placeholder={
+            isFunctionNode
+              ? "msg  (or a template referencing the input)"
+              : undefined
           }
-        }}
-        placeholder="// Write your code here..."
-        nodeLabel={nodeLabel}
-      />
+          nodeLabel={nodeLabel}
+        />
+        {isFunctionNode && (
+          <div className="text-[9px] text-slate-500">
+            Not executed as JavaScript. The value is used as a template / output
+            value to transform or pass through the incoming message.
+          </div>
+        )}
+      </div>
     );
   }
 
