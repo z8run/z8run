@@ -125,6 +125,31 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The well-known placeholder secret shipped in `.env.example`.
+const WEAK_PLACEHOLDER_SECRET: &str = "change-me-in-production";
+
+/// Minimum acceptable secret length (in characters) for adequate entropy.
+const MIN_SECRET_LEN: usize = 16;
+
+/// Returns `true` if the given secret is a known default or too short.
+fn is_weak_secret(value: &str) -> bool {
+    value == WEAK_PLACEHOLDER_SECRET || value.len() < MIN_SECRET_LEN
+}
+
+/// Reject known-weak/default production secrets.
+///
+/// Fails with an actionable [`anyhow`] error when `value` matches the shipped
+/// placeholder or is shorter than [`MIN_SECRET_LEN`] characters.
+fn validate_production_secret(name: &str, value: &str) -> anyhow::Result<()> {
+    if is_weak_secret(value) {
+        anyhow::bail!(
+            "{name} is a known default or too short; set a strong secret (>= {MIN_SECRET_LEN} chars). \
+             Generate with: openssl rand -base64 32"
+        );
+    }
+    Ok(())
+}
+
 /// Start the z8run server.
 async fn cmd_serve(
     port: u16,
@@ -178,7 +203,30 @@ async fn cmd_serve(
             dev_secret
         }
     };
+    // Z8_VAULT_SECRET falls back to the JWT secret when unset. Validate the
+    // effective value that will actually be used for the vault.
     let vault_secret = std::env::var("Z8_VAULT_SECRET").unwrap_or_else(|_| jwt_secret.clone());
+
+    // Reject known-weak/default secrets before startup.
+    // Production databases (PostgreSQL/MySQL) hard-fail; SQLite (dev) only warns.
+    let is_production_db = url.starts_with("postgres") || url.starts_with("mysql");
+    if is_production_db {
+        validate_production_secret("Z8_JWT_SECRET", &jwt_secret)?;
+        validate_production_secret("Z8_VAULT_SECRET", &vault_secret)?;
+    } else {
+        if is_weak_secret(&jwt_secret) {
+            tracing::warn!(
+                "Z8_JWT_SECRET is a known default or too short (< 16 chars); this is insecure. \
+                 Set a strong secret before deploying. Generate with: openssl rand -base64 32"
+            );
+        }
+        if is_weak_secret(&vault_secret) {
+            tracing::warn!(
+                "Z8_VAULT_SECRET is a known default or too short (< 16 chars); this is insecure. \
+                 Set a strong secret before deploying. Generate with: openssl rand -base64 32"
+            );
+        }
+    }
 
     let (storage, user_storage, vault): (
         Arc<dyn z8run_storage::repository::FlowRepository>,
