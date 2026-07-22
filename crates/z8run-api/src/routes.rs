@@ -972,12 +972,19 @@ async fn hook_handler(
     }
 
     // Wait for the response from http-out (with timeout)
-    await_flow_response(flow_id, rx, &state).await
+    await_flow_response(flow_id, trace_id, rx, &state).await
 }
 
 /// Shared logic: waits for the oneshot response from http-out node.
+///
+/// `trace_id` is the key under which the responder was registered in
+/// `state.webhook_responders` (see `hook_handler`), so cleanup on
+/// drop/timeout MUST remove with `trace_id` — removing by `flow_id`
+/// would leak this responder and could evict an unrelated entry.
+/// `flow_id` is retained purely for logging correlation.
 async fn await_flow_response(
     flow_id: Uuid,
+    trace_id: Uuid,
     rx: tokio::sync::oneshot::Receiver<z8run_core::nodes::http_out::WebhookResponse>,
     state: &Arc<AppState>,
 ) -> (StatusCode, Json<serde_json::Value>) {
@@ -993,7 +1000,7 @@ async fn await_flow_response(
         }
         Ok(Err(_)) => {
             warn!(flow_id = %flow_id, "Response channel dropped");
-            state.webhook_responders.write().await.remove(&flow_id);
+            state.webhook_responders.write().await.remove(&trace_id);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({"error": "Flow completed without sending a response"})),
@@ -1001,7 +1008,7 @@ async fn await_flow_response(
         }
         Err(_) => {
             warn!(flow_id = %flow_id, "Flow timed out after 10 seconds");
-            state.webhook_responders.write().await.remove(&flow_id);
+            state.webhook_responders.write().await.remove(&trace_id);
             (
                 StatusCode::GATEWAY_TIMEOUT,
                 Json(serde_json::json!({"error": "Flow execution timed out (10s)"})),
@@ -1082,33 +1089,53 @@ async fn import_flow(
     let description = flow_data["description"].as_str().unwrap_or("");
     let version = flow_data["version"].as_str().unwrap_or("0.1.0");
 
-    // Validate node types - reject unknown nodes before creating the flow
+    // Validate node types - reject unknown nodes before creating the flow.
+    //
+    // This is the complete canonical set of node types the UI/engine support.
+    // It MUST stay in sync with the frontend node registry
+    // (`frontend/src/lib/nodeDefinitions.ts`) and the engine registration
+    // (`crates/z8run-core/src/nodes/mod.rs`). Deriving this list from a shared
+    // registry source is a future improvement.
     const VALID_NODE_TYPES: &[&str] = &[
+        "aggregator",
+        "ai-agent",
+        "batch",
+        "classifier",
+        "conversation-memory",
+        "crm",
+        "cron-trigger",
+        "csv",
+        "database",
+        "debug",
+        "delay",
+        "embeddings",
+        "filter",
+        "function",
         "http-in",
         "http-out",
         "http-request",
-        "function",
-        "debug",
-        "switch",
-        "filter",
-        "delay",
-        "timer",
-        "webhook",
-        "json",
-        "database",
-        "mqtt",
-        "llm",
-        "embeddings",
-        "classifier",
-        "prompt-template",
-        "text-splitter",
-        "vector-store",
-        "structured-output",
-        "summarizer",
-        "ai-agent",
+        "human-handoff",
+        "if-else",
         "image-gen",
-        "sanitize",
+        "json",
+        "llm",
+        "loop",
         "mapper",
+        "mqtt",
+        "prompt-template",
+        "sanitize",
+        "structured-output",
+        "stt",
+        "summarizer",
+        "switch",
+        "text-splitter",
+        "timer",
+        "tts",
+        "twilio",
+        "vector-store",
+        "webhook",
+        "webhook-trigger",
+        "whatsapp",
     ];
 
     if let Some(canvas_nodes) = flow_data["canvas_nodes"].as_array() {
