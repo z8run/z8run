@@ -37,7 +37,7 @@
     "@xyflow/react": "^12.11.6",
     "clsx": "^2.1.1",
     "ky": "^1.7.4",
-    "lucide-react": "^1.46.0",
+    "lucide-react": "^1.47.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",
