@@ -84,6 +84,17 @@ pub struct FlowMeta {
     /// Editor notes/comments.
     #[serde(default)]
     pub notes: Vec<String>,
+    /// Free-form tags for grouping and ordering related flows.
+    ///
+    /// Flows that stream into one another are separate rows with no link
+    /// between them, so a chain is only discoverable by reading names. Tags
+    /// make the relationship queryable: a shared downstream step carries the
+    /// tag of every upstream that feeds it, which a single parent pointer
+    /// could not express.
+    ///
+    /// `serde(default)` so flows written before this field still load.
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 fn default_zoom() -> f64 {

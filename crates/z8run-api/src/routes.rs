@@ -187,6 +187,10 @@ async fn list_flows(
             "edges": canvas_edge_count,
             "created_at": f.created_at.to_rfc3339(),
             "updated_at": f.updated_at.to_rfc3339(),
+            // Surfaced on the summary so the list can group and order a chain
+            // without fetching every flow in full.
+            "tags": f.metadata.tags,
+            "notes": f.metadata.notes,
         }));
     }
 
@@ -317,6 +321,24 @@ async fn update_flow(
     // Update description if provided
     if let Some(desc) = payload["description"].as_str() {
         flow.description = desc.to_string();
+    }
+
+    // Tags and notes ride the import payload. Without this an exported flow
+    // loses both on re-import, which is how a chain quietly becomes a pile of
+    // unrelated flows.
+    // In update_flow the payload IS the flow object (no export envelope), so
+    // these read straight off it. import_flow has to unwrap `flow` first.
+    if let Some(tags) = payload.get("tags").and_then(|v| v.as_array()) {
+        flow.metadata.tags = tags
+            .iter()
+            .filter_map(|t| t.as_str().map(str::to_string))
+            .collect();
+    }
+    if let Some(notes) = payload.get("notes").and_then(|v| v.as_array()) {
+        flow.metadata.notes = notes
+            .iter()
+            .filter_map(|t| t.as_str().map(str::to_string))
+            .collect();
     }
 
     // Store the React Flow canvas state in metadata
@@ -1474,6 +1496,33 @@ async fn import_flow(
     let mut flow = Flow::new(name);
     flow.description = description.to_string();
     flow.version = version.to_string();
+
+    // Tags and notes come off the FLOW object, not the envelope: `name` and
+    // `description` above are read from `flow_data`, and reading these from
+    // `payload` yields nothing — the key persisted empty, which reads as "no
+    // tags were set" rather than as a wiring bug. Accepted at the flow's top
+    // level (where an author writes them) or under `metadata` (where an export
+    // round-trips them).
+    if let Some(tags) = flow_data
+        .get("tags")
+        .or_else(|| flow_data.pointer("/metadata/tags"))
+        .and_then(|v| v.as_array())
+    {
+        flow.metadata.tags = tags
+            .iter()
+            .filter_map(|t| t.as_str().map(str::to_string))
+            .collect();
+    }
+    if let Some(notes) = flow_data
+        .get("notes")
+        .or_else(|| flow_data.pointer("/metadata/notes"))
+        .and_then(|v| v.as_array())
+    {
+        flow.metadata.notes = notes
+            .iter()
+            .filter_map(|t| t.as_str().map(str::to_string))
+            .collect();
+    }
 
     // Restore canvas state into metadata
     if let Some(nodes) = flow_data.get("canvas_nodes") {
